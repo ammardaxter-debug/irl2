@@ -1007,8 +1007,8 @@ async function seedAuthUsers() {
   }
 }
 
-// Initialize DB then start server
-async function start() {
+// Initialize DB and seed users (runs on both local and Vercel)
+async function initializeApp() {
   try {
     await db.initDb();
     console.log('  ✅ Database initialized (Firebase)');
@@ -1032,18 +1032,26 @@ async function start() {
     } else {
       console.log(`  📊 Firebase has data (${checkSnap.numChildren()} riders)`);
     }
-
-    app.listen(PORT, () => {
-      console.log(`\n  🚀 Inspiring Roads Logistics Server`);
-      console.log(`  ────────────────────────────────────`);
-      console.log(`  → Running at http://localhost:${PORT}`);
-      console.log(`  → Login: http://localhost:${PORT}/login`);
-      console.log(`  → Database: Firebase Realtime Database ☁️\n`);
-    });
   } catch (err) {
-    console.error('Failed to start:', err);
-    process.exit(1);
+    console.error('Failed to initialize:', err);
   }
 }
 
-start();
+// Initialize on import (for Vercel)
+initializeApp();
+
+// Only listen when running locally (not on Vercel)
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`\n  🚀 Inspiring Roads Logistics Server`);
+    console.log(`  ────────────────────────────────────`);
+    console.log(`  → Running at http://localhost:${PORT}`);
+    console.log(`  → Login: http://localhost:${PORT}/login`);
+    console.log(`  → Rider Portal: http://localhost:${PORT}/rider/`);
+    console.log(`  → Database: Firebase Realtime Database ☁️\n`);
+  });
+}
+
+// Export for Vercel
+module.exports = app;
