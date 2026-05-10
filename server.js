@@ -3,17 +3,33 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const cookieParser = require('cookie-parser');
 const db = require('./database');
 const XLSX = require('xlsx');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'irl-rider-portal-secret-2026';
+const DASHBOARD_SECRET = process.env.DASHBOARD_SECRET || 'irl-dashboard-secret-2026';
 
 const BACKUP_DIR = path.join(__dirname, 'data', 'backups');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Rate limiting store
+const loginAttempts = {};
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// Dashboard auth users
+const DASHBOARD_USERS = [
+  { email: 'abdullah@irl.sa', name: 'Abdullah Khan', role: 'admin', password: 'IRL@Admin2026!' },
+  { email: 'saad@irl.sa', name: 'Saad', role: 'viewer', password: 'Saad@View2026!' },
+  { email: 'firas@irl.sa', name: 'Firas Al Arifi', role: 'viewer', password: 'Firas@View2026!' }
+];
+
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use((req, res, next) => {
@@ -864,20 +880,142 @@ app.post('/api/settings/logo', async (req, res) => {
   }
 });
 
+// ========== DASHBOARD AUTHENTICATION ==========
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+
+    const key = email.toLowerCase();
+
+    // Check rate limiting
+    const attempts = loginAttempts[key];
+    if (attempts && attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+      const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({ error: 'Account temporarily locked', lockout_seconds: remaining });
+    }
+
+    // Find user in Firebase
+    const snap = await db.getDb().ref(`auth_users/${key.replace(/\./g, '_dot_')}`).once('value');
+    const user = snap.val();
+
+    if (!user) {
+      trackFailedAttempt(key);
+      const rem = MAX_ATTEMPTS - (loginAttempts[key]?.count || 0);
+      return res.status(401).json({ error: 'Invalid email or password', remaining_attempts: rem });
+    }
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      trackFailedAttempt(key);
+      const rem = MAX_ATTEMPTS - (loginAttempts[key]?.count || 0);
+      if (rem <= 0) {
+        return res.status(429).json({ error: 'Account temporarily locked', lockout_seconds: Math.ceil(LOCKOUT_MS / 1000) });
+      }
+      return res.status(401).json({ error: 'Invalid email or password', remaining_attempts: rem });
+    }
+
+    // Success — clear attempts
+    delete loginAttempts[key];
+
+    const token = jwt.sign(
+      { email: user.email, name: user.name, role: user.role },
+      DASHBOARD_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    res.cookie('irl_session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60 * 1000
+    });
+
+    res.json({ success: true, user: { name: user.name, email: user.email, role: user.role }, redirect: '/' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Session check
+app.get('/api/auth/session', (req, res) => {
+  const token = req.cookies?.irl_session;
+  if (!token) return res.json({ user: null });
+  try {
+    const decoded = jwt.verify(token, DASHBOARD_SECRET);
+    res.json({ user: { name: decoded.name, email: decoded.email, role: decoded.role } });
+  } catch (err) {
+    res.clearCookie('irl_session');
+    res.json({ user: null });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('irl_session');
+  res.json({ success: true });
+});
+
+function trackFailedAttempt(key) {
+  if (!loginAttempts[key]) loginAttempts[key] = { count: 0 };
+  loginAttempts[key].count++;
+  if (loginAttempts[key].count >= MAX_ATTEMPTS) {
+    loginAttempts[key].lockedUntil = Date.now() + LOCKOUT_MS;
+  }
+}
+
 // Catch-all: serve appropriate index.html
 app.get('*', (req, res) => {
   if (req.path.startsWith('/rider')) {
-    res.sendFile(path.join(__dirname, 'public', 'rider', 'index.html'));
-  } else {
+    return res.sendFile(path.join(__dirname, 'public', 'rider', 'index.html'));
+  }
+  if (req.path === '/login' || req.path === '/login.html') {
+    return res.sendFile(path.join(__dirname, 'public', 'login.html'));
+  }
+  // For all other routes, check session — redirect to login if not authenticated
+  const token = req.cookies?.irl_session;
+  if (!token) {
+    return res.redirect('/login');
+  }
+  try {
+    jwt.verify(token, DASHBOARD_SECRET);
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } catch (err) {
+    res.clearCookie('irl_session');
+    res.redirect('/login');
   }
 });
+
+// ========== SEED AUTH USERS ==========
+async function seedAuthUsers() {
+  for (const u of DASHBOARD_USERS) {
+    const key = u.email.replace(/\./g, '_dot_');
+    const snap = await db.getDb().ref(`auth_users/${key}`).once('value');
+    if (!snap.exists()) {
+      const hash = await bcrypt.hash(u.password, 10);
+      await db.getDb().ref(`auth_users/${key}`).set({
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        password_hash: hash,
+        created_at: new Date().toISOString()
+      });
+      console.log(`  👤 Auth user seeded: ${u.email} (${u.role})`);
+    }
+  }
+}
 
 // Initialize DB then start server
 async function start() {
   try {
     await db.initDb();
     console.log('  ✅ Database initialized (Firebase)');
+
+    // Seed dashboard auth users
+    await seedAuthUsers();
+    console.log('  🔐 Dashboard auth users ready');
 
     // Auto-migrate from SQLite if Firebase is empty
     const checkSnap = await db.getDb().ref('riders').once('value');
@@ -899,6 +1037,7 @@ async function start() {
       console.log(`\n  🚀 Inspiring Roads Logistics Server`);
       console.log(`  ────────────────────────────────────`);
       console.log(`  → Running at http://localhost:${PORT}`);
+      console.log(`  → Login: http://localhost:${PORT}/login`);
       console.log(`  → Database: Firebase Realtime Database ☁️\n`);
     });
   } catch (err) {
