@@ -1,0 +1,26 @@
+{
+  "rider_id": 4,
+  "rider_name": "MD AKASH MRIDHA",
+  "rider_type": "company",
+  "client_company": "Noon Minutes",
+  "period_start": "2026-03-21",
+  "period_end": "2026-04-20",
+  "total_primary_orders": 507,
+  "total_associate_orders": 55,
+  "total_orders": 562,
+  "present_days": 24,
+  "absent_days": 1,
+  "weekoff_days": 3,
+  "base_salary": 1950,
+  "per_order_rate": 0,
+  "total_salary": 1800,
+  "deductions": 0,
+  "calculated_salary": 1800,
+  "warnings": [
+    {
+      "type": "attendance",
+      "message": "🚨 Incomplete Payout: Pro-rated 24/26 days"
+    }
+  ],
+  "low_checkin_days": []
+}

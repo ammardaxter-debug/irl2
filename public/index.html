@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Inspiring Roads Logistics - Rider Management System for managing delivery riders across KSA">
+  <title>Inspiring Roads Logistics — Rider Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css?v=10">
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-container">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="5.5" cy="17.5" r="2.5" stroke="#2563EB" stroke-width="2"/>
+            <circle cx="18.5" cy="17.5" r="2.5" stroke="#2563EB" stroke-width="2"/>
+            <path d="M8 17.5h7" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 17.5L12 10h-2L8 8" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 10h3l2 4" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 8h3" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="company-name">Inspiring Roads</span>
+          <span class="company-subtitle">LOGISTICS</span>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="riders" id="nav-riders">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Riders</span>
+      </a>
+      <a href="#" class="nav-item" data-page="daily-logs" id="nav-daily-logs">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span>Daily Logs</span>
+      </a>
+      <a href="#" class="nav-item" data-page="payroll" id="nav-payroll">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Payroll</span>
+      </a>
+      <a href="#" class="nav-item" data-page="expenses" id="nav-expenses">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+        <span>Expense Tracker</span>
+      </a>
+      <a href="#" class="nav-item" data-page="fleet" id="nav-fleet">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H8a2 2 0 0 0-2 2v7.5M8 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+        <span>Fleet Mgt</span>
+      </a>
+      <a href="#" class="nav-item" data-page="reports-center" id="nav-reports-center">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Reports & Export</span>
+      </a>
+      <a href="#" class="nav-item" data-page="live-tracking" id="nav-live-tracking">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+          <path d="M12 6v2M12 16v2M6 12H4M20 12h-2"/>
+        </svg>
+        <span>Live Tracking</span>
+      </a>
+      <a href="#" class="nav-item" data-page="backup" id="nav-backup">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Backup Data</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="profile-trigger" id="profile-trigger" onclick="ProfileMenu.open()">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="sidebar-avatar">AK</div>
+          <span class="profile-online-dot"></span>
+        </div>
+        <div class="profile-info">
+          <div class="profile-name" id="sidebar-name" title="Abdullah Khan">Abdullah</div>
+          <div class="profile-role" id="sidebar-title">Manager · IRL</div>
+        </div>
+        <svg class="profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content">
+    <!-- Header -->
+    <header class="main-header" id="main-header">
+      <div class="header-left">
+        <button class="mobile-menu-btn" id="mobile-menu-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="page-title" id="page-title">Dashboard</h1>
+      </div>
+      <div class="header-right" style="display:flex; align-items:center; gap:16px;">
+        <div style="position:relative; cursor:pointer;" onclick="Notifications.showPanel()" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" style="width:22px;height:22px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="notif-badge" style="display:none; position:absolute; top:-4px; right:-4px; background:#DC2626; color:white; font-size:9px; font-weight:700; min-width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; border:2px solid white;">0</span>
+        </div>
+        <div class="cycle-swiper" style="display:flex; align-items:center; background:#EFF6FF; border-radius:12px; padding:4px;">
+          <button class="cycle-swiper-btn" onclick="Utils.cyclePrev()" title="Previous Cycle" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:#2563EB; transition:all 0.2s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="header-date" id="header-date" style="padding:0 8px; font-size:12px; font-weight:600; color:#2563EB; text-align:center; min-width:120px; background:none;"></div>
+          <button class="cycle-swiper-btn" onclick="Utils.cycleNext()" title="Next Cycle" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:#2563EB; transition:all 0.2s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Pages Container -->
+    <div class="page-container" id="page-container">
+      <!-- Dashboard Page -->
+      <div class="page active" id="page-dashboard"></div>
+
+      <!-- Riders Page -->
+      <div class="page" id="page-riders"></div>
+
+      <!-- Daily Logs Page -->
+      <div class="page" id="page-daily-logs"></div>
+
+      <!-- PAYROLL PAGE -->
+      <div id="page-payroll" class="page"></div>
+
+      <!-- EXPENSES PAGE -->
+      <div id="page-expenses" class="page"></div>
+
+      <!-- FLEET MANAGEMENT PAGE -->
+      <div id="page-fleet" class="page"></div>
+
+      <!-- REPORTS CENTER PAGE -->
+      <div id="page-reports-center" class="page"></div>
+
+      <!-- LIVE TRACKING PAGE -->
+      <div id="page-live-tracking" class="page"></div>
+
+      <!-- BACKUP PAGE -->
+      <div id="page-backup" class="page"></div>
+    </div>
+  </main>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Modal</h2>
+        <button class="modal-close" id="modal-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Command Palette -->
+  <div class="cmd-palette-overlay" id="cmd-palette-overlay" style="display:none;">
+    <div class="cmd-palette">
+      <div class="cmd-search-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmd-search-input" placeholder="Search riders, bikes, or pages..." autocomplete="off">
+        <span class="cmd-shortcut-hint">ESC to close</span>
+      </div>
+      <div class="cmd-results" id="cmd-results"></div>
+    </div>
+  </div>
+
+  <!-- Global Loading Overlay -->
+  <div id="global-loading" class="global-loading">
+    <div class="loader-content">
+      <div class="loader-company-name">INSPIRING ROADS LOGISTICS</div>
+      
+      <div class="loader-avatar-container">
+        <div class="loader-pulse-ring"></div>
+        <img class="loader-avatar-img" id="loader-avatar-img" src="" alt="Supervisor" style="display:none;">
+        <div class="loader-avatar-fallback" id="loader-avatar-fallback">AK</div>
+      </div>
+      
+      <div class="loader-bar">
+        <div class="loader-fill"></div>
+      </div>
+      
+      <div class="loader-main-text">
+        <span id="loader-text">Loading</span><span class="animated-dots"></span>
+      </div>
+      <div class="loader-subtext" id="loader-subtext"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <!-- Print Mount for Native HTML Payslips -->
+  <div id="print-mount" style="display: none;"></div>
+
+  <!-- Scripts -->
+  <script src="/js/utils.js?v=10"></script>
+  <script src="/js/api.js?v=10"></script>
+  <script src="/js/reports.js?v=14"></script>
+  <script src="/js/sponsor-excel.js?v=3"></script>
+  <script src="/js/dashboard.js?v=11"></script>
+  <script src="/js/riders.js?v=10"></script>
+  <script src="/js/daily-logs.js?v=10"></script>
+  <script src="/js/warning-whatsapp.js?v=10"></script>
+  <script src="/js/payroll.js?v=11"></script>
+  <script src="/js/expenses.js?v=20"></script>
+  <script src="/js/bikes.js?v=10"></script>
+  <script src="/js/backup.js?v=10"></script>
+  <script src="/js/excel-export.js?v=15"></script>
+  <script src="/js/reports-center.js?v=11"></script>
+  <script src="/js/live-tracking.js?v=10"></script>
+  <script src="/js/profile-menu.js?v=10"></script>
+  <script src="/js/app.js?v=10"></script>
+</body>
+</html>

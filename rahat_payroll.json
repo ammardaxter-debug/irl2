@@ -1,0 +1,51 @@
+{
+  "rider_id": 22,
+  "rider_name": "Rahat Ullah",
+  "rider_type": "company",
+  "client_company": "Noon Minutes",
+  "period_start": "2026-03-21",
+  "period_end": "2026-04-20",
+  "total_primary_orders": 359,
+  "total_associate_orders": 15,
+  "total_orders": 374,
+  "present_days": 23,
+  "absent_days": 0,
+  "weekoff_days": 3,
+  "base_salary": 1950,
+  "per_order_rate": 0,
+  "total_salary": 1950,
+  "deductions": 100,
+  "calculated_salary": 1850,
+  "warnings": [
+    {
+      "type": "orders",
+      "message": "Orders: 374/520 minimum req"
+    },
+    {
+      "type": "attendance",
+      "message": "🚨 Incomplete Payout: Only 23/26 present days"
+    },
+    {
+      "type": "checkin",
+      "message": "🚨 Incomplete Payout: 7 days below 11 hrs",
+      "days": [
+        "2026-03-21",
+        "2026-03-22",
+        "2026-03-24",
+        "2026-03-25",
+        "2026-03-26",
+        "2026-03-27",
+        "2026-03-28"
+      ]
+    }
+  ],
+  "low_checkin_days": [
+    "2026-03-21",
+    "2026-03-22",
+    "2026-03-24",
+    "2026-03-25",
+    "2026-03-26",
+    "2026-03-27",
+    "2026-03-28"
+  ]
+}
