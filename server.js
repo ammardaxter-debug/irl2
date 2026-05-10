@@ -39,6 +39,34 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Dashboard auth gate — runs BEFORE static files are served
+app.use((req, res, next) => {
+  // Allow these paths without auth
+  const isPublic =
+    req.path === '/login' || req.path === '/login.html' ||
+    req.path.startsWith('/css/login') || req.path.startsWith('/js/login') ||
+    req.path.startsWith('/rider') || req.path.startsWith('/api/rider') ||
+    req.path.startsWith('/api/auth');
+
+  if (isPublic) return next();
+
+  // Protect root dashboard and its assets
+  if (req.path === '/' || req.path === '/index.html') {
+    const token = req.cookies?.irl_session;
+    if (!token) return res.redirect('/login');
+    try {
+      jwt.verify(token, DASHBOARD_SECRET);
+      return next();
+    } catch (err) {
+      res.clearCookie('irl_session');
+      return res.redirect('/login');
+    }
+  }
+
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // JWT middleware for rider portal routes
