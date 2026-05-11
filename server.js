@@ -785,7 +785,7 @@ app.get('/api/rider/me', verifyRiderToken, async (req, res) => {
     if (safeRider.bike_id) {
       try {
         const bikes = await db.getBikes();
-        const bike = bikes.find(b => b.id === parseInt(safeRider.bike_id));
+        const bike = bikes.find(b => String(b.id) === String(safeRider.bike_id));
         if (bike) safeRider.bike = bike;
       } catch (err) {
         console.error('Error fetching bike for rider', err);
