@@ -26,14 +26,27 @@ const Bikes = {
     // Process expiries
     const bikesWithStatus = this.bikes.map(b => {
       const daysUntilExpiry = Utils.daysUntil(b.insurance_expiry);
-      return { ...b, daysUntilExpiry };
+      const daysUntilAuthExpiry = Utils.daysUntil(b.authorization_expiry);
+      
+      let worstExpiry = Infinity;
+      if (b.insurance_expiry || b.authorization_expiry) {
+         if (b.insurance_expiry && b.authorization_expiry) {
+            worstExpiry = Math.min(daysUntilExpiry, daysUntilAuthExpiry);
+         } else if (b.insurance_expiry) {
+            worstExpiry = daysUntilExpiry;
+         } else {
+            worstExpiry = daysUntilAuthExpiry;
+         }
+      }
+      
+      return { ...b, daysUntilExpiry, daysUntilAuthExpiry, worstExpiry };
     });
 
     // Filtering
     let filtered = bikesWithStatus;
     if (this.currentFilter === 'active') filtered = filtered.filter(b => b.status === 'active');
     if (this.currentFilter === 'maintenance') filtered = filtered.filter(b => b.status === 'maintenance');
-    if (this.currentFilter === 'expiring') filtered = filtered.filter(b => b.daysUntilExpiry <= 30 && b.daysUntilExpiry >= 0);
+    if (this.currentFilter === 'expiring') filtered = filtered.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0);
 
     // Search
     if (this.searchQuery) {
@@ -47,7 +60,7 @@ const Bikes = {
     // Stats
     const activeStatus = this.bikes.filter(b => b.status === 'active').length;
     const maintenanceStatus = this.bikes.filter(b => b.status === 'maintenance').length;
-    const expiringSoon = bikesWithStatus.filter(b => b.daysUntilExpiry <= 30 && b.daysUntilExpiry >= 0).length;
+    const expiringSoon = bikesWithStatus.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0).length;
 
     return `
       <!-- Stats Row -->
@@ -65,7 +78,7 @@ const Bikes = {
           <div class="stat-card-value">${maintenanceStatus}</div>
         </div>
         <div class="card stat-card ${expiringSoon > 0 ? 'rose' : 'slate'}">
-          <div class="stat-card-header"><span class="stat-card-label">Insurance Expiring</span></div>
+          <div class="stat-card-header"><span class="stat-card-label">Docs Expiring</span></div>
           <div class="stat-card-value">${expiringSoon}</div>
         </div>
       </div>
@@ -114,19 +127,22 @@ const Bikes = {
       let healthDot = '<span class="health-dot success"></span>';
       let expiryText = 'Valid & Secure';
       
-      if (bike.daysUntilExpiry < 0) {
+      if (bike.worstExpiry < 0) {
          expiryClass = 'color: var(--danger-600); font-weight: bold;';
-         healthDot = '<span class="health-dot danger" title="Insurance Expired!"></span>';
+         healthDot = '<span class="health-dot danger" title="Document Expired!"></span>';
          expiryText = 'EXPIRED!';
-      } else if (bike.daysUntilExpiry <= 30) {
+      } else if (bike.worstExpiry <= 30) {
          expiryClass = 'color: var(--warning-600); font-weight: bold;';
          healthDot = '<span class="health-dot warning" title="Expiring Soon"></span>';
-         expiryText = `Expiring (${bike.daysUntilExpiry} days)`;
+         expiryText = `Expiring (${bike.worstExpiry} days)`;
       }
 
       const statusBadge = bike.status === 'active' ? '<span class="badge badge-success">● Active</span>' :
                           bike.status === 'maintenance' ? '<span class="badge badge-warning">⚙ Maintenance</span>' :
                           '<span class="badge badge-slate">○ Retired</span>';
+
+      const authAlert = bike.daysUntilAuthExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
+      const insAlert = bike.daysUntilExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
 
       return `
         <div class="card section-card bike-card" style="cursor: pointer; animation: slideUp 300ms ease both; animation-delay: ${index * 40}ms;" data-id="${bike.id}">
@@ -149,8 +165,12 @@ const Bikes = {
               <span style="${expiryClass} display:flex; align-items:center;">${healthDot} ${expiryText}</span>
             </div>
             <div style="display:flex; justify-content: space-between;">
+              <span style="color: var(--slate-500)">Authorization:</span>
+              <span style="${authAlert}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : '—'}</span>
+            </div>
+            <div style="display:flex; justify-content: space-between;">
               <span style="color: var(--slate-500)">Insurance Expiry:</span>
-              <span style="${expiryClass}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</span>
+              <span style="${insAlert}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</span>
             </div>
           </div>
         </div>
@@ -216,6 +236,10 @@ const Bikes = {
           <input type="date" id="bf-ins-start" class="form-control" value="${isEdit && bike.insurance_start ? bike.insurance_start : ''}">
         </div>
         <div class="form-group">
+          <label>Authorization Expiry</label>
+          <input type="date" id="bf-auth-expiry" class="form-control" value="${isEdit && bike.authorization_expiry ? bike.authorization_expiry : ''}">
+        </div>
+        <div class="form-group">
           <label>Insurance Expiry Date</label>
           <input type="date" id="bf-ins-expiry" class="form-control" value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}">
         </div>
@@ -249,6 +273,7 @@ const Bikes = {
         status: document.getElementById('bf-status').value,
         insurance_start: document.getElementById('bf-ins-start').value || null,
         insurance_expiry: document.getElementById('bf-ins-expiry').value || null,
+        authorization_expiry: document.getElementById('bf-auth-expiry').value || null,
         notes: document.getElementById('bf-notes').value.trim(),
       };
 

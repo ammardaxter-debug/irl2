@@ -470,6 +470,10 @@ const DailyLogs = {
             <input type="text" class="form-input" name="absent_reason" id="edit_absent_reason_input" value="${Utils.escapeHtml(log.absent_reason || '')}" placeholder="e.g. Sick Leave, Bike Breakdown, No Show...">
           </div>
           <div class="form-actions" style="grid-column: 1/-1">
+            <button type="button" class="btn btn-danger" id="btn-delete-log" style="margin-right:auto;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Delete Log
+            </button>
             <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btn-update-log">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -521,8 +525,27 @@ const DailyLogs = {
         document.querySelector('#edit-log-form input[name="associate_orders"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_hours"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_minutes"]').value = 0;
+        document.querySelector('#edit-log-form input[name="checkin_minutes"]').value = 0;
       }
     }));
+
+    document.getElementById('btn-delete-log')?.addEventListener('click', async () => {
+      const confirmMsg = `Are you sure you want to permanently delete this log for ${log.rider_name}? This action cannot be undone.`;
+      const confirmed = await Utils.confirm(confirmMsg, 'Delete Log', 'Yes, Delete', 'Cancel', true);
+      if (confirmed) {
+        try {
+          Utils.showLoading('Deleting log');
+          await API.deleteDailyLog(log.id);
+          Utils.showToast('Log deleted successfully', 'success');
+          Utils.closeModal();
+          this.render();
+        } catch (err) {
+          Utils.showToast(err.message, 'error');
+        } finally {
+          Utils.hideLoading();
+        }
+      }
+    });
 
     document.getElementById('edit-log-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();

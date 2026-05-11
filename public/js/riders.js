@@ -961,39 +961,60 @@ const Riders = {
 
       const reader = new FileReader();
       reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-          // Resize image (Max 150x150)
-          const canvas = document.createElement('canvas');
-          const MAX_SIZE = 150;
-          let width = img.width;
-          let height = img.height;
+        // Create Cropper Modal
+        const cropperModal = document.createElement('div');
+        cropperModal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;";
+        cropperModal.innerHTML = `
+          <div style="width:100%;max-width:500px;background:white;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="padding:20px;font-weight:700;font-size:18px;border-bottom:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center;">
+              Crop Profile Photo
+              <button id="btn-close-crop" style="background:none;border:none;cursor:pointer;color:#6B7280;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            <div style="width:100%;height:400px;background:#111827;display:flex;align-items:center;justify-content:center;">
+              <img id="cropper-img" src="${event.target.result}" style="max-width:100%;max-height:100%;display:block;">
+            </div>
+            <div style="padding:20px;display:flex;justify-content:flex-end;gap:12px;background:#F9FAFB;">
+              <button id="btn-cancel-crop" style="padding:10px 20px;border-radius:8px;border:1px solid #E5E7EB;background:white;font-weight:600;color:#374151;cursor:pointer;">Cancel</button>
+              <button id="btn-save-crop" style="padding:10px 20px;border-radius:8px;border:none;background:#2563EB;font-weight:600;color:white;cursor:pointer;box-shadow:0 4px 6px -1px rgba(37,99,235,0.2);">Crop & Save HD</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(cropperModal);
+        
+        const imageToCrop = document.getElementById('cropper-img');
+        const cropper = new Cropper(imageToCrop, {
+          aspectRatio: 1,
+          viewMode: 1,
+          autoCropArea: 1,
+          background: false,
+        });
 
-          if (width > height) {
-            if (width > MAX_SIZE) {
-              height *= MAX_SIZE / width;
-              width = MAX_SIZE;
-            }
-          } else {
-            if (height > MAX_SIZE) {
-              width *= MAX_SIZE / height;
-              height = MAX_SIZE;
-            }
-          }
+        const closeModal = () => {
+          cropper.destroy();
+          cropperModal.remove();
+          fileInput.value = '';
+        };
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Get compressed base64
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        document.getElementById('btn-close-crop').onclick = closeModal;
+        document.getElementById('btn-cancel-crop').onclick = closeModal;
+        
+        document.getElementById('btn-save-crop').onclick = () => {
+          // Output high-quality 800x800 image
+          const canvas = cropper.getCroppedCanvas({
+            width: 800,
+            height: 800,
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: 'high'
+          });
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           hiddenPhotoInput.value = dataUrl;
           previewImg.src = dataUrl;
           previewImg.style.display = 'block';
           if (btnRemovePhoto) btnRemovePhoto.style.display = 'block';
+          
+          cropper.destroy();
+          cropperModal.remove();
         };
-        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     });

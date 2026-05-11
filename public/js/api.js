@@ -119,6 +119,12 @@ const API = {
     });
   },
 
+  deleteDailyLog(id) {
+    return this.request(`/daily-logs/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   // ── Payroll ──
   getPayroll(start, end) {
     return this.request(`/payroll?start=${start}&end=${end}`);

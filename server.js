@@ -780,6 +780,18 @@ app.get('/api/rider/me', verifyRiderToken, async (req, res) => {
     const rider = await db.getRiderById(req.riderId);
     if (!rider) return res.status(404).json({ error: 'Rider not found' });
     const { portal_password, ...safeRider } = rider;
+    
+    // Attach assigned bike if exists
+    if (safeRider.bike_id) {
+      try {
+        const bikes = await db.getBikes();
+        const bike = bikes.find(b => b.id === parseInt(safeRider.bike_id));
+        if (bike) safeRider.bike = bike;
+      } catch (err) {
+        console.error('Error fetching bike for rider', err);
+      }
+    }
+
     res.json(safeRider);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -791,6 +803,16 @@ app.put('/api/rider/me', verifyRiderToken, async (req, res) => {
   try {
     const updated = await db.updateRiderSelfService(req.riderId, req.body);
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete daily log
+app.delete('/api/daily-logs/:id', async (req, res) => {
+  try {
+    await db.deleteDailyLog(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
