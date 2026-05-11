@@ -829,6 +829,11 @@ const Riders = {
         </div>
 
         <div class="rider-form-group">
+          <label class="rider-form-label">Company/Noon ID</label>
+          <input type="text" class="rider-form-input" name="noon_id" value="${isEdit ? Utils.escapeHtml(rider.noon_id || rider.company_id || rider.rider_company_id || '') : ''}" placeholder="Enter assigned ID">
+        </div>
+
+        <div class="rider-form-group">
           <label class="rider-form-label">Store / Warehouse (Noon)</label>
           <select class="rider-form-select" name="store_warehouse">
             <option value="">Select store</option>
@@ -1021,6 +1026,7 @@ const Riders = {
         name: formData.get('name'),
         phone: formData.get('phone'),
         email: formData.get('email') || '',
+        noon_id: formData.get('noon_id') || '',
         date_of_birth: formData.get('date_of_birth') || null,
         nationality: formData.get('nationality'),
         rider_type: riderType,

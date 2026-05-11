@@ -298,10 +298,10 @@ const Dashboard = {
                         <td style="font-size:20px; text-align:center; width:50px; padding:12px 6px;">${medal || `<span style="font-size:14px; color:var(--slate-400); font-weight:bold;">#${idx+1}</span>`}</td>
                         <td style="padding:12px 6px;">
                           <div style="font-weight:700; color:var(--slate-800); font-size:14px; margin-bottom:6px;">${Utils.escapeHtml(r.name)}</div>
-                          <div>${Utils.getTierBadgeHtml(r.total_orders)}</div>
+                          <div>${Utils.getTierBadgeHtml(r.total)}</div>
                         </td>
                         <td style="text-align: right; padding:12px 6px;">
-                           <div style="font-size:18px; font-weight:800; color:var(--primary-600);">${r.total_orders}</div>
+                           <div style="font-size:18px; font-weight:800; color:var(--primary-600);">${r.total}</div>
                            <div style="font-size:11px; color:var(--slate-400); font-weight:500; text-transform:uppercase;">Orders</div>
                         </td>
                       </tr>

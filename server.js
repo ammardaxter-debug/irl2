@@ -829,6 +829,7 @@ app.post('/api/rider/my-logs', verifyRiderToken, async (req, res) => {
       const now = new Date();
       const diffHours = (now - createdDate) / (1000 * 60 * 60);
       
+      // 24h lock only applies when EDITING an existing log
       if (diffHours > 24) {
         return res.status(403).json({ error: 'You can only edit logs within 24 hours of submission.' });
       }
@@ -837,8 +838,33 @@ app.post('/api/rider/my-logs', verifyRiderToken, async (req, res) => {
       return res.json(updatedLog);
     }
     
+    // New log for a past date (missing day) — always allowed
     const log = await db.createDailyLog(data);
     res.status(201).json(log);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get missing days for rider
+app.get('/api/rider/missing-days', verifyRiderToken, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
+    const logs = await db.getDailyLogsByRider(req.riderId, start, end);
+    const loggedDates = new Set(logs.map(l => (l.log_date || '').slice(0, 10)));
+    const missing = [];
+    const today = new Date().toISOString().slice(0, 10);
+    let cursor = new Date(start + 'T00:00:00');
+    const endDate = new Date(end + 'T00:00:00');
+    while (cursor <= endDate) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      if (dateStr <= today && !loggedDates.has(dateStr)) {
+        missing.push(dateStr);
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    res.json({ missing, total: missing.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

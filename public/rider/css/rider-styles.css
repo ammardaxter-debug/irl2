@@ -600,3 +600,164 @@ body {
   .r-login-card { max-width: 420px; margin-left: auto; margin-right: auto; border-radius: 24px; margin-bottom: 24px; }
   .r-bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); border-radius: 20px 20px 0 0; }
 }
+
+/* ── Header Actions (Online + Notification + Avatar) ── */
+.r-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.r-header-icon-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--r-bg);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--r-text-secondary);
+  transition: background 0.2s;
+}
+
+.r-header-icon-btn:active { background: var(--r-border); }
+
+.r-header-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#r-online-btn {
+  width: auto;
+  border-radius: 20px;
+  padding: 0 10px;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.r-online-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--r-text-muted);
+}
+
+.r-coming-soon-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--r-warning);
+  position: absolute;
+  top: 4px; right: 4px;
+}
+
+#r-notif-btn {
+  position: relative;
+}
+
+/* ── Missing Days Alert ── */
+.r-missing-alert {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  background: linear-gradient(135deg, #FFF7ED, #FFFBEB);
+  border: 1px solid #FDE68A;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  animation: r-fadeIn 0.4s ease;
+}
+
+.r-missing-alert-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.r-missing-alert-body {
+  flex: 1;
+}
+
+.r-missing-alert-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400E;
+  margin-bottom: 4px;
+}
+
+.r-missing-alert-text {
+  font-size: 12px;
+  color: #A16207;
+  line-height: 1.4;
+}
+
+.r-btn-warning {
+  background: #F59E0B;
+  color: #FFF;
+  border: none;
+}
+
+.r-btn-warning:active { background: #D97706; }
+
+/* ── Profile ID Badge ── */
+.r-profile-id-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+}
+
+.r-profile-id-badge svg {
+  stroke: rgba(255,255,255,0.5);
+}
+
+/* ── Notifications Empty State ── */
+.r-notif-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.r-notif-empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.r-notif-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--r-text);
+  margin-bottom: 8px;
+}
+
+.r-notif-empty-text {
+  font-size: 13px;
+  color: var(--r-text-muted);
+  line-height: 1.5;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+/* ── Stats Grid 3-column for 6 items ── */
+.r-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.r-stat-card {
+  padding: 12px 8px;
+}
+
+.r-stat-value {
+  font-size: 20px;
+}
+
+.r-stat-label {
+  font-size: 10px;
+}

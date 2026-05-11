@@ -113,6 +113,8 @@ const RiderPages = {
         <div class="r-welcome-name">Hello, ${rider.name || 'Rider'}!</div>
         <div class="r-welcome-sub">${dateStr}</div>
       </div>
+
+      <div id="r-home-missing-alert"></div>
       
       <div class="r-card">
         <div class="r-card-header">
@@ -128,9 +130,12 @@ const RiderPages = {
       <div class="r-card">
         <div class="r-card-header">
           <div class="r-card-title">This Cycle Summary</div>
+          <div style="font-size:11px;color:var(--r-text-muted);" id="r-home-cycle-range"></div>
         </div>
         <div class="r-stats-grid" id="r-home-stats">
-          <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Orders</div></div>
+          <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Total Orders</div></div>
+          <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Primary</div></div>
+          <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Associate</div></div>
           <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Days Present</div></div>
           <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Days Absent</div></div>
           <div class="r-stat-card"><div class="r-stat-value">-</div><div class="r-stat-label">Avg Hrs/Day</div></div>
@@ -142,9 +147,17 @@ const RiderPages = {
   async attachHomeEvents() {
     try {
       const today = RiderApp.getTodayLocal();
-      const cycleStart = today.substring(0, 8) + '01'; // simple cycle start for now
+      const cycle = RiderApp.getCurrentCycle();
+      const effectiveEnd = today < cycle.end ? today : cycle.end;
+
+      // Show cycle range label
+      const rangeEl = document.getElementById('r-home-cycle-range');
+      if (rangeEl) {
+        const fmt = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        rangeEl.textContent = `${fmt(cycle.start)} — ${fmt(cycle.end)}`;
+      }
       
-      const logs = await RiderAPI.getMyLogs(cycleStart, today);
+      const logs = await RiderAPI.getMyLogs(cycle.start, effectiveEnd);
       const todayLog = logs.find(l => l.log_date === today);
       
       // Update Today's Status
@@ -157,7 +170,7 @@ const RiderPages = {
         todayEl.innerHTML = `
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
             <span class="r-chip ${badgeClass}">${todayLog.attendance_status}</span>
-            ${todayLog.attendance_status === 'Present' ? `<span style="font-size:13px; font-weight:600;">${todayLog.primary_orders + todayLog.associate_orders} Orders</span>` : ''}
+            ${todayLog.attendance_status === 'Present' ? `<span style="font-size:13px; font-weight:600;">${(todayLog.primary_orders||0) + (todayLog.associate_orders||0)} Orders</span>` : ''}
           </div>
           ${todayLog.attendance_status === 'Present' ? `
             <div style="display:flex; gap:12px;">
@@ -174,18 +187,45 @@ const RiderPages = {
         `;
       }
       
-      // Update Stats
+      // Update Stats with primary/associate breakdown
       const present = logs.filter(l => l.attendance_status === 'Present');
       const absent = logs.filter(l => l.attendance_status === 'Absent');
-      const totalOrders = present.reduce((sum, l) => sum + (l.primary_orders || 0) + (l.associate_orders || 0), 0);
+      const totalPrimary = present.reduce((sum, l) => sum + (l.primary_orders || 0), 0);
+      const totalAssociate = present.reduce((sum, l) => sum + (l.associate_orders || 0), 0);
+      const totalOrders = totalPrimary + totalAssociate;
       const avgMins = present.length > 0 ? present.reduce((sum, l) => sum + ((l.checkin_hours || 0) * 60 + (l.checkin_minutes || 0)), 0) / present.length : 0;
       
       document.getElementById('r-home-stats').innerHTML = `
-        <div class="r-stat-card"><div class="r-stat-value" style="color:var(--r-primary)">${totalOrders}</div><div class="r-stat-label">Orders</div></div>
+        <div class="r-stat-card"><div class="r-stat-value" style="color:var(--r-primary)">${totalOrders}</div><div class="r-stat-label">Total Orders</div></div>
+        <div class="r-stat-card"><div class="r-stat-value">${totalPrimary}</div><div class="r-stat-label">Primary</div></div>
+        <div class="r-stat-card"><div class="r-stat-value">${totalAssociate}</div><div class="r-stat-label">Associate</div></div>
         <div class="r-stat-card"><div class="r-stat-value">${present.length}</div><div class="r-stat-label">Days Present</div></div>
         <div class="r-stat-card"><div class="r-stat-value" style="color:${absent.length > 0 ? 'var(--r-danger)' : 'var(--r-text)'}">${absent.length}</div><div class="r-stat-label">Days Absent</div></div>
         <div class="r-stat-card"><div class="r-stat-value">${Math.floor(avgMins/60)}<span style="font-size:14px">h</span></div><div class="r-stat-label">Avg/Day</div></div>
       `;
+
+      // Check for missing days and show alert
+      try {
+        const missingData = await RiderAPI.getMissingDays(cycle.start, effectiveEnd);
+        const alertEl = document.getElementById('r-home-missing-alert');
+        if (missingData && missingData.total > 0 && alertEl) {
+          const missingDatesFormatted = missingData.missing.slice(0, 5).map(d => {
+            const dt = new Date(d + 'T00:00:00');
+            return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }).join(', ');
+          const moreText = missingData.total > 5 ? ` and ${missingData.total - 5} more` : '';
+          alertEl.innerHTML = `
+            <div class="r-missing-alert">
+              <div class="r-missing-alert-icon">⚠️</div>
+              <div class="r-missing-alert-body">
+                <div class="r-missing-alert-title">You have ${missingData.total} missing day${missingData.total > 1 ? 's' : ''}</div>
+                <div class="r-missing-alert-text">Please lodge your data for: ${missingDatesFormatted}${moreText}. Keeping records up to date helps ensure accurate payroll.</div>
+                <button class="r-btn r-btn-sm r-btn-warning" onclick="RiderApp.navigate('log')" style="margin-top:8px;">Lodge Missing Data</button>
+              </div>
+            </div>
+          `;
+        }
+      } catch (e) { /* silent */ }
       
     } catch (err) {
       document.getElementById('r-home-today-status').innerHTML = `<p style="color:var(--r-danger)">Failed to load data.</p>`;
@@ -205,6 +245,10 @@ const RiderPages = {
         <div id="r-log-locked-msg" style="display:none; background:#FEF2F2; color:#DC2626; padding:12px; border-radius:8px; font-size:13px; font-weight:500; margin-bottom:16px; border:1px solid #FECACA;">
           This data was lodged over 24 hours ago and can no longer be edited.
         </div>
+
+        <div id="r-log-missing-hint" style="display:none; background:linear-gradient(135deg,#FFF7ED,#FFFBEB); color:#92400E; padding:12px; border-radius:8px; font-size:13px; font-weight:500; margin-bottom:16px; border:1px solid #FDE68A;">
+          💡 You can select a past date to fill in missing data. Please keep your records complete.
+        </div>
         
         <form id="r-log-form">
           <div class="r-form-group">
@@ -223,8 +267,13 @@ const RiderPages = {
           
           <div id="r-log-worked-fields">
             <div class="r-form-group">
-              <label class="r-form-label">Total Orders Delivered</label>
-              <input type="number" class="r-form-input" id="r-log-orders" placeholder="e.g. 24" min="0">
+              <label class="r-form-label">Primary Orders</label>
+              <input type="number" class="r-form-input" id="r-log-primary" placeholder="e.g. 18" min="0">
+            </div>
+
+            <div class="r-form-group">
+              <label class="r-form-label">Associate Orders</label>
+              <input type="number" class="r-form-input" id="r-log-associate" placeholder="e.g. 6" min="0">
             </div>
             
             <div class="r-form-group">
@@ -263,44 +312,43 @@ const RiderPages = {
     const statusSelect = document.getElementById('r-log-status');
     const workedFields = document.getElementById('r-log-worked-fields');
     const absentFields = document.getElementById('r-log-absent-fields');
+    const missingHint = document.getElementById('r-log-missing-hint');
     
     // Toggle fields based on status
     statusSelect.addEventListener('change', () => {
       const isPresent = statusSelect.value === 'Present';
       const isAbsent = statusSelect.value === 'Absent';
-      
       workedFields.style.display = isPresent ? 'block' : 'none';
       absentFields.style.display = isAbsent ? 'block' : 'none';
-      
-      if (isPresent) document.getElementById('r-log-orders').required = true;
-      else document.getElementById('r-log-orders').required = false;
-      
       if (isAbsent) document.getElementById('r-log-reason').required = true;
       else document.getElementById('r-log-reason').required = false;
     });
     
-    // Initial trigger
     statusSelect.dispatchEvent(new Event('change'));
 
-    // Check for existing log on date change
     const dateInput = document.getElementById('r-log-date');
     const submitBtn = document.getElementById('r-log-submit');
+
     const checkDate = async () => {
       try {
         const date = dateInput.value;
+        const today = RiderApp.getTodayLocal();
         submitBtn.disabled = true;
         submitBtn.textContent = 'Checking...';
+
+        // Show hint if past date
+        if (missingHint) {
+          missingHint.style.display = date < today ? 'block' : 'none';
+        }
         
-        // Ensure RiderAPI exposes getLogs (add it if missing, but we assume it's there based on search)
-        // Wait, the previous search returned "return await this.request(`/my-logs?start=${start}&end=${end}`);"
-        // Let's call it via RiderAPI.request directly to be safe.
         const logs = await RiderAPI.request(`/my-logs?start=${date}&end=${date}`);
         
         if (logs && logs.length > 0) {
           const log = logs[0];
           statusSelect.value = log.attendance_status || 'Present';
           statusSelect.dispatchEvent(new Event('change'));
-          document.getElementById('r-log-orders').value = log.primary_orders || '';
+          document.getElementById('r-log-primary').value = log.primary_orders || '';
+          document.getElementById('r-log-associate').value = log.associate_orders || '';
           document.getElementById('r-log-hrs').value = log.checkin_hours || '';
           document.getElementById('r-log-mins').value = log.checkin_minutes || '';
           document.getElementById('r-log-reason').value = log.absent_reason || '';
@@ -320,7 +368,8 @@ const RiderPages = {
           
           document.getElementById('r-log-locked-msg').style.display = isLocked ? 'block' : 'none';
           statusSelect.disabled = isLocked;
-          document.getElementById('r-log-orders').disabled = isLocked;
+          document.getElementById('r-log-primary').disabled = isLocked;
+          document.getElementById('r-log-associate').disabled = isLocked;
           document.getElementById('r-log-hrs').disabled = isLocked;
           document.getElementById('r-log-mins').disabled = isLocked;
           document.getElementById('r-log-reason').disabled = isLocked;
@@ -332,7 +381,7 @@ const RiderPages = {
             submitBtn.textContent = 'Locked (Older than 24h)';
             submitBtn.disabled = true;
             submitBtn.style.background = 'var(--r-text-muted)';
-            submitBtn.style.display = 'none'; // Completely hide submit button if locked
+            submitBtn.style.display = 'none';
           } else {
             submitBtn.textContent = 'Update Data';
             submitBtn.disabled = false;
@@ -342,19 +391,20 @@ const RiderPages = {
         } else {
           document.getElementById('r-log-locked-msg').style.display = 'none';
           statusSelect.disabled = false;
-          document.getElementById('r-log-orders').disabled = false;
+          document.getElementById('r-log-primary').disabled = false;
+          document.getElementById('r-log-associate').disabled = false;
           document.getElementById('r-log-hrs').disabled = false;
           document.getElementById('r-log-mins').disabled = false;
           document.getElementById('r-log-reason').disabled = false;
           document.getElementById('r-log-upload-zone').style.pointerEvents = 'auto';
           document.getElementById('r-log-upload-zone').style.opacity = '1';
           
-          submitBtn.textContent = 'Submit Data';
+          submitBtn.textContent = date < today ? 'Submit Missing Day Data' : 'Submit Data';
           submitBtn.disabled = false;
           submitBtn.style.background = 'var(--r-primary)';
           submitBtn.style.display = 'block';
-          // Reset form somewhat, keeping the date
-          document.getElementById('r-log-orders').value = '';
+          document.getElementById('r-log-primary').value = '';
+          document.getElementById('r-log-associate').value = '';
           document.getElementById('r-log-hrs').value = '11';
           document.getElementById('r-log-mins').value = '0';
           document.getElementById('r-log-reason').value = '';
@@ -368,7 +418,7 @@ const RiderPages = {
     };
     
     dateInput.addEventListener('change', checkDate);
-    checkDate(); // Run on mount
+    checkDate();
 
     // File Upload handling
     const uploadZone = document.getElementById('r-log-upload-zone');
@@ -381,24 +431,20 @@ const RiderPages = {
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          // Compress to max 800px width/height to save database space
           const canvas = document.createElement('canvas');
           const MAX_SIZE = 800;
           let width = img.width;
           let height = img.height;
           if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
           else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-          
           canvas.width = width; canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // 60% quality
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           base64Input.value = dataUrl;
           preview.src = dataUrl;
           preview.style.display = 'block';
@@ -417,8 +463,8 @@ const RiderPages = {
       const data = {
         log_date: document.getElementById('r-log-date').value,
         attendance_status: statusSelect.value,
-        primary_orders: statusSelect.value === 'Present' ? parseInt(document.getElementById('r-log-orders').value || 0) : 0,
-        associate_orders: 0, // Simplified for rider portal
+        primary_orders: statusSelect.value === 'Present' ? parseInt(document.getElementById('r-log-primary').value || 0) : 0,
+        associate_orders: statusSelect.value === 'Present' ? parseInt(document.getElementById('r-log-associate').value || 0) : 0,
         checkin_hours: statusSelect.value === 'Present' ? parseInt(document.getElementById('r-log-hrs').value || 0) : 0,
         checkin_minutes: statusSelect.value === 'Present' ? parseInt(document.getElementById('r-log-mins').value || 0) : 0,
         absent_reason: statusSelect.value === 'Absent' ? document.getElementById('r-log-reason').value : '',
@@ -487,6 +533,8 @@ const RiderPages = {
             <div class="r-card-header"><div class="r-card-title">Monthly Summary</div></div>
             <div class="r-stats-grid">
               <div class="r-stat-card"><div class="r-stat-value" style="color:var(--r-primary)">${report.total_orders}</div><div class="r-stat-label">Total Orders</div></div>
+              <div class="r-stat-card"><div class="r-stat-value">${report.total_primary || 0}</div><div class="r-stat-label">Primary Orders</div></div>
+              <div class="r-stat-card"><div class="r-stat-value">${report.total_associate || 0}</div><div class="r-stat-label">Associate Orders</div></div>
               <div class="r-stat-card"><div class="r-stat-value">${report.present_days}</div><div class="r-stat-label">Days Present</div></div>
               <div class="r-stat-card"><div class="r-stat-value">${report.calculated_salary}</div><div class="r-stat-label">Est. Salary (SAR)</div></div>
               <div class="r-stat-card"><div class="r-stat-value">${report.avg_checkin_hours}h</div><div class="r-stat-label">Avg Hours</div></div>
@@ -500,14 +548,14 @@ const RiderPages = {
                 <div class="r-log-item">
                   <div class="r-log-date">
                     <span class="day">${parseInt(l.log_date.slice(8, 10))}</span>
-                    <span class="month">${new Date(l.log_date).toLocaleDateString('en-US', {month:'short'})}</span>
+                    <span class="month">${new Date(l.log_date+'T00:00:00').toLocaleDateString('en-US', {month:'short'})}</span>
                   </div>
                   <div style="flex:1;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                       <span class="r-chip ${l.attendance_status === 'Present' ? 'r-chip-success' : (l.attendance_status === 'Absent' ? 'r-chip-danger' : 'r-chip-warning')}">${l.attendance_status}</span>
                       ${l.attendance_status === 'Present' ? `<span style="font-size:13px; font-weight:700;">${(l.primary_orders||0)+(l.associate_orders||0)} <span style="font-weight:500;color:var(--r-text-muted)">orders</span></span>` : ''}
                     </div>
-                    ${l.attendance_status === 'Present' ? `<div style="font-size:12px; color:var(--r-text-muted);">🕒 ${l.checkin_hours}h ${l.checkin_minutes}m</div>` : ''}
+                    ${l.attendance_status === 'Present' ? `<div style="font-size:12px; color:var(--r-text-muted);">📦 P: ${l.primary_orders||0} · A: ${l.associate_orders||0} &nbsp;|&nbsp; 🕒 ${l.checkin_hours}h ${l.checkin_minutes}m</div>` : ''}
                     ${l.absent_reason ? `<div style="font-size:12px; color:var(--r-text-muted); font-style:italic;">Reason: ${l.absent_reason}</div>` : ''}
                   </div>
                 </div>
@@ -548,6 +596,7 @@ const RiderPages = {
   // ==========================================
   renderProfile() {
     const rider = RiderAPI.getCachedRider() || {};
+    const riderId = rider.noon_id || rider.rider_company_id || rider.company_id || rider.id || '—';
     
     return `
       <div class="r-profile-header">
@@ -556,6 +605,10 @@ const RiderPages = {
         </div>
         <div class="r-profile-name">${rider.name || 'Rider Name'}</div>
         <div class="r-profile-role">${rider.rider_type === 'company' ? 'Company Rider' : 'Freelancer'} • ${rider.client_company || 'Inspiring Roads'}</div>
+        <div class="r-profile-id-badge">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span>ID: ${riderId}</span>
+        </div>
       </div>
 
       <div class="r-card">
@@ -612,7 +665,18 @@ const RiderPages = {
     `;
   },
 
-  attachProfileEvents() {
+  async attachProfileEvents() {
+    // Refresh profile from server
+    try {
+      const freshRider = await RiderAPI.getProfile();
+      // Re-render ID badge if it updated
+      const idBadge = document.querySelector('.r-profile-id-badge span');
+      if (idBadge && freshRider) {
+        const newId = freshRider.noon_id || freshRider.rider_company_id || freshRider.company_id || freshRider.id || '—';
+        idBadge.textContent = `ID: ${newId}`;
+      }
+    } catch (e) { /* silent */ }
+
     document.getElementById('r-profile-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('r-prof-save');
@@ -657,6 +721,30 @@ const RiderPages = {
         btn.textContent = 'Change Password';
       }
     });
+  },
+
+  // ==========================================
+  // NOTIFICATIONS PAGE (Placeholder for future)
+  // ==========================================
+  renderNotifications() {
+    return `
+      <div class="r-card">
+        <div class="r-card-header">
+          <div class="r-card-title">Notifications</div>
+        </div>
+        <div class="r-notif-empty">
+          <div class="r-notif-empty-icon">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--r-text-muted)" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="r-notif-empty-title">No Notifications Yet</div>
+          <div class="r-notif-empty-text">You're all caught up! Notifications and important messages from the company will appear here.</div>
+        </div>
+      </div>
+    `;
+  },
+
+  attachNotificationsEvents() {
+    // Placeholder — will be implemented in future updates
   }
 
 };

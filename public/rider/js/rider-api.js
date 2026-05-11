@@ -71,6 +71,10 @@ const RiderAPI = {
     return await this.request(`/my-report?start=${start}&end=${end}`);
   },
 
+  async getMissingDays(start, end) {
+    return await this.request(`/missing-days?start=${start}&end=${end}`);
+  },
+
   async changePassword(current_password, new_password) {
     return await this.request('/change-password', 'PUT', { current_password, new_password });
   }

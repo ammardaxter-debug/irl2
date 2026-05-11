@@ -44,6 +44,9 @@ const RiderApp = {
       case 'profile':
         content = this.wrapWithLayout(RiderPages.renderProfile(), 'profile');
         break;
+      case 'notifications':
+        content = this.wrapWithLayout(RiderPages.renderNotifications(), 'notifications');
+        break;
       default:
         content = this.wrapWithLayout(`<div class="r-empty"><p>Page not found</p></div>`);
     }
@@ -70,8 +73,18 @@ const RiderApp = {
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <div class="title">Inspiring Roads</div>
-          <div class="r-profile-avatar" style="width:32px;height:32px;margin:0;border:none;font-size:12px;background:var(--r-bg);color:var(--r-text);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;" onclick="RiderApp.navigate('profile')">
-            ${avatarHtml}
+          <div class="r-header-actions">
+            <button class="r-header-icon-btn" id="r-online-btn" title="Coming Soon" disabled>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M8.5 8.5a6 6 0 0 1 7 0"/><path d="M5.6 5.6a10 10 0 0 1 12.8 0"/></svg>
+              <span class="r-online-label">Offline</span>
+              <span class="r-coming-soon-dot"></span>
+            </button>
+            <button class="r-header-icon-btn" id="r-notif-btn" onclick="RiderApp.navigate('notifications')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </button>
+            <div class="r-profile-avatar" style="width:32px;height:32px;margin:0;border:none;font-size:12px;background:var(--r-bg);color:var(--r-text);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;" onclick="RiderApp.navigate('profile')">
+              ${avatarHtml}
+            </div>
           </div>
         </header>
 
@@ -124,6 +137,44 @@ const RiderApp = {
   getTodayLocal() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  /** Get current Noon cycle boundaries (21st prev month → 20th current month) */
+  getCurrentCycle() {
+    const now = new Date();
+    const day = now.getDate();
+    let startYear, startMonth, endYear, endMonth;
+
+    if (day >= 21) {
+      // Cycle: 21st of this month → 20th of next month
+      startYear = now.getFullYear();
+      startMonth = now.getMonth() + 1;
+      endMonth = now.getMonth() + 2;
+      endYear = now.getFullYear();
+      if (endMonth > 12) { endMonth = 1; endYear++; }
+    } else {
+      // Cycle: 21st of previous month → 20th of this month
+      startMonth = now.getMonth(); // previous month (0-indexed becomes 1-indexed)
+      startYear = now.getFullYear();
+      if (startMonth === 0) { startMonth = 12; startYear--; }
+      endMonth = now.getMonth() + 1;
+      endYear = now.getFullYear();
+    }
+
+    const start = `${startYear}-${String(startMonth).padStart(2, '0')}-21`;
+    const end = `${endYear}-${String(endMonth).padStart(2, '0')}-20`;
+    return { start, end };
+  },
+
+  /** Get cycle for a given month string like "2026-05" */
+  getCycleForMonth(monthStr) {
+    const [y, m] = monthStr.split('-').map(Number);
+    let prevY = y;
+    let prevM = m - 1;
+    if (prevM === 0) { prevM = 12; prevY--; }
+    const start = `${prevY}-${String(prevM).padStart(2, '0')}-21`;
+    const end = `${y}-${String(m).padStart(2, '0')}-20`;
+    return { start, end };
   }
 };
 
