@@ -253,7 +253,7 @@ const DailyLogs = {
         const logId = parseInt(btn.dataset.logId);
         const log = logged.find(l => l.id === logId);
         if (log && log.screenshot) {
-          Utils.openModal('Screenshot Proof', \`<div style="text-align:center;"><img src="\${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>\`);
+          Utils.openModal('Screenshot Proof', `<div style="text-align:center;"><img src="${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>`);
         }
       });
     });
