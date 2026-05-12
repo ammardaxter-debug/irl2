@@ -243,8 +243,8 @@ const DailyLogs = {
       card.addEventListener('click', (e) => {
         // Ignore if they clicked the view proof or delete button
         if (e.target.closest('.view-proof-btn') || e.target.closest('.delete-log-btn')) return;
-        const logId = parseInt(card.dataset.logId);
-        const log = logged.find(l => l.id === logId);
+        const logId = card.dataset.logId;
+        const log = logged.find(l => String(l.id) === logId);
         if (log) this.openEditForm(log);
       });
     });
@@ -253,8 +253,8 @@ const DailyLogs = {
     document.querySelectorAll('.view-proof-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const logId = parseInt(btn.dataset.logId);
-        const log = logged.find(l => l.id === logId);
+        const logId = btn.dataset.logId;
+        const log = logged.find(l => String(l.id) === logId);
         if (log && log.screenshot) {
           Utils.openModal('Screenshot Proof', `<div style="text-align:center;"><img src="${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>`);
         }
@@ -265,7 +265,7 @@ const DailyLogs = {
     document.querySelectorAll('.delete-log-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const logId = parseInt(btn.dataset.logId);
+        const logId = btn.dataset.logId;
         const riderName = btn.dataset.riderName;
         const confirmed = await Utils.confirm(`Are you sure you want to permanently delete this log for ${riderName}? This action cannot be undone.`, 'Delete Log', 'Yes, Delete', 'Cancel', true);
         if (confirmed) {
