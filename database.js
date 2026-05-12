@@ -958,6 +958,42 @@ async function deleteRiderRequest(id, riderId) {
   return { success: true };
 }
 
+// ========== NOTIFICATIONS & PUSH TOKENS ==========
+
+async function saveRiderPushToken(riderId, pushToken) {
+  await fbDb.ref(`riders/${riderId}`).update({ push_token: pushToken });
+  return { success: true };
+}
+
+async function createNotification(data) {
+  const id = await getNextId('notifications');
+  const notification = {
+    ...data,
+    read: false,
+    created_at: nowISO()
+  };
+  await fbDb.ref(`notifications/${id}`).set(notification);
+  return { id, ...notification };
+}
+
+async function getNotificationsForRider(riderId) {
+  const snapshot = await fbDb.ref('notifications').once('value');
+  const data = snapshotToArray(snapshot);
+  return data
+    .filter(n => String(n.rider_id) === String(riderId))
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+}
+
+async function markNotificationRead(id, riderId) {
+  const snap = await fbDb.ref(`notifications/${id}`).once('value');
+  if (!snap.exists()) throw new Error('Notification not found');
+  const notification = snap.val();
+  if (String(notification.rider_id) !== String(riderId)) throw new Error('Unauthorized');
+  
+  await fbDb.ref(`notifications/${id}`).update({ read: true, read_at: nowISO() });
+  return { success: true };
+}
+
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
   archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsByRider,
@@ -972,5 +1008,7 @@ module.exports = {
   // Rider Portal
   setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,
   getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
-  getMyRequests, deleteRiderRequest
+  getMyRequests, deleteRiderRequest,
+  // Notifications
+  saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead
 };

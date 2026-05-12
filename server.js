@@ -7,6 +7,9 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 const db = require('./database');
 const XLSX = require('xlsx');
+const { Expo } = require('expo-server-sdk');
+
+const expo = new Expo();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'irl-rider-portal-secret-2026';
 const DASHBOARD_SECRET = process.env.DASHBOARD_SECRET || 'irl-dashboard-secret-2026';
@@ -83,6 +86,20 @@ function verifyRiderToken(req, res, next) {
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// JWT middleware for admin dashboard API
+function verifyAdminToken(req, res, next) {
+  const token = req.cookies?.irl_session;
+  if (!token) return res.status(401).json({ error: 'Admin authentication required' });
+  try {
+    const decoded = jwt.verify(token, DASHBOARD_SECRET);
+    req.adminName = decoded.name;
+    req.adminRole = decoded.role;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired admin session' });
   }
 }
 
@@ -967,11 +984,48 @@ app.get('/api/admin/rider-requests', async (req, res) => {
 });
 
 // Admin: Update rider request status
-app.put('/api/admin/rider-requests/:id', async (req, res) => {
+app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
   try {
     const { status, admin_note } = req.body;
+    const adminName = req.adminName || 'Admin';
     if (!status) return res.status(400).json({ error: 'Status required' });
-    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note);
+    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName);
+    
+    // Create Notification & Send Push
+    try {
+      const snap = await db.getDb().ref(`rider_requests/${req.params.id}`).once('value');
+      const request = snap.val();
+      if (request) {
+        const title = status === 'approved' ? 'Request Approved' : 'Request Rejected';
+        const msg = status === 'approved' 
+          ? `Your ${request.category} request has been approved by ${adminName}.`
+          : `Your ${request.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
+
+        await db.createNotification({
+          rider_id: request.rider_id,
+          type: status === 'approved' ? 'request_approved' : 'request_rejected',
+          title: title,
+          message: msg,
+          processed_by_name: adminName
+        });
+
+        // Send Push Notification
+        const riderSnap = await db.getDb().ref(`riders/${request.rider_id}`).once('value');
+        const rider = riderSnap.val();
+        if (rider && rider.push_token && Expo.isExpoPushToken(rider.push_token)) {
+          await expo.sendPushNotificationsAsync([{
+            to: rider.push_token,
+            sound: 'default',
+            title: title,
+            body: msg,
+            data: { requestId: req.params.id, type: status }
+          }]);
+        }
+      }
+    } catch (pushErr) {
+      console.error('Error sending push notification:', pushErr);
+    }
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -991,6 +1045,37 @@ app.put('/api/rider/change-password', verifyRiderToken, async (req, res) => {
     const match = await bcrypt.compare(current_password, rider.portal_password);
     if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
     await db.setRiderPassword(req.riderId, new_password);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== RIDER NOTIFICATIONS ==========
+
+app.put('/api/rider/push-token', verifyRiderToken, async (req, res) => {
+  try {
+    const { push_token } = req.body;
+    if (!push_token) return res.status(400).json({ error: 'Push token required' });
+    await db.saveRiderPushToken(req.riderId, push_token);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/rider/notifications', verifyRiderToken, async (req, res) => {
+  try {
+    const notifications = await db.getNotificationsForRider(req.riderId);
+    res.json(notifications);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/rider/notifications/:id/read', verifyRiderToken, async (req, res) => {
+  try {
+    await db.markNotificationRead(req.params.id, req.riderId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
