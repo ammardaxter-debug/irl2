@@ -314,5 +314,58 @@ const Utils = {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  },
+
+  // Custom Prompt Dialog
+  prompt(message, title = 'Input Required', placeholder = '', confirmText = 'Submit', cancelText = 'Cancel') {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay active';
+      overlay.style.zIndex = '9999';
+      
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:450px; animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+          <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
+            <h2 class="modal-title" style="font-size:20px; font-weight:700;">${this.escapeHtml(title)}</h2>
+          </div>
+          <div class="modal-body" style="padding-top:12px;">
+            <p style="color:#4B5563; font-size:14px; margin-bottom:12px;">${this.escapeHtml(message)}</p>
+            <textarea id="custom-prompt-input" class="input" style="width:100%; min-height:100px; padding:12px; border-radius:12px; border:1.5px solid #E5E7EB; margin-bottom:24px; font-family:inherit; font-size:14px; resize:none;" placeholder="${this.escapeHtml(placeholder)}"></textarea>
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+              <button class="btn btn-outline prompt-cancel-btn">${cancelText}</button>
+              <button class="btn prompt-ok-btn" style="background:#0F0F0F; color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer;">${confirmText}</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      const input = overlay.querySelector('#custom-prompt-input');
+      input.focus();
+      
+      const cleanup = () => {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 200);
+      };
+      
+      overlay.querySelector('.prompt-ok-btn').onclick = () => { 
+        const val = input.value.trim();
+        cleanup(); 
+        resolve(val); 
+      };
+      
+      overlay.querySelector('.prompt-cancel-btn').onclick = () => { 
+        cleanup(); 
+        resolve(null); 
+      };
+
+      // Handle Escape key
+      overlay.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup();
+          resolve(null);
+        }
+      };
+    });
   }
 };

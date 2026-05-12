@@ -648,7 +648,8 @@ const Expenses = {
     let adminNote = '';
     
     if (status === 'rejected') {
-      adminNote = prompt('Please enter a reason for rejection (optional):') || '';
+      adminNote = await Utils.prompt('Please enter a reason for rejection (optional):', 'Reject Request', 'e.g. Insufficient documents, Wait for next cycle...');
+      if (adminNote === null) return; // User cancelled the prompt
     }
 
     const confirmed = await Utils.confirm(`Are you sure you want to ${action} this request?`, `${action} Request`);
