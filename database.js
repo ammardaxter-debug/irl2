@@ -939,6 +939,25 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
   return { success: true };
 }
 
+async function getMyRequests(riderId) {
+  const snapshot = await fbDb.ref('rider_requests').once('value');
+  const data = snapshotToArray(snapshot);
+  return data
+    .filter(r => String(r.rider_id) === String(riderId))
+    .sort((a, b) => (b.created_at || b.updated_at || '').localeCompare(a.created_at || a.updated_at || ''));
+}
+
+async function deleteRiderRequest(id, riderId) {
+  const snap = await fbDb.ref(`rider_requests/${id}`).once('value');
+  if (!snap.exists()) throw new Error('Request not found');
+  const request = snap.val();
+  if (String(request.rider_id) !== String(riderId)) throw new Error('Unauthorized');
+  if (request.status !== 'pending') throw new Error('Only pending requests can be deleted');
+  
+  await fbDb.ref(`rider_requests/${id}`).remove();
+  return { success: true };
+}
+
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
   archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsByRider,
