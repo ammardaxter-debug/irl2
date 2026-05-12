@@ -841,8 +841,102 @@ async function getRiderMonthlyReport(riderId, start, end) {
     avg_checkin_hours: Math.floor(avgCheckinMin / 60),
     avg_checkin_minutes: Math.round(avgCheckinMin % 60),
     calculated_salary: calculatedSalary,
-    logs: logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''))
   };
+}
+
+// ========== RIDER REQUESTS (Food, Advance, etc.) ==========
+
+async function getUnsettledPaymentsForRider(riderId) {
+  const rid = String(riderId);
+  const [expSnap, advSnap] = await Promise.all([
+    fbDb.ref('expenses').once('value'),
+    fbDb.ref('salary_advances').once('value')
+  ]);
+
+  const expenses = snapshotToArray(expSnap).filter(e => 
+    String(e.rider_id) === rid && 
+    (e.is_deductible === 1 || e.is_deductible === true) && 
+    !e.deductionSettled
+  );
+
+  const advances = snapshotToArray(advSnap).filter(a => 
+    String(a.rider_id) === rid && 
+    a.status === 'approved' && 
+    !a.deductionSettled
+  );
+
+  const items = [
+    ...expenses.map(e => ({ id: e.id, type: 'deduction', amount: e.amount, date: e.expense_date || e.created_at, description: e.category + (e.notes ? `: ${e.notes}` : '') })),
+    ...advances.map(a => ({ id: a.id, type: 'advance', amount: a.amount, date: a.created_at, description: 'Salary Advance' }))
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  return {
+    total_unsettled: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+    total_advances: advances.reduce((sum, a) => sum + (a.amount || 0), 0),
+    items
+  };
+}
+
+async function createRiderRequest(data) {
+  const id = await getNextId('rider_requests');
+  const request = {
+    ...data,
+    status: 'pending',
+    created_at: nowISO(),
+    updated_at: nowISO()
+  };
+  await fbDb.ref(`rider_requests/${id}`).set(request);
+  return { id, ...request };
+}
+
+async function getRiderRequests(status = 'pending') {
+  const snapshot = await fbDb.ref('rider_requests').once('value');
+  let data = snapshotToArray(snapshot);
+  if (status) {
+    data = data.filter(r => r.status === status);
+  }
+  return data.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin') {
+  const requestSnap = await fbDb.ref(`rider_requests/${id}`).once('value');
+  if (!requestSnap.exists()) throw new Error('Request not found');
+  const request = requestSnap.val();
+
+  await fbDb.ref(`rider_requests/${id}`).update({
+    status,
+    admin_note: adminNote,
+    processed_by: processedBy,
+    updated_at: nowISO()
+  });
+
+  if (status === 'approved') {
+    // If approved, create the actual expense/advance record
+    if (request.category === 'Advance') {
+      await createAdvance({
+        rider_id: request.rider_id,
+        rider_name: request.rider_name,
+        amount: request.amount,
+        notes: `Rider Request: ${request.description || ''}`,
+        source: 'rider_request',
+        request_id: id
+      });
+    } else {
+      await createExpense({
+        expense_date: todayLocal(),
+        category: request.category,
+        amount: request.amount,
+        rider_id: request.rider_id,
+        rider_name: request.rider_name,
+        is_deductible: true,
+        notes: `Rider Request: ${request.description || ''}`,
+        source: 'rider_request',
+        request_id: id
+      });
+    }
+  }
+
+  return { success: true };
 }
 
 module.exports = {
@@ -857,5 +951,6 @@ module.exports = {
   getPaymentStatuses, getAllBikes, createBike, updateBike, deleteBike,
   getAuditLogs, migrateFromSQLite,
   // Rider Portal
-  setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport
+  setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,
+  getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus
 };

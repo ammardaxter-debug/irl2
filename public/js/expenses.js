@@ -218,6 +218,7 @@ const Expenses = {
           <div class="tab-clean ${this.currentTab === 'expenses' ? 'active' : ''}" data-tab="expenses" onclick="Expenses.switchTab('expenses')">Expenses Log</div>
           <div class="tab-clean ${this.currentTab === 'funds' ? 'active' : ''}" data-tab="funds" onclick="Expenses.switchTab('funds')">Funds Received</div>
           <div class="tab-clean ${this.currentTab === 'deductions' ? 'active' : ''}" data-tab="deductions" onclick="Expenses.switchTab('deductions')">Rider Deductions</div>
+          <div class="tab-clean ${this.currentTab === 'rider_requests' ? 'active' : ''}" data-tab="rider_requests" onclick="Expenses.switchTab('rider_requests')">Rider Requests</div>
         </div>
 
         <div id="expense-content-area">
@@ -586,6 +587,78 @@ const Expenses = {
       }
       
       this.renderDeductionsUI(area);
+    } else if (this.currentTab === 'rider_requests') {
+      await this.renderRiderRequests(area);
+    }
+  },
+
+  async renderRiderRequests(area) {
+    area.innerHTML = `<div class="p-8"><div class="spinner"></div></div>`;
+    try {
+      const requests = await API.getRiderRequests('pending');
+      let html = `
+        <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
+          <table class="table-clean">
+            <thead>
+              <tr>
+                <th>Submitted</th>
+                <th>Rider</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th style="text-align:right">Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      if (requests.length === 0) {
+        html += `<tr><td colspan="6" style="text-align:center; padding:64px 20px;">
+          <div style="font-size:16px; font-weight:500; color:#6B7280;">No pending rider requests</div>
+        </td></tr>`;
+      } else {
+        requests.forEach(r => {
+          const dateStr = Utils.formatDate(r.created_at);
+          html += `
+            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
+              <td><div style="font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div></td>
+              <td><span style="background:#EFF6FF; color:#2563EB; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></td>
+              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(r.description || '-')}</div></td>
+              <td style="font-weight:700; color:#0F0F0F; text-align:right;">${Utils.formatCurrency(r.amount)}</td>
+              <td>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm" style="background:#16A34A; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'approved')">Approve</button>
+                  <button class="btn btn-sm" style="background:#DC2626; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'rejected')">Reject</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+      }
+      html += `</tbody></table></div>`;
+      area.innerHTML = html;
+    } catch (err) {
+      area.innerHTML = `<div style="color:red; padding:20px;">Error: ${err.message}</div>`;
+    }
+  },
+
+  async processRiderRequest(id, status) {
+    const action = status === 'approved' ? 'Approve' : 'Reject';
+    const confirmed = await Utils.confirm(`Are you sure you want to ${action} this request?`, `${action} Request`);
+    if (!confirmed) return;
+
+    let adminNote = '';
+    if (status === 'rejected') {
+      adminNote = await Utils.prompt('Reason for rejection (optional):', 'Reject Request');
+    }
+
+    try {
+      await API.updateRiderRequestStatus(id, status, adminNote);
+      Utils.showToast(`Request ${status} successfully`, 'success');
+      this.render();
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
     }
   },
 

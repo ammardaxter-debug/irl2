@@ -311,5 +311,17 @@ const API = {
       method: 'PUT',
       body: JSON.stringify({ rider_id: riderId, cycle_key: cycleKey })
     });
+  },
+
+  // ── Rider Requests ──
+  getRiderRequests(status = 'pending') {
+    return this.request(`/admin/rider-requests?status=${status}`);
+  },
+
+  updateRiderRequestStatus(id, status, adminNote) {
+    return this.request(`/admin/rider-requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, admin_note: adminNote })
+    });
   }
 };

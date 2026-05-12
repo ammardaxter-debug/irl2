@@ -892,7 +892,6 @@ app.get('/api/rider/missing-days', verifyRiderToken, async (req, res) => {
   }
 });
 
-// Get monthly report
 app.get('/api/rider/my-report', verifyRiderToken, async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -900,6 +899,60 @@ app.get('/api/rider/my-report', verifyRiderToken, async (req, res) => {
     const report = await db.getRiderMonthlyReport(req.riderId, start, end);
     if (!report) return res.status(404).json({ error: 'Rider not found' });
     res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get unsettled payments for rider
+app.get('/api/rider/unsettled-payments', verifyRiderToken, async (req, res) => {
+  try {
+    const data = await db.getUnsettledPaymentsForRider(req.riderId);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Request money (Food, Advance, etc.)
+app.post('/api/rider/request-money', verifyRiderToken, async (req, res) => {
+  try {
+    const { amount, category, description } = req.body;
+    if (!amount || !category) return res.status(400).json({ error: 'Amount and category required' });
+    
+    const rider = await db.getRiderById(req.riderId);
+    if (!rider) return res.status(404).json({ error: 'Rider not found' });
+
+    const request = await db.createRiderRequest({
+      rider_id: req.riderId,
+      rider_name: rider.name,
+      amount: parseFloat(amount),
+      category,
+      description: description || ''
+    });
+    res.status(201).json(request);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Get rider requests
+app.get('/api/admin/rider-requests', async (req, res) => {
+  try {
+    const requests = await db.getRiderRequests(req.query.status);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Update rider request status
+app.put('/api/admin/rider-requests/:id', async (req, res) => {
+  try {
+    const { status, admin_note } = req.body;
+    if (!status) return res.status(400).json({ error: 'Status required' });
+    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
