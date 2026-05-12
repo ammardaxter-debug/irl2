@@ -194,6 +194,9 @@ const DailyLogs = {
           <button class="view-proof-btn" data-log-id="${log.id}" style="background:transparent; border:none; color:#2563EB; cursor:pointer; padding:4px;" title="View Screenshot">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </button>` : ''}
+          <button class="delete-log-btn" data-log-id="${log.id}" data-rider-name="${Utils.escapeHtml(log.rider_name)}" style="background:transparent; border:none; color:#DC2626; cursor:pointer; padding:4px;" title="Delete Log">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
           <button style="background:transparent; border:none; color:#9CA3AF; cursor:pointer; padding:4px;" title="Edit Log">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -238,8 +241,8 @@ const DailyLogs = {
     // Edit logged entries
     document.querySelectorAll('[data-action="edit"]').forEach(card => {
       card.addEventListener('click', (e) => {
-        // Ignore if they clicked the view proof button
-        if (e.target.closest('.view-proof-btn')) return;
+        // Ignore if they clicked the view proof or delete button
+        if (e.target.closest('.view-proof-btn') || e.target.closest('.delete-log-btn')) return;
         const logId = parseInt(card.dataset.logId);
         const log = logged.find(l => l.id === logId);
         if (log) this.openEditForm(log);
@@ -254,6 +257,28 @@ const DailyLogs = {
         const log = logged.find(l => l.id === logId);
         if (log && log.screenshot) {
           Utils.openModal('Screenshot Proof', `<div style="text-align:center;"><img src="${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>`);
+        }
+      });
+    });
+
+    // Delete Log button (Direct)
+    document.querySelectorAll('.delete-log-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const logId = parseInt(btn.dataset.logId);
+        const riderName = btn.dataset.riderName;
+        const confirmed = await Utils.confirm(`Are you sure you want to permanently delete this log for ${riderName}? This action cannot be undone.`, 'Delete Log', 'Yes, Delete', 'Cancel', true);
+        if (confirmed) {
+          try {
+            Utils.showLoading('Deleting log');
+            await API.deleteDailyLog(logId);
+            Utils.showToast('Log deleted successfully', 'success');
+            this.render();
+          } catch (err) {
+            Utils.showToast(err.message, 'error');
+          } finally {
+            Utils.hideLoading();
+          }
         }
       });
     });
