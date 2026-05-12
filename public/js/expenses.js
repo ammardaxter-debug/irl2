@@ -618,7 +618,7 @@ const Expenses = {
         </td></tr>`;
       } else {
         requests.forEach(r => {
-          const dateStr = Utils.formatDate(r.created_at);
+          const dateStr = Utils.formatDateTime(r.created_at || r.updated_at);
           html += `
             <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
               <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
@@ -645,20 +645,24 @@ const Expenses = {
 
   async processRiderRequest(id, status) {
     const action = status === 'approved' ? 'Approve' : 'Reject';
+    let adminNote = '';
+    
+    if (status === 'rejected') {
+      adminNote = prompt('Please enter a reason for rejection (optional):') || '';
+    }
+
     const confirmed = await Utils.confirm(`Are you sure you want to ${action} this request?`, `${action} Request`);
     if (!confirmed) return;
 
-    let adminNote = '';
-    if (status === 'rejected') {
-      adminNote = await Utils.prompt('Reason for rejection (optional):', 'Reject Request');
-    }
-
     try {
+      Utils.showLoading(`${action}ing...`);
       await API.updateRiderRequestStatus(id, status, adminNote);
-      Utils.showToast(`Request ${status} successfully`, 'success');
+      Utils.showToast(`Request ${status} successfully`);
       this.render();
     } catch (err) {
       Utils.showToast(err.message, 'error');
+    } finally {
+      Utils.hideLoading();
     }
   },
 
