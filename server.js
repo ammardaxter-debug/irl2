@@ -784,7 +784,7 @@ app.get('/api/rider/me', verifyRiderToken, async (req, res) => {
     // Attach assigned bike if exists
     if (safeRider.bike_id) {
       try {
-        const bikes = await db.getBikes();
+        const bikes = await db.getAllBikes();
         const bike = bikes.find(b => String(b.id) === String(safeRider.bike_id));
         if (bike) safeRider.bike = bike;
       } catch (err) {
