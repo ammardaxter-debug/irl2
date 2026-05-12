@@ -7,9 +7,6 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 const db = require('./database');
 const XLSX = require('xlsx');
-const { Expo } = require('expo-server-sdk');
-
-const expo = new Expo();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'irl-rider-portal-secret-2026';
 const DASHBOARD_SECRET = process.env.DASHBOARD_SECRET || 'irl-dashboard-secret-2026';
@@ -1012,14 +1009,22 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
         // Send Push Notification
         const riderSnap = await db.getDb().ref(`riders/${request.rider_id}`).once('value');
         const rider = riderSnap.val();
-        if (rider && rider.push_token && Expo.isExpoPushToken(rider.push_token)) {
-          await expo.sendPushNotificationsAsync([{
-            to: rider.push_token,
-            sound: 'default',
-            title: title,
-            body: msg,
-            data: { requestId: req.params.id, type: status }
-          }]);
+        if (rider && rider.push_token) {
+          try {
+            const { Expo } = await import('expo-server-sdk');
+            const expo = new Expo();
+            if (Expo.isExpoPushToken(rider.push_token)) {
+              await expo.sendPushNotificationsAsync([{
+                to: rider.push_token,
+                sound: 'default',
+                title: title,
+                body: msg,
+                data: { requestId: req.params.id, type: status }
+              }]);
+            }
+          } catch (importErr) {
+            console.error('Dynamic import of expo-server-sdk failed:', importErr);
+          }
         }
       }
     } catch (pushErr) {
