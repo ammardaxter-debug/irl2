@@ -905,7 +905,7 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
 
   await fbDb.ref(`rider_requests/${id}`).update({
     status,
-    admin_note: adminNote,
+    admin_note: adminNote || '',
     processed_by: processedBy,
     updated_at: nowISO()
   });
@@ -952,5 +952,6 @@ module.exports = {
   getAuditLogs, migrateFromSQLite,
   // Rider Portal
   setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,
-  getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus
+  getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
+  getMyRequests, deleteRiderRequest
 };

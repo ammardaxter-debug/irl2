@@ -936,6 +936,26 @@ app.post('/api/rider/request-money', verifyRiderToken, async (req, res) => {
   }
 });
 
+// Rider: Get my requests
+app.get('/api/rider/my-requests', verifyRiderToken, async (req, res) => {
+  try {
+    const requests = await db.getMyRequests(req.riderId);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rider: Delete my request
+app.delete('/api/rider/request/:id', verifyRiderToken, async (req, res) => {
+  try {
+    const result = await db.deleteRiderRequest(req.params.id, req.riderId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: Get rider requests
 app.get('/api/admin/rider-requests', async (req, res) => {
   try {
