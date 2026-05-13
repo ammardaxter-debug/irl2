@@ -420,7 +420,7 @@ const ProfileMenu = {
   },
   
   applyCrop() {
-    const boxSize = 240;
+    const boxSize = 512;
     const canvas = document.createElement('canvas');
     canvas.width = boxSize;
     canvas.height = boxSize;
@@ -439,8 +439,8 @@ const ProfileMenu = {
     
     const cropX = (boxRect.left - rect.left) * scaleX;
     const cropY = (boxRect.top - rect.top) * scaleY;
-    const cropW = boxSize * scaleX;
-    const cropH = boxSize * scaleY;
+    const cropW = boxRect.width * scaleX;
+    const cropH = boxRect.height * scaleY;
     
     ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, boxSize, boxSize);
     
@@ -451,11 +451,11 @@ const ProfileMenu = {
     statusEl.style.display = 'block';
     
     let pct = 0;
-    statusEl.innerText = `Uploading... ${pct}%`;
+    statusEl.innerText = `Uploading HD... ${pct}%`;
     const interval = setInterval(() => {
       pct += Math.floor(Math.random() * 20) + 10;
       if (pct > 95) pct = 95;
-      statusEl.innerText = `Uploading... ${pct}%`;
+      statusEl.innerText = `Uploading HD... ${pct}%`;
     }, 200);
     
     canvas.toBlob((blob) => {
@@ -464,7 +464,7 @@ const ProfileMenu = {
          this.uploadToFirebase(reader.result, interval);
       };
       reader.readAsDataURL(blob);
-    }, 'image/jpeg', 0.85); // Compress blob
+    }, 'image/jpeg', 0.95); // High quality HD
   },
 
   async uploadToFirebase(dataUrl, progressInterval) {
