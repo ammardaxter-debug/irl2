@@ -420,11 +420,15 @@ const ProfileMenu = {
   },
   
   applyCrop() {
-    const boxSize = 512;
+    const boxSize = 1024;
     const canvas = document.createElement('canvas');
     canvas.width = boxSize;
     canvas.height = boxSize;
     const ctx = canvas.getContext('2d');
+    
+    // Enable ultra-high quality rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     
     // Draw white background
     ctx.fillStyle = '#FFFFFF';
@@ -451,11 +455,11 @@ const ProfileMenu = {
     statusEl.style.display = 'block';
     
     let pct = 0;
-    statusEl.innerText = `Uploading HD... ${pct}%`;
+    statusEl.innerText = `Uploading Ultra-HD... ${pct}%`;
     const interval = setInterval(() => {
       pct += Math.floor(Math.random() * 20) + 10;
       if (pct > 95) pct = 95;
-      statusEl.innerText = `Uploading HD... ${pct}%`;
+      statusEl.innerText = `Uploading Ultra-HD... ${pct}%`;
     }, 200);
     
     canvas.toBlob((blob) => {
@@ -464,7 +468,7 @@ const ProfileMenu = {
          this.uploadToFirebase(reader.result, interval);
       };
       reader.readAsDataURL(blob);
-    }, 'image/jpeg', 0.95); // High quality HD
+    }, 'image/png'); // Lossless Ultra-HD
   },
 
   async uploadToFirebase(dataUrl, progressInterval) {
