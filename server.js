@@ -94,6 +94,7 @@ function verifyAdminToken(req, res, next) {
     const decoded = jwt.verify(token, DASHBOARD_SECRET);
     req.adminName = decoded.name;
     req.adminRole = decoded.role;
+    req.adminEmail = decoded.email;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired admin session' });
@@ -980,18 +981,47 @@ app.get('/api/admin/rider-requests', async (req, res) => {
   }
 });
 
-app.get('/api/test-notification', async (req, res) => {
+// ========== ADMIN PROFILES ==========
+
+app.get('/api/admin/profiles', async (req, res) => {
   try {
-    const result = await db.createNotification({
-      rider_id: '5',
-      type: 'test_from_vercel',
-      title: 'Vercel Test',
-      message: 'If you see this, the Vercel backend can create notifications!',
-      processed_by_name: 'System'
-    });
-    res.json({ success: true, result });
+    const profiles = await db.getAdminProfiles();
+    res.json(profiles);
   } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/profile', verifyAdminToken, async (req, res) => {
+  try {
+    const { name, title, photo_url } = req.body;
+    const emailKey = (req.adminEmail || '').replace(/\./g, '_dot_');
+    if (!emailKey) return res.status(400).json({ error: 'Cannot identify admin' });
+    await db.updateAdminProfile(emailKey, { name, title, photo_url, role: req.adminRole });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== APP VERSION CONFIG ==========
+
+app.get('/api/app-version', async (req, res) => {
+  try {
+    const version = await db.getAppVersion();
+    res.json(version);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
+  try {
+    const { latest_version, min_version, download_url, force } = req.body;
+    await db.setAppVersion({ latest_version, min_version, download_url, force: !!force });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1001,18 +1031,38 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
     const { status, admin_note } = req.body;
     const adminName = req.adminName || 'Admin';
     if (!status) return res.status(400).json({ error: 'Status required' });
+
+    // Get admin photo for notification
+    let adminPhoto = '';
+    try {
+      const emailKey = (req.adminEmail || '').replace(/\./g, '_dot_');
+      if (emailKey) {
+        const profile = await db.getAdminProfile(emailKey);
+        if (profile && profile.photo_url) adminPhoto = profile.photo_url;
+      }
+    } catch (e) { /* ignore */ }
+
     const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName);
     
-    // Send Push Notification
+    // Update the notification with admin photo
     try {
       const snap = await db.getDb().ref(`rider_requests/${req.params.id}`).once('value');
       const request = snap.val();
       if (request) {
+        // Find the most recent notification for this rider and update with photo
+        const notifSnap = await db.getDb().ref('notifications').orderByChild('rider_id').equalTo(String(request.rider_id)).limitToLast(1).once('value');
+        if (notifSnap.exists()) {
+          notifSnap.forEach(child => {
+            db.getDb().ref(`notifications/${child.key}`).update({ processed_by_photo: adminPhoto });
+          });
+        }
+
         const title = status === 'approved' ? 'Request Approved' : 'Request Rejected';
         const msg = status === 'approved' 
           ? `Your ${request.category} request has been approved by ${adminName}.`
           : `Your ${request.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
 
+        // Send Push Notification
         const riderSnap = await db.getDb().ref(`riders/${request.rider_id}`).once('value');
         const rider = riderSnap.val();
         if (rider && rider.push_token) {

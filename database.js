@@ -1008,6 +1008,44 @@ async function markNotificationRead(id, riderId) {
   return { success: true };
 }
 
+// ========== ADMIN PROFILES ==========
+
+async function getAdminProfiles() {
+  const snapshot = await fbDb.ref('admin_profiles').once('value');
+  if (!snapshot.exists()) return {};
+  return snapshot.val();
+}
+
+async function getAdminProfile(emailKey) {
+  const snapshot = await fbDb.ref(`admin_profiles/${emailKey}`).once('value');
+  if (!snapshot.exists()) return null;
+  return snapshot.val();
+}
+
+async function updateAdminProfile(emailKey, data) {
+  await fbDb.ref(`admin_profiles/${emailKey}`).update({
+    ...data,
+    updated_at: nowISO()
+  });
+  return { success: true };
+}
+
+// ========== APP VERSION CONFIG ==========
+
+async function getAppVersion() {
+  const snapshot = await fbDb.ref('app_config/version').once('value');
+  if (!snapshot.exists()) return { latest_version: '1.0.0', min_version: '1.0.0', download_url: '', force: false };
+  return snapshot.val();
+}
+
+async function setAppVersion(data) {
+  await fbDb.ref('app_config/version').set({
+    ...data,
+    updated_at: nowISO()
+  });
+  return { success: true };
+}
+
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
   archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsByRider,
@@ -1024,5 +1062,9 @@ module.exports = {
   getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
   getMyRequests, deleteRiderRequest,
   // Notifications
-  saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead
+  saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead,
+  // Admin Profiles
+  getAdminProfiles, getAdminProfile, updateAdminProfile,
+  // App Version
+  getAppVersion, setAppVersion
 };
