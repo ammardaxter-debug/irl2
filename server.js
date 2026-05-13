@@ -1348,5 +1348,26 @@ if (!process.env.VERCEL) {
   });
 }
 
+// ==========================================
+// APP VERSION
+// ==========================================
+app.get('/api/app-version', async (req, res) => {
+  try {
+    const versionData = await db.getAppVersion();
+    res.json(versionData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
+  try {
+    await db.setAppVersion(req.body);
+    res.json({ message: 'App version updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export for Vercel
 module.exports = app;

@@ -120,6 +120,25 @@ async function deleteRiderPermanently(id) {
   return true;
 }
 
+// ========== APP CONFIG ==========
+
+async function getAppVersion() {
+  const snapshot = await fbDb.ref('app_config/version').once('value');
+  if (snapshot.exists()) {
+    return snapshot.val();
+  }
+  return { latest_version: "1.1.0", min_version: "1.0.0", download_url: "", force: false };
+}
+
+async function setAppVersion(data) {
+  await fbDb.ref('app_config/version').set({
+    latest_version: data.latest_version || "1.1.0",
+    min_version: data.min_version || "1.0.0",
+    download_url: data.download_url || "",
+    force: data.force === true || data.force === 'true'
+  });
+}
+
 // ========== DAILY LOGS ==========
 
 async function getDailyLogs(date) {
