@@ -5,16 +5,28 @@
 const ProfileMenu = {
 
   async open() {
-    let settings = {};
+    let admin = { name: 'Abdullah Khan', title: 'Manager', photo_url: '' };
     try {
-      const res = await fetch('/api/settings');
-      if (res.ok) settings = await res.json();
-    } catch(e) { console.warn('Could not fetch settings', e); }
+      const res = await fetch('/api/auth/session');
+      const session = await res.json();
+      if (session && session.user) {
+        // Fetch the detailed profile from the new profiles node
+        const emailKey = session.user.email.replace(/\./g, '_dot_');
+        const pRes = await fetch('/api/admin/profiles');
+        const allProfiles = await pRes.json();
+        const profile = allProfiles[emailKey] || {};
+        
+        admin = {
+          name: profile.name || session.user.name,
+          title: profile.title || 'Administrator',
+          photo_url: profile.photo_url || ''
+        };
+      }
+    } catch(e) { console.warn('Could not fetch admin profile', e); }
     
-    const supervisorObj = settings.supervisor || {};
-    const supervisorName = supervisorObj.name || localStorage.getItem('irl_supervisor_name') || 'Abdullah Khan';
-    const supervisorTitle = supervisorObj.title || localStorage.getItem('irl_supervisor_title') || 'Manager';
-    const photoUrl = supervisorObj.photo_url || window.supervisorPhotoUrl || localStorage.getItem('irl_supervisor_photo') || '';
+    const supervisorName = admin.name;
+    const supervisorTitle = admin.title;
+    const photoUrl = admin.photo_url;
     
     const lang = localStorage.getItem('irl_lang') || 'en';
     const dateFmt = localStorage.getItem('irl_date_format') || 'DD/MM/YYYY';
@@ -300,12 +312,12 @@ const ProfileMenu = {
     if (field === 'name') window.supervisorName = newVal;
     if (field === 'title') window.supervisorTitle = newVal;
     
-    // Save to firebase
+    // Save to firebase via new profile API
     try {
-      await fetch('/api/settings', {
-        method: 'POST',
+      await fetch('/api/admin/profile', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: `supervisor/${field}`, value: newVal })
+        body: JSON.stringify({ name: window.supervisorName, title: window.supervisorTitle })
       });
     } catch(e) { console.warn(e); }
     
@@ -457,17 +469,14 @@ const ProfileMenu = {
 
   async uploadToFirebase(dataUrl, progressInterval) {
     try {
-      await fetch('/api/settings', {
-        method: 'POST',
+      await fetch('/api/admin/profile', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'supervisor/photo_url', value: dataUrl })
-      });
-      
-      // Also update the global company logo for Rider Portal
-      await fetch('/api/settings/logo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logo: dataUrl })
+        body: JSON.stringify({ 
+          name: window.supervisorName, 
+          title: window.supervisorTitle,
+          photo_url: dataUrl 
+        })
       });
 
       clearInterval(progressInterval);
@@ -557,16 +566,27 @@ const ProfileMenu = {
 
   // ── Init: load saved settings into sidebar on page load ──
   async init() {
-    let settings = {};
+    let admin = { name: 'Abdullah Khan', title: 'Manager', photo_url: '' };
     try {
-      const res = await fetch('/api/settings');
-      if (res.ok) settings = await res.json();
+      const res = await fetch('/api/auth/session');
+      const session = await res.json();
+      if (session && session.user) {
+        const emailKey = session.user.email.replace(/\./g, '_dot_');
+        const pRes = await fetch('/api/admin/profiles');
+        const allProfiles = await pRes.json();
+        const profile = allProfiles[emailKey] || {};
+        
+        admin = {
+          name: profile.name || session.user.name,
+          title: profile.title || 'Administrator',
+          photo_url: profile.photo_url || ''
+        };
+      }
     } catch(e) {}
     
-    const supervisorSettings = settings.supervisor || {};
-    const supervisorName = supervisorSettings.name || localStorage.getItem('irl_supervisor_name') || 'Abdullah Khan';
-    const supervisorTitle = supervisorSettings.title || localStorage.getItem('irl_supervisor_title') || 'Manager';
-    const photoUrl = supervisorSettings.photo_url || localStorage.getItem('irl_supervisor_photo');
+    const supervisorName = admin.name;
+    const supervisorTitle = admin.title;
+    const photoUrl = admin.photo_url;
     
     window.supervisorName = supervisorName;
     window.supervisorTitle = supervisorTitle;

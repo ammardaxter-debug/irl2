@@ -1042,7 +1042,7 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
       }
     } catch (e) { /* ignore */ }
 
-    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName);
+    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName, adminPhoto);
     
     // Update the notification with admin photo
     try {

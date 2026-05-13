@@ -898,7 +898,7 @@ async function getRiderRequests(status = 'pending') {
   return data.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin') {
+async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin', processedByPhoto = '') {
   const requestSnap = await fbDb.ref(`rider_requests/${id}`).once('value');
   if (!requestSnap.exists()) throw new Error('Request not found');
   const request = requestSnap.val();
@@ -921,7 +921,8 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
     type: status === 'approved' ? 'request_approved' : 'request_rejected',
     title: title,
     message: msg,
-    processed_by_name: processedBy
+    processed_by_name: processedBy,
+    processed_by_photo: processedByPhoto
   });
 
   if (status === 'approved') {
@@ -993,8 +994,27 @@ async function createNotification(data) {
 async function getNotificationsForRider(riderId) {
   const snapshot = await fbDb.ref('notifications').once('value');
   const data = snapshotToArray(snapshot);
+  
+  // Fetch latest admin profiles for real-time photo sync
+  const adminSnap = await fbDb.ref('admin_profiles').once('value');
+  const adminProfiles = adminSnap.exists() ? adminSnap.val() : {};
+  
+  // Create a mapping of name -> photo
+  const photoMap = {};
+  for (const key in adminProfiles) {
+    const profile = adminProfiles[key];
+    if (profile.name && profile.photo_url) {
+      photoMap[profile.name] = profile.photo_url;
+    }
+  }
+
   return data
     .filter(n => String(n.rider_id) === String(riderId))
+    .map(n => ({
+      ...n,
+      // If a photo exists in the profile, override the stored one
+      processed_by_photo: photoMap[n.processed_by_name] || n.processed_by_photo || ''
+    }))
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 }
 
