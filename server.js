@@ -988,7 +988,7 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
     if (!status) return res.status(400).json({ error: 'Status required' });
     const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName);
     
-    // Create Notification & Send Push
+    // Send Push Notification
     try {
       const snap = await db.getDb().ref(`rider_requests/${req.params.id}`).once('value');
       const request = snap.val();
@@ -998,15 +998,6 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
           ? `Your ${request.category} request has been approved by ${adminName}.`
           : `Your ${request.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
 
-        await db.createNotification({
-          rider_id: request.rider_id,
-          type: status === 'approved' ? 'request_approved' : 'request_rejected',
-          title: title,
-          message: msg,
-          processed_by_name: adminName
-        });
-
-        // Send Push Notification
         const riderSnap = await db.getDb().ref(`riders/${request.rider_id}`).once('value');
         const rider = riderSnap.val();
         if (rider && rider.push_token) {

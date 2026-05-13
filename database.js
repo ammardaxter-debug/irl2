@@ -910,6 +910,20 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
     updated_at: nowISO()
   });
 
+  // Create an in-app notification for the rider
+  const title = status === 'approved' ? 'Request Approved' : 'Request Rejected';
+  const msg = status === 'approved' 
+    ? `Your ${request.category} request has been approved by ${processedBy}.`
+    : `Your ${request.category} request was rejected by ${processedBy}. Reason: ${adminNote || 'No reason provided'}`;
+
+  await createNotification({
+    rider_id: request.rider_id,
+    type: status === 'approved' ? 'request_approved' : 'request_rejected',
+    title: title,
+    message: msg,
+    processed_by_name: processedBy
+  });
+
   if (status === 'approved') {
     // If approved, create the actual expense/advance record
     if (request.category === 'Advance') {
