@@ -980,6 +980,21 @@ app.get('/api/admin/rider-requests', async (req, res) => {
   }
 });
 
+app.get('/api/test-notification', async (req, res) => {
+  try {
+    const result = await db.createNotification({
+      rider_id: '5',
+      type: 'test_from_vercel',
+      title: 'Vercel Test',
+      message: 'If you see this, the Vercel backend can create notifications!',
+      processed_by_name: 'System'
+    });
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 // Admin: Update rider request status
 app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
   try {
