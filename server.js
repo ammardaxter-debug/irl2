@@ -127,6 +127,16 @@ app.post('/api/riders', async (req, res) => {
   try {
     if (!req.body.name) return res.status(400).json({ error: 'Name is required' });
     const rider = await db.createRider(req.body);
+    
+    // Sync bike assignment if bike_id provided
+    if (req.body.bike_id) {
+      try {
+        await db.updateBike(req.body.bike_id, { assigned_rider_id: String(rider.id), assigned_rider_name: rider.name });
+      } catch (err) {
+        console.error('Failed to sync bike assignment on create:', err);
+      }
+    }
+
     res.status(201).json(rider);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -135,8 +145,27 @@ app.post('/api/riders', async (req, res) => {
 
 app.put('/api/riders/:id', async (req, res) => {
   try {
-    const rider = await db.updateRider(parseInt(req.params.id), req.body);
+    const riderId = parseInt(req.params.id);
+    const oldRider = await db.getRiderById(riderId);
+    const rider = await db.updateRider(riderId, req.body);
     if (!rider) return res.status(404).json({ error: 'Rider not found' });
+
+    // Sync bike assignment if bike_id changed
+    if (req.body.bike_id !== undefined && String(oldRider?.bike_id) !== String(req.body.bike_id)) {
+      try {
+        // Clear old bike assignment
+        if (oldRider?.bike_id) {
+          await db.updateBike(oldRider.bike_id, { assigned_rider_id: null, assigned_rider_name: null });
+        }
+        // Set new bike assignment
+        if (req.body.bike_id) {
+          await db.updateBike(req.body.bike_id, { assigned_rider_id: String(riderId), assigned_rider_name: rider.name });
+        }
+      } catch (err) {
+        console.error('Failed to sync bike assignment:', err);
+      }
+    }
+
     res.json(rider);
   } catch (err) {
     res.status(500).json({ error: err.message });

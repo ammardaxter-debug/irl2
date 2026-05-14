@@ -173,6 +173,15 @@ const Bikes = {
               <span style="${insAlert}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</span>
             </div>
           </div>
+          
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--slate-200); display:flex; align-items:center; gap:8px;">
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--slate-100); display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div style="font-size: 13px; font-weight: 500; color: var(--slate-700);">
+               ${bike.assigned_rider_name || 'No rider assigned'}
+            </div>
+          </div>
         </div>
       `;
     }).join('');

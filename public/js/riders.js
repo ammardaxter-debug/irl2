@@ -301,6 +301,19 @@ const Riders = {
             <div style="font-size:12px; color:#6B7280;">${Utils.escapeHtml(branchInfo)}</div>
          </div>
       </div>
+
+      <div id="assigned-vehicle-container" style="margin-top:16px;">
+         <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.05em;">Assigned Vehicle</div>
+         <div id="rider-bike-info" style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:12px; padding:12px; display:flex; align-items:center; gap:12px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:white; border:1px solid #E5E7EB; display:flex; align-items:center; justify-content:center; color:#6B7280;">
+               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/></svg>
+            </div>
+            <div style="flex:1;">
+               <div id="rider-bike-plate" style="font-size:14px; font-weight:600; color:#0F0F0F;">No vehicle assigned</div>
+               <div id="rider-bike-model" style="font-size:12px; color:#6B7280;">Assign a bike in the edit menu</div>
+            </div>
+         </div>
+      </div>
       
       <div style="height:1px; background:#F3F4F6; margin:20px 0;"></div>
 
@@ -475,6 +488,27 @@ const Riders = {
            }
         } else {
            document.getElementById('net-salary-pill').innerText = "Net: SR 0.00";
+        }
+
+        // Fetch and display bike info
+        if (rider.bike_id) {
+          try {
+            const bikes = await API.getBikes();
+            const bike = bikes.find(b => String(b.id) === String(rider.bike_id));
+            if (bike) {
+              const plateEl = document.getElementById('rider-bike-plate');
+              const modelEl = document.getElementById('rider-bike-model');
+              const infoBox = document.getElementById('rider-bike-info');
+              if (plateEl) plateEl.innerText = bike.plate_number;
+              if (modelEl) modelEl.innerText = bike.model || 'Unknown Model';
+              if (infoBox) {
+                 infoBox.style.background = '#F0FDF4';
+                 infoBox.style.borderColor = '#DCFCE7';
+              }
+            }
+          } catch (err) {
+            console.warn("Failed to load bike info", err);
+          }
         }
       } catch (err) {
         console.warn("Failed KPI sync", err);
