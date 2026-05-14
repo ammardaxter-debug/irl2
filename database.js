@@ -263,7 +263,7 @@ async function getExpenses(start, end) {
 }
 
 async function createExpense(expData) {
-  if (expData.rider_id && !expData.rider_name) {
+  if (expData.rider_id && (!expData.rider_name || expData.rider_name === 'Rider')) {
     const rider = await getRiderById(expData.rider_id);
     if (rider) expData.rider_name = rider.name;
   }
@@ -283,6 +283,10 @@ async function createExpense(expData) {
 }
 
 async function updateExpense(id, expData) {
+  if (expData.rider_id && (!expData.rider_name || expData.rider_name === 'Rider')) {
+    const rider = await getRiderById(expData.rider_id);
+    if (rider) expData.rider_name = rider.name;
+  }
   const { receipt_base64, ...rest } = expData;
   const updateData = { ...rest, updated_at: nowISO() };
   if (receipt_base64 !== undefined) updateData.receipt_url = receipt_base64;

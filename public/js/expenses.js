@@ -353,7 +353,10 @@ const Expenses = {
           
           const catBadge = `<span style="background:${catBg}; color:${catColor}; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:500;">${Utils.escapeHtml(e.category)}</span>`;
 
-          const recipientStr = e.rider_id ? Utils.escapeHtml(e.rider_name || 'Rider') : Utils.escapeHtml(e.vendor_name || 'Other');
+          const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+          let rName = e.rider_name;
+          if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : 'Rider';
+          const recipientStr = e.rider_id ? Utils.escapeHtml(rName) : Utils.escapeHtml(e.vendor_name || 'Other');
           const amountColor = e.is_deductible ? '#DC2626' : '#0F0F0F';
           
           html += `
@@ -570,7 +573,15 @@ const Expenses = {
           const riderMap = {};
           for (const e of riderExpenses) {
             if (!riderMap[e.rider_id]) {
-              riderMap[e.rider_id] = { rider_name: e.rider_name || `Rider #${e.rider_id}`, rider_id: e.rider_id, pending: [], settled: [] };
+              const foundRider = this.riders.find(r => r.id == e.rider_id);
+              let rName = e.rider_name;
+              if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : `Rider #${e.rider_id}`;
+              riderMap[e.rider_id] = { 
+                rider_name: rName, 
+                rider_id: e.rider_id, 
+                pending: [], 
+                settled: [] 
+              };
             }
             if (e.deductionSettled) { riderMap[e.rider_id].settled.push(e); }
             else { riderMap[e.rider_id].pending.push(e); }
