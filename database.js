@@ -378,7 +378,8 @@ async function getFunds(start, end) {
   if (error) throw error;
   return (data || []).map(f => ({
     ...f,
-    description: f.source || f.description
+    description: f.source || f.description,
+    receipt_base64: f.receipt_url || f.receipt_base64
   })).sort((a, b) => {
     const dateA = a.receive_date || a.created_at || '';
     const dateB = b.receive_date || b.created_at || '';
@@ -389,20 +390,24 @@ async function getFunds(start, end) {
 }
 
 async function createFund(fundData) {
-  const { description, ...rest } = fundData;
-  const { data, error } = await supabase.from('company_funds').insert([{
+  const { description, receipt_base64, ...rest } = fundData;
+  const insertData = {
     ...rest,
     source: description || rest.source,
     created_at: nowISO()
-  }]).select().single();
+  };
+  if (receipt_base64 !== undefined) insertData.receipt_url = receipt_base64;
+  
+  const { data, error } = await supabase.from('company_funds').insert([insertData]).select().single();
   if (error) throw error;
-  return { ...data, description: data.source };
+  return { ...data, description: data.source, receipt_base64: data.receipt_url };
 }
 
 async function updateFund(id, fundData) {
-  const { description, ...rest } = fundData;
+  const { description, receipt_base64, ...rest } = fundData;
   const updateData = { ...rest, updated_at: nowISO() };
   if (description) updateData.source = description;
+  if (receipt_base64 !== undefined) updateData.receipt_url = receipt_base64;
   
   const { error } = await supabase.from('company_funds').update(updateData).eq('id', id);
   if (error) throw error;
