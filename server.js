@@ -1198,7 +1198,9 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({ success: true, user: { name: user.name, email: user.email, role: user.role }, redirect: '/' });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Login error:', err.message);
+    const msg = err.message.includes('auth_users') ? err.message : 'Server error';
+    res.status(500).json({ error: msg });
   }
 });
 

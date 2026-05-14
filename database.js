@@ -819,9 +819,20 @@ async function updateSettings(key, value) {
 }
 
 async function getAuthUser(email) {
-  const { data, error } = await supabase.from('auth_users').select('*').eq('email', email.toLowerCase()).single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
+  try {
+    const { data, error } = await supabase.from('auth_users').select('*').eq('email', email.toLowerCase()).single();
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows
+      if (error.code === '42P01') {
+        throw new Error("Table 'auth_users' is missing in Supabase. Please run the SQL script to create it.");
+      }
+      throw error;
+    }
+    return data || null;
+  } catch (err) {
+    console.error('getAuthUser error:', err.message);
+    throw err;
+  }
 }
 
 async function upsertAuthUser(userData) {
