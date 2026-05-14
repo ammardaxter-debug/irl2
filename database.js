@@ -799,5 +799,39 @@ module.exports = {
   // Admin Profiles
   getAdminProfiles, getAdminProfile, updateAdminProfile,
   // App Version
-  getAppVersion, setAppVersion
+  getAppVersion, setAppVersion,
+  // Auth Users
+  getAuthUser, upsertAuthUser,
+  // Settings
+  getSettings, updateSettings
 };
+
+async function getSettings(key) {
+  const { data, error } = await supabase.from('app_config').select('value').eq('key', key).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data ? data.value : null;
+}
+
+async function updateSettings(key, value) {
+  const { error } = await supabase.from('app_config').upsert({ key, value, updated_at: nowISO() });
+  if (error) throw error;
+  return { success: true };
+}
+
+async function getAuthUser(email) {
+  const { data, error } = await supabase.from('auth_users').select('*').eq('email', email.toLowerCase()).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function upsertAuthUser(userData) {
+  const { error } = await supabase.from('auth_users').upsert({
+    email: userData.email.toLowerCase(),
+    name: userData.name,
+    role: userData.role,
+    password_hash: userData.password_hash,
+    created_at: userData.created_at || nowISO()
+  });
+  if (error) throw error;
+  return { success: true };
+}

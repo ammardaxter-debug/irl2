@@ -169,37 +169,18 @@ app.get('/api/daily-logs', async (req, res) => {
   try {
     const { date, rider_id, start, end } = req.query;
     
-    // If rider_id is provided, return all logs for that rider (for bulk lodge)
     if (rider_id) {
-      const snapshot = await db.getDb().ref('daily_logs').once('value');
-      const results = [];
-      if (snapshot.exists()) {
-        snapshot.forEach(child => {
-          const log = child.val();
-          if (log.rider_id === parseInt(rider_id)) {
-            results.push({ id: parseInt(child.key), ...log });
-          }
-        });
-      }
-      return res.json(results);
+      const logs = await db.getDailyLogsByRider(parseInt(rider_id), start, end);
+      return res.json(logs);
     }
     
-    // If start and end are provided, return logs in that date range
     if (start && end) {
-      const snapshot = await db.getDb().ref('daily_logs')
-        .orderByChild('log_date')
-        .startAt(start)
-        .endAt(end)
-        .once('value');
-      const results = [];
-      if (snapshot.exists()) {
-        snapshot.forEach(child => {
-          results.push({ id: parseInt(child.key), ...child.val() });
-        });
-      }
-      return res.json(results);
+      // If no rider_id but start/end, we get all logs in range
+      const { data, error } = await db.getDb().from('daily_logs').select('*').gte('log_date', start).lte('log_date', end);
+      if (error) throw error;
+      return res.json(data || []);
     }
-    
+
     const logDate = date || new Date().toISOString().split('T')[0];
     const logs = await db.getDailyLogs(logDate);
     res.json(logs);
@@ -1146,8 +1127,8 @@ app.put('/api/riders/:id/set-password', async (req, res) => {
 // Company Logo Settings
 app.get('/api/settings/logo', async (req, res) => {
   try {
-    const snap = await db.getDb().ref('settings/company_logo').once('value');
-    res.json({ logo: snap.val() || null });
+    const logo = await db.getSettings('company_logo');
+    res.json({ logo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1156,7 +1137,7 @@ app.get('/api/settings/logo', async (req, res) => {
 app.post('/api/settings/logo', async (req, res) => {
   try {
     const { logo } = req.body;
-    await db.getDb().ref('settings/company_logo').set(logo);
+    await db.updateSettings('company_logo', logo);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1180,9 +1161,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(429).json({ error: 'Account temporarily locked', lockout_seconds: remaining });
     }
 
-    // Find user in Firebase
-    const snap = await db.getDb().ref(`auth_users/${key.replace(/\./g, '_dot_')}`).once('value');
-    const user = snap.val();
+    // Find user in Supabase
+    const user = await db.getAuthUser(email);
 
     if (!user) {
       trackFailedAttempt(key);
@@ -1274,11 +1254,10 @@ app.get('*', (req, res) => {
 // ========== SEED AUTH USERS ==========
 async function seedAuthUsers() {
   for (const u of DASHBOARD_USERS) {
-    const key = u.email.replace(/\./g, '_dot_');
-    const snap = await db.getDb().ref(`auth_users/${key}`).once('value');
-    if (!snap.exists()) {
+    const user = await db.getAuthUser(u.email);
+    if (!user) {
       const hash = await bcrypt.hash(u.password, 10);
-      await db.getDb().ref(`auth_users/${key}`).set({
+      await db.upsertAuthUser({
         email: u.email,
         name: u.name,
         role: u.role,
@@ -1294,27 +1273,15 @@ async function seedAuthUsers() {
 async function initializeApp() {
   try {
     await db.initDb();
-    console.log('  ✅ Database initialized (Firebase)');
+    console.log('  🐘 Database initialized (Supabase)');
 
     // Seed dashboard auth users
     await seedAuthUsers();
     console.log('  🔐 Dashboard auth users ready');
 
-    // Auto-migrate from SQLite if Firebase is empty
-    const checkSnap = await db.getDb().ref('riders').once('value');
-    if (!checkSnap.exists() || checkSnap.numChildren() === 0) {
-      console.log('  📦 Firebase is empty — attempting auto-migration from SQLite...');
-      try {
-        const result = await db.migrateFromSQLite();
-        if (result.migrated) {
-          console.log(`  🎉 Auto-migration complete: ${result.total} records moved to Firebase`);
-        }
-      } catch (migErr) {
-        console.log('  ⚠️ Auto-migration skipped:', migErr.message);
-      }
-    } else {
-      console.log(`  📊 Firebase has data (${checkSnap.numChildren()} riders)`);
-    }
+    // Check if we have data
+    const riders = await db.getAllRiders();
+    console.log(`  📊 Database has data (${riders.length} riders)`);
   } catch (err) {
     console.error('Failed to initialize:', err);
   }
