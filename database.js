@@ -242,10 +242,7 @@ async function getExpenseStats() {
 }
 
 async function getExpenses(start, end) {
-  let query = supabase.from('expenses').select(`
-    *,
-    riders(name)
-  `);
+  let query = supabase.from('expenses').select('*');
   if (start && end) {
     query = query.gte('expense_date', start).lte('expense_date', end);
   }
@@ -254,7 +251,7 @@ async function getExpenses(start, end) {
   
   return (data || []).map(e => ({
     ...e,
-    rider_name: e.riders?.name || e.rider_name
+    rider_name: e.rider_name
   })).sort((a, b) => {
     const dateA = a.expense_date || a.created_at || '';
     const dateB = b.expense_date || b.created_at || '';
