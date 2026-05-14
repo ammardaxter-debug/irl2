@@ -1044,27 +1044,15 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
 
     const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName, adminPhoto);
     
-    // Update the notification with admin photo
+    // Send Push Notification
     try {
-      const snap = await db.getDb().ref(`rider_requests/${req.params.id}`).once('value');
-      const request = snap.val();
-      if (request) {
-        // Find the most recent notification for this rider and update with photo
-        const notifSnap = await db.getDb().ref('notifications').orderByChild('rider_id').equalTo(String(request.rider_id)).limitToLast(1).once('value');
-        if (notifSnap.exists()) {
-          notifSnap.forEach(child => {
-            db.getDb().ref(`notifications/${child.key}`).update({ processed_by_photo: adminPhoto });
-          });
-        }
-
+      if (result && result.rider_id) {
         const title = status === 'approved' ? 'Request Approved' : 'Request Rejected';
         const msg = status === 'approved' 
-          ? `Your ${request.category} request has been approved by ${adminName}.`
-          : `Your ${request.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
+          ? `Your ${result.category} request has been approved by ${adminName}.`
+          : `Your ${result.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
 
-        // Send Push Notification
-        const riderSnap = await db.getDb().ref(`riders/${request.rider_id}`).once('value');
-        const rider = riderSnap.val();
+        const { data: rider } = await db.getDb().from('riders').select('*').eq('id', result.rider_id).single();
         if (rider && rider.push_token) {
           try {
             const { Expo } = await import('expo-server-sdk');
