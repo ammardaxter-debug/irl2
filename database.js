@@ -251,7 +251,8 @@ async function getExpenses(start, end) {
   
   return (data || []).map(e => ({
     ...e,
-    rider_name: e.rider_name
+    rider_name: e.rider_name,
+    receipt_base64: e.receipt_url || e.receipt_base64
   })).sort((a, b) => {
     const dateA = a.expense_date || a.created_at || '';
     const dateB = b.expense_date || b.created_at || '';
@@ -266,18 +267,27 @@ async function createExpense(expData) {
     const rider = await getRiderById(expData.rider_id);
     if (rider) expData.rider_name = rider.name;
   }
-  const { data, error } = await supabase.from('expenses').insert([{
-    ...expData,
+  
+  const { receipt_base64, ...rest } = expData;
+  const insertData = {
+    ...rest,
     "deductionSettled": false,
     created_at: nowISO()
-  }]).select().single();
+  };
+  if (receipt_base64 !== undefined) insertData.receipt_url = receipt_base64;
+  
+  const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
   if (error) throw error;
   await logAudit('CREATE', 'Expense', `Logged expense: ${expData.category} - ${expData.amount} SAR`);
-  return data;
+  return { ...data, receipt_base64: data.receipt_url };
 }
 
 async function updateExpense(id, expData) {
-  const { error } = await supabase.from('expenses').update({ ...expData, updated_at: nowISO() }).eq('id', id);
+  const { receipt_base64, ...rest } = expData;
+  const updateData = { ...rest, updated_at: nowISO() };
+  if (receipt_base64 !== undefined) updateData.receipt_url = receipt_base64;
+  
+  const { error } = await supabase.from('expenses').update(updateData).eq('id', id);
   if (error) throw error;
   return { id };
 }
@@ -366,7 +376,10 @@ async function getFunds(start, end) {
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []).sort((a, b) => {
+  return (data || []).map(f => ({
+    ...f,
+    description: f.source || f.description
+  })).sort((a, b) => {
     const dateA = a.receive_date || a.created_at || '';
     const dateB = b.receive_date || b.created_at || '';
     const dateCmp = dateB.localeCompare(dateA);
@@ -376,16 +389,22 @@ async function getFunds(start, end) {
 }
 
 async function createFund(fundData) {
+  const { description, ...rest } = fundData;
   const { data, error } = await supabase.from('company_funds').insert([{
-    ...fundData,
+    ...rest,
+    source: description || rest.source,
     created_at: nowISO()
   }]).select().single();
   if (error) throw error;
-  return data;
+  return { ...data, description: data.source };
 }
 
 async function updateFund(id, fundData) {
-  const { error } = await supabase.from('company_funds').update({ ...fundData, updated_at: nowISO() }).eq('id', id);
+  const { description, ...rest } = fundData;
+  const updateData = { ...rest, updated_at: nowISO() };
+  if (description) updateData.source = description;
+  
+  const { error } = await supabase.from('company_funds').update(updateData).eq('id', id);
   if (error) throw error;
   return { id };
 }
