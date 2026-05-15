@@ -73,6 +73,30 @@ async function updateRider(id, riderData) {
   return data;
 }
 
+async function updateRiderLocation(id, lat, lng) {
+  const { error } = await supabase.from('riders')
+    .update({
+      last_lat: lat,
+      last_lng: lng,
+      last_location_update: nowISO(),
+      updated_at: nowISO()
+    })
+    .eq('id', id);
+  if (error) throw error;
+  return { success: true };
+}
+
+async function updateRiderOnlineStatus(id, isOnline) {
+  const { error } = await supabase.from('riders')
+    .update({
+      is_online: isOnline,
+      updated_at: nowISO()
+    })
+    .eq('id', id);
+  if (error) throw error;
+  return { success: true };
+}
+
 async function archiveRider(id) {
   return await updateRider(id, { status: 'inactive' });
 }

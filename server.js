@@ -1144,11 +1144,35 @@ app.put('/api/rider/change-password', verifyRiderToken, async (req, res) => {
     if (new_password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
     // Verify current password
     const rider = await db.getRiderById(req.riderId);
-    if (!rider) return res.status(404).json({ error: 'Rider not found' });
-    const bcrypt = require('bcryptjs');
+    if (!rider || !rider.portal_password) return res.status(404).json({ error: 'Rider not found' });
     const match = await bcrypt.compare(current_password, rider.portal_password);
-    if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+    if (!match) return res.status(400).json({ error: 'Current password incorrect' });
+
     await db.setRiderPassword(req.riderId, new_password);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update rider location
+app.post('/api/rider/location', verifyRiderToken, async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+    if (latitude === undefined || longitude === undefined) return res.status(400).json({ error: 'latitude and longitude required' });
+    await db.updateRiderLocation(req.riderId, latitude, longitude);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update online status
+app.put('/api/rider/online-status', verifyRiderToken, async (req, res) => {
+  try {
+    const { is_online } = req.body;
+    if (is_online === undefined) return res.status(400).json({ error: 'is_online required' });
+    await db.updateRiderOnlineStatus(req.riderId, is_online);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
