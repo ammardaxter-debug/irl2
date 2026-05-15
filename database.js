@@ -627,7 +627,7 @@ async function authenticateRider(phone, plainPassword) {
 }
 
 async function updateRiderSelfService(riderId, riderData) {
-  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality'];
+  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry'];
   const updates = { updated_at: nowISO() };
   for (const key of allowed) {
     if (riderData[key] !== undefined) updates[key] = riderData[key];
