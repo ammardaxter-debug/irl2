@@ -1168,7 +1168,7 @@ app.post('/api/rider/location', verifyRiderToken, async (req, res) => {
 });
 
 // Update online status
-app.put('/api/rider/online-status', verifyRiderToken, async (req, res) => {
+app.post('/api/rider/online-status', verifyRiderToken, async (req, res) => {
   try {
     const { is_online } = req.body;
     if (is_online === undefined) return res.status(400).json({ error: 'is_online required' });
