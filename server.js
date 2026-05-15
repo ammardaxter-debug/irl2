@@ -991,6 +991,51 @@ app.get('/api/admin/rider-requests', async (req, res) => {
   }
 });
 
+// ========== LEADERBOARD API ==========
+app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
+
+    // 1. Get all active riders
+    const riders = await db.getAllRiders('active');
+    
+    // 2. Get all logs for the period
+    const { data: allLogs, error: logErr } = await db.getDb()
+      .from('daily_logs')
+      .select('rider_id, primary_orders, associate_orders')
+      .gte('log_date', start)
+      .lte('log_date', end);
+
+    if (logErr) throw logErr;
+
+    // 3. Aggregate stats
+    const statsMap = {};
+    (allLogs || []).forEach(log => {
+      const rid = log.rider_id;
+      const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      if (!statsMap[rid]) statsMap[rid] = 0;
+      statsMap[rid] += orders;
+    });
+
+    // 4. Map to rider details
+    const leaderboard = riders.map(r => ({
+      id: r.id,
+      name: r.name,
+      photo: r.profile_photo || r.photo_url || null,
+      total_orders: statsMap[r.id] || 0,
+      rider_type: r.rider_type
+    }));
+
+    // 5. Sort by orders desc
+    leaderboard.sort((a, b) => b.total_orders - a.total_orders);
+
+    res.json(leaderboard);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========== ADMIN PROFILES ==========
 
 app.get('/api/admin/profiles', async (req, res) => {
