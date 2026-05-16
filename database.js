@@ -815,15 +815,16 @@ module.exports = {
   getPaymentStatuses, getAllBikes, createBike, updateBike, deleteBike,
   getAuditLogs, migrateFromSQLite,
   // Rider Portal
+  // Rider Portal
   setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,
   getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
   getMyRequests, deleteRiderRequest,
+  // Tracking
+  updateRiderOnlineStatus, updateRiderLocation,
   // Notifications
   saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead,
   // Admin Profiles
   getAdminProfiles, getAdminProfile, updateAdminProfile,
-  // App Version
-  getAppVersion, setAppVersion,
   // Auth Users
   getAuthUser, upsertAuthUser,
   // Settings
