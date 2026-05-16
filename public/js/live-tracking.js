@@ -145,19 +145,18 @@ const LiveTracking = {
             if (!r.lat || !r.lng) return;
             
             const isOnline = r.isOnline === true;
-            const markerColor = isOnline ? '#22c55e' : '#94a3b8';
-            const markerIcon = isOnline ? '🚴' : '💤';
             
             if (this._riderMarkers[r.id]) {
                 this._riderMarkers[r.id].setLatLng([r.lat, r.lng]);
-                // Update icon if status changed
+                // Update icon if status changed (detecting by color in HTML)
                 const currentHtml = this._riderMarkers[r.id].options.icon.options.html;
-                if (!currentHtml.includes(markerColor)) {
-                    this._riderMarkers[r.id].setIcon(this.createIcon(markerColor, markerIcon));
+                const targetColor = isOnline ? '#2563eb' : '#64748b';
+                if (!currentHtml.includes(targetColor)) {
+                    this._riderMarkers[r.id].setIcon(this.createIcon(isOnline));
                 }
             } else {
                 const marker = L.marker([r.lat, r.lng], { 
-                    icon: this.createIcon(markerColor, markerIcon) 
+                    icon: this.createIcon(isOnline) 
                 }).addTo(this._map);
                 
                 marker.bindPopup(`
@@ -180,10 +179,31 @@ const LiveTracking = {
         });
     },
 
-    createIcon(color, emoji) {
+    createIcon(isOnline) {
+        const color = isOnline ? '#2563eb' : '#64748b';
+        const shadow = isOnline ? 'rgba(37, 99, 235, 0.4)' : 'transparent';
+        const pulse = isOnline ? `
+            <div style="position:absolute; width:100%; height:100%; border-radius:12px; background:${color}; opacity:0.3; animation: rider-pulse 2s infinite;"></div>
+        ` : '';
+
         return L.divIcon({
-            html: `<div class="custom-marker" style="width:36px; height:36px; background:${color}; border:3px solid white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 6px -1px rgba(0,0,0,0.2); font-size:18px;">${emoji}</div>`,
-            className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+            html: `
+                <div style="position:relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center;">
+                    ${pulse}
+                    <div class="custom-marker" style="width:34px; height:34px; background:white; border:2.5px solid ${color}; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 16px -4px rgba(0,0,0,0.2); position:relative; z-index:2;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
+                        </svg>
+                    </div>
+                    <style>
+                        @keyframes rider-pulse {
+                            0% { transform: scale(0.8); opacity: 0.5; }
+                            100% { transform: scale(1.6); opacity: 0; }
+                        }
+                    </style>
+                </div>
+            `,
+            className: '', iconSize: [42, 42], iconAnchor: [21, 21]
         });
     },
 
