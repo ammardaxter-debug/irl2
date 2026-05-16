@@ -189,8 +189,10 @@ const LiveTracking = {
 
     updateRiderList(riders) {
         const list = document.getElementById('rider-list');
-        list.innerHTML = riders.map(r => `
-            <div class="rider-item" onclick="LiveTracking.focusRider(${r.lat}, ${r.lng}, '${r.id}')" style="padding:15px; border-radius:16px; margin-bottom:10px; background:white; border:1px solid #eef2f6; display:flex; align-items:center; gap:12px;">
+        list.innerHTML = riders.map(r => {
+            const hasLocation = r.lat && r.lng;
+            return `
+            <div class="rider-item" onclick="LiveTracking.focusRider(${r.lat || 'null'}, ${r.lng || 'null'}, '${r.id}')" style="padding:15px; border-radius:16px; margin-bottom:10px; background:white; border:1px solid #eef2f6; display:flex; align-items:center; gap:12px; opacity: ${hasLocation ? '1' : '0.7'};">
                 <div style="width:44px; height:44px; background:${r.isOnline ? '#f0fdf4' : '#f8fafc'}; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:20px; border:1px solid ${r.isOnline ? '#bbf7d0' : '#e2e8f0'};">
                     ${r.isOnline ? '🚴' : '💤'}
                 </div>
@@ -198,12 +200,14 @@ const LiveTracking = {
                     <div style="font-weight:800; font-size:14px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r.name}</div>
                     <div style="font-size:12px; color:#64748b;">${r.isOnline ? '<span style="color:#22c55e; font-weight:700;">Active Now</span>' : 'Inactive'}</div>
                 </div>
-                <div style="text-align:right;">
-                    <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:4px;">${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}</div>
-                    <div style="width:10px; height:10px; background:${r.isOnline ? '#22c55e' : '#cbd5e1'}; border-radius:50%; margin-left:auto;"></div>
+                <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                    <button style="background:${hasLocation ? '#2563eb' : '#cbd5e1'}; color:white; border:none; width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:${hasLocation ? 'pointer' : 'not-allowed'};" title="Track Rider">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <div style="font-size:10px; font-weight:700; color:#94a3b8;">${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}</div>
                 </div>
             </div>
-        `).join('') || '<div style="text-align:center; padding:40px; color:#94a3b8;">No riders registered</div>';
+        `}).join('') || '<div style="text-align:center; padding:40px; color:#94a3b8;">No riders registered</div>';
     },
 
     updateStats(riders) {
@@ -214,11 +218,20 @@ const LiveTracking = {
 
     focusRider(lat, lng, id) {
         if (!lat || !lng) {
-            alert('This rider has not shared their location yet.');
+            alert('Waiting for this rider to sync their GPS...');
             return;
         }
-        this._map.flyTo([lat, lng], 17, { duration: 1.5 });
-        if (this._riderMarkers[id]) this._riderMarkers[id].openPopup();
+        this._map.flyTo([lat, lng], 18, { 
+            duration: 1.5,
+            easeLinearity: 0.25 
+        });
+        
+        // Wait for flyTo to finish or just open popup immediately
+        if (this._riderMarkers[id]) {
+            setTimeout(() => {
+                this._riderMarkers[id].openPopup();
+            }, 500);
+        }
     },
 
     recenter() {
