@@ -1179,7 +1179,25 @@ app.post('/api/rider/online-status', verifyRiderToken, async (req, res) => {
   }
 });
 
-// ========== RIDER NOTIFICATIONS ==========
+// Get all rider locations (Admin)
+app.get('/api/admin/fleet-locations', async (req, res) => {
+  try {
+    const riders = await db.getAllRiders();
+    const activeRiders = riders.map(r => ({
+      id: r.id,
+      name: r.name,
+      lat: r.last_lat,
+      lng: r.last_lng,
+      lastUpdate: r.last_location_update,
+      isOnline: r.is_online,
+      status: r.status,
+      photo: r.profile_photo || r.photo_url
+    }));
+    res.json(activeRiders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.put('/api/rider/push-token', verifyRiderToken, async (req, res) => {
   try {
