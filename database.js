@@ -871,3 +871,27 @@ async function upsertAuthUser(userData) {
   if (error) throw error;
   return { success: true };
 }
+
+// ========== TRACKING & FLEET MGT ==========
+async function updateRiderOnlineStatus(riderId, isOnline) {
+  const { error } = await supabase.from('riders')
+    .update({ 
+      is_online: isOnline, 
+      last_location_update: nowISO() 
+    })
+    .eq('id', riderId);
+  if (error) throw error;
+  return { success: true };
+}
+
+async function updateRiderLocation(riderId, lat, lng) {
+  const { error } = await supabase.from('riders')
+    .update({ 
+      last_lat: lat, 
+      last_lng: lng, 
+      last_location_update: nowISO() 
+    })
+    .eq('id', riderId);
+  if (error) throw error;
+  return { success: true };
+}
