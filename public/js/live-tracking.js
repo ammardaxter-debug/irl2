@@ -145,9 +145,14 @@ const LiveTracking = {
             if (!r.lat || !r.lng) return;
             
             const isOnline = r.isOnline === true;
+            const popupContent = this.getPopupHtml(r, isOnline);
             
             if (this._riderMarkers[r.id]) {
                 this._riderMarkers[r.id].setLatLng([r.lat, r.lng]);
+                
+                // Update popup content live
+                this._riderMarkers[r.id].setPopupContent(popupContent);
+                
                 // Update icon if status changed (detecting by color in HTML)
                 const currentHtml = this._riderMarkers[r.id].options.icon.options.html;
                 const targetColor = isOnline ? '#2563eb' : '#64748b';
@@ -159,24 +164,28 @@ const LiveTracking = {
                     icon: this.createIcon(isOnline) 
                 }).addTo(this._map);
                 
-                marker.bindPopup(`
-                    <div style="padding:15px; min-width:200px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                            <div style="width:40px; height:40px; background:#f8fafc; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div>
-                            <div>
-                                <div style="font-weight:800; color:#0f172a; font-size:14px;">${r.name}</div>
-                                <div style="font-size:11px; color:${isOnline ? '#16a34a' : '#64748b'}; font-weight:700;">${isOnline ? '● ONLINE' : '● OFFLINE'}</div>
-                            </div>
-                        </div>
-                        <div style="background:#f1f5f9; padding:8px; border-radius:8px; font-size:12px; color:#475569;">
-                            <div>📍 ${r.status || 'Active'}</div>
-                            <div>🕒 Last Update: ${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString() : 'N/A'}</div>
-                        </div>
-                    </div>
-                `);
+                marker.bindPopup(popupContent);
                 this._riderMarkers[r.id] = marker;
             }
         });
+    },
+
+    getPopupHtml(r, isOnline) {
+        return `
+            <div style="padding:15px; min-width:200px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <div style="width:40px; height:40px; background:#f8fafc; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div>
+                    <div>
+                        <div style="font-weight:800; color:#0f172a; font-size:14px;">${r.name}</div>
+                        <div style="font-size:11px; color:${isOnline ? '#16a34a' : '#64748b'}; font-weight:700;">${isOnline ? '● ONLINE' : '● OFFLINE'}</div>
+                    </div>
+                </div>
+                <div style="background:#f1f5f9; padding:8px; border-radius:8px; font-size:12px; color:#475569;">
+                    <div>📍 ${r.status || 'Active'}</div>
+                    <div>🕒 Last Update: ${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString() : 'N/A'}</div>
+                </div>
+            </div>
+        `;
     },
 
     createIcon(isOnline) {
