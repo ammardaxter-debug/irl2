@@ -157,9 +157,35 @@ async function getMissingLogs(date) {
   return riders.filter(r => !loggedRiderIds.has(String(r.id)));
 }
 
+function sanitizeDailyLog(logData) {
+  if (!logData || typeof logData !== 'object') return {};
+  const validKeys = [
+    'rider_id',
+    'rider_name',
+    'log_date',
+    'attendance_status',
+    'primary_orders',
+    'associate_orders',
+    'checkin_hours',
+    'checkin_minutes',
+    'notes',
+    'screenshot',
+    'submitted_at',
+    'absent_reason'
+  ];
+  const sanitized = {};
+  for (const key of validKeys) {
+    if (logData[key] !== undefined) {
+      sanitized[key] = logData[key];
+    }
+  }
+  return sanitized;
+}
+
 async function createDailyLog(logData) {
+  const sanitized = sanitizeDailyLog(logData);
   const { data, error } = await supabase.from('daily_logs').insert([{
-    ...logData,
+    ...sanitized,
     created_at: nowISO(),
     updated_at: nowISO()
   }]).select().single();
@@ -168,8 +194,9 @@ async function createDailyLog(logData) {
 }
 
 async function updateDailyLog(id, logData) {
+  const sanitized = sanitizeDailyLog(logData);
   const { data, error } = await supabase.from('daily_logs')
-    .update({ ...logData, updated_at: nowISO() })
+    .update({ ...sanitized, updated_at: nowISO() })
     .eq('id', id)
     .select().single();
   if (error) throw error;

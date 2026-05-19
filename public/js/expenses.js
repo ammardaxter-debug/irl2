@@ -336,8 +336,12 @@ const Expenses = {
         displayExpenses.forEach(e => {
           const dateStr = Utils.formatDate(e.expense_date);
           let deductBadge = '';
-          if (e.is_deductible && (e.is_deductible === 'true' || e.is_deductible === 1 || e.is_deductible === true) && e.rider_id) {
-            deductBadge = `<span style="background:#FEF3C7; color:#D97706; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Deductible</span>`;
+          if (e.is_deductible && (e.is_deductible === 'true' || e.is_deductible === 1 || e.is_deductible === true)) {
+            if (e.rider_id) {
+              deductBadge = `<span style="background:#FEF3C7; color:#D97706; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Rider Deductible</span>`;
+            } else {
+              deductBadge = `<span style="background:#FFEDD5; color:#C2410C; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Supervisor Deductible</span>`;
+            }
           } else {
             deductBadge = `<span style="background:#DCFCE7; color:#16A34A; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Company Paid</span>`;
           }
@@ -1492,7 +1496,8 @@ const Expenses = {
           <label class="expense-form-label">Deductibility</label>
           <select class="expense-form-input" name="deduct_type" id="expense-deductible">
             <option value="company">Company Paid</option>
-            <option value="deductible">Deductible (rider will repay)</option>
+            <option value="deductible">Rider Deductible (rider will repay)</option>
+            <option value="supervisor">Supervisor Deductible (supervisor will repay)</option>
           </select>
           <div id="medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
         </div>
@@ -1582,7 +1587,11 @@ const Expenses = {
          deductibleSelect.disabled = false;
          medHint.style.display = 'none';
          if (['Advance', 'Food', 'Cash Relay'].includes(cat)) {
-            deductibleSelect.value = 'deductible';
+            if (riderSelect.value) {
+               deductibleSelect.value = 'deductible';
+            } else {
+               deductibleSelect.value = 'supervisor';
+            }
          } else if (deductibleSelect.value === 'false' || deductibleSelect.value === 'true') {
             deductibleSelect.value = 'company';
          }
@@ -1751,11 +1760,7 @@ const Expenses = {
         }
       });
     } catch (err) {
-      Utils.showToast(err.message, 'error');
-    }
-  },
-
-  async openEditExpenseModal(id) {
+       async openEditExpenseModal(id) {
     Utils.showLoading('Loading', 'Preparing form');
     try {
       let exp;
@@ -1770,73 +1775,104 @@ const Expenses = {
       if (!exp) throw new Error('Expense record not found');
 
       const categories = ['Advance', 'Food', 'Cash Relay', 'Internet Package', 'Transport', 'Equipment', 'Maintenance', 'Uniform', 'Other', 'Health / Medical'];
+      
       let riderOptions = '<option value="">-- General / Vendor --</option>';
       this.riders.forEach(r => {
-        riderOptions += `<option value="${r.id}" ${r.id === exp.rider_id ? 'selected' : ''}>${r.name}</option>`;
+        riderOptions += `<option value="${r.id}" ${r.id === exp.rider_id ? 'selected' : ''}>${r.name} (${r.client_company || 'Active'})</option>`;
       });
 
+      const pillsHtml = categories.map(c => `
+        <div class="expense-cat-pill ${c === exp.category ? 'active' : ''}" data-cat="${c}" onclick="document.getElementById('edit-expense-cat').value='${c}'; document.querySelectorAll('#edit-expense-form .expense-cat-pill').forEach(p=>p.classList.remove('active')); this.classList.add('active'); document.getElementById('edit-expense-cat').dispatchEvent(new Event('change'));">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          ${c}
+        </div>
+      `).join('');
+
+      const getInitialDeductType = (exp) => {
+        if (exp.is_deductible && (exp.is_deductible === 'true' || exp.is_deductible === 1 || exp.is_deductible === true)) {
+          return exp.rider_id ? 'deductible' : 'supervisor';
+        }
+        return 'company';
+      };
+      const initialDeductType = getInitialDeductType(exp);
+
       const html = `
-        <form id="edit-expense-form" class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Expense Date</label>
-            <input type="date" class="form-input" name="expense_date" required value="${exp.expense_date}" max="${Utils.today()}">
-          </div>
+        <form id="edit-expense-form" style="display:flex;flex-direction:column;gap:16px;padding:4px 0;">
           
-          <div class="form-group">
-            <label class="form-label">Category</label>
-            <select class="form-select" name="category" id="edit-expense-cat" required>
-              ${categories.map(c => `<option value="${c}" ${c === exp.category ? 'selected' : ''}>${c}</option>`).join('')}
-            </select>
+          <!-- Hidden actual select to maintain form logic -->
+          <select name="category" id="edit-expense-cat" required style="display:none;">
+            <option value="">Select Category</option>
+            ${categories.map(c => `<option value="${c}" ${c === exp.category ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+          
+          <div>
+            <label class="expense-form-label" style="margin-bottom:8px;">Category</label>
+            <div class="expense-cat-pills">
+              ${pillsHtml}
+            </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Deductibility</label>
-            <select class="form-select" name="is_deductible" id="edit-expense-deductible">
-              <option value="false" ${!exp.is_deductible ? 'selected' : ''}>Company Paid (No Deduction)</option>
-              <option value="true" ${exp.is_deductible ? 'selected' : ''}>Rider Deductible (From Salary)</option>
+          <div>
+            <label class="expense-form-label">Deductibility</label>
+            <select class="expense-form-input" name="deduct_type" id="edit-expense-deductible">
+              <option value="company" ${initialDeductType === 'company' ? 'selected' : ''}>Company Paid</option>
+              <option value="deductible" ${initialDeductType === 'deductible' ? 'selected' : ''}>Rider Deductible (rider will repay)</option>
+              <option value="supervisor" ${initialDeductType === 'supervisor' ? 'selected' : ''}>Supervisor Deductible (supervisor will repay)</option>
             </select>
             <div id="edit-medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Linked Rider</label>
-            <select class="form-select" name="rider_id" id="edit-expense-rider">
+          <div style="display:flex; gap:16px;">
+            <div style="flex:1;">
+              <label class="expense-form-label">Date</label>
+              <input type="date" class="expense-form-input" name="expense_date" required value="${exp.expense_date}" max="${Utils.today()}">
+            </div>
+            <div style="flex:1;">
+              <label class="expense-form-label">Amount (SAR)</label>
+              <input type="number" step="0.01" min="0" class="expense-form-input" name="amount" id="edit-expense-amount" required placeholder="0.00" value="${exp.amount}" oninput="document.getElementById('edit-expense-footer-total').innerText = 'Logging: SAR ' + (parseFloat(this.value)||0).toFixed(2) + ' · April 2026 cycle'; document.getElementById('edit-expense-submit-btn').disabled = !(parseFloat(this.value)>0 && document.getElementById('edit-expense-cat').value);">
+            </div>
+          </div>
+          
+          <div>
+            <label class="expense-form-label">Linked Rider</label>
+            <select class="expense-form-input" name="rider_id" id="edit-expense-rider">
               ${riderOptions}
             </select>
           </div>
           
-          <div class="form-group">
-            <label class="form-label">Amount (﷼)</label>
-            <input type="number" step="0.01" min="0" class="form-input" name="amount" required value="${exp.amount}">
+          <div id="edit-vendor-group" style="display:none; transition: all 150ms;">
+            <label class="expense-form-label">Vendor or Item Name</label>
+            <input type="text" class="expense-form-input" name="vendor_name" id="edit-vendor-input" value="${Utils.escapeHtml(exp.vendor_name || '')}" placeholder="e.g. AC Installer, Petrol, Spare Part">
           </div>
           
-          <div class="form-group" style="grid-column: 1 / -1;" id="edit-vendor-group">
-            <label class="form-label">Name / Description (If Other/General)</label>
-            <input type="text" class="form-input" name="vendor_name" id="edit-vendor-input" value="${Utils.escapeHtml(exp.vendor_name || '')}">
+          <div>
+            <label class="expense-form-label">Notes</label>
+            <textarea class="expense-form-input" name="notes" placeholder="Optional notes...">${Utils.escapeHtml(exp.notes || '')}</textarea>
           </div>
           
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label class="form-label">Notes</label>
-            <input type="text" class="form-input" name="notes" value="${Utils.escapeHtml(exp.notes || '')}">
+          <div>
+            <div class="expense-upload-zone" onclick="document.getElementById('edit-receipt-upload').click()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span class="upload-text" style="font-size:13px; font-weight:500;">Attach receipt or PDF</span>
+            </div>
+            <div id="edit-receipt-preview-area" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+            <input type="file" id="edit-receipt-upload" multiple accept="image/*,.pdf" style="display:none;">
+            <div style="font-size:11px; color:#9CA3AF; margin-top:6px;">Images compressed automatically · PDFs supported</div>
+            <input type="hidden" id="edit-receipt-base64-hidden">
           </div>
           
-          <div class="form-group" style="grid-column: 1 / -1; background:var(--slate-50); padding:16px; border-radius:8px; border:1px dashed var(--slate-300);">
-            <label class="form-label">Update Receipt Photos / PDFs (Optional)</label>
-            <div id="edit-receipt-preview-area" style="display:none; margin-bottom:12px;"></div>
-            <input type="file" id="edit-receipt-upload" multiple class="form-input" style="padding:4px; font-size:13px">
-            <small class="form-hint" style="margin-top:8px; display:block">New uploads will add to the existing receipts. Remove manually if replacing.</small>
-            <input type="hidden" id="edit-receipt-base64-hidden" value="">
-          </div>
-          
-          <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-end; margin-top: 10px;">
-            <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary">Update Expense</button>
+          <div class="expense-footer">
+            <div id="edit-expense-footer-total" style="font-size:12px; color:#6B7280;">Logging: SAR ${(parseFloat(exp.amount)||0).toFixed(2)} · April 2026 cycle</div>
+            <div style="display:flex; gap:12px;">
+              <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
+              <button type="submit" id="edit-expense-submit-btn" style="width:140px; height:42px; border-radius:10px; border:none; background:#2563EB; color:white; font-weight:600; cursor:pointer; transition:opacity 150ms;">Save Expense</button>
+            </div>
           </div>
         </form>
       `;
 
       Utils.hideLoading();
-      Utils.openModal('Edit Expense', html);
+      Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#0F0F0F;">Edit Expense</div><div style="font-size:13px;color:#6B7280;font-weight:normal;margin-top:2px;">Modify logged expense details</div>', html, 'modal-expense');
       
       // Inject base64 directly to avoid massive HTML parsing freezes
       if (exp.receipt_base64) {
@@ -1846,6 +1882,22 @@ const Expenses = {
       const catSelect = document.getElementById('edit-expense-cat');
       const riderSelect = document.getElementById('edit-expense-rider');
       const vendorGroup = document.getElementById('edit-vendor-group');
+      const vendorInput = document.getElementById('edit-vendor-input');
+      const submitBtn = document.getElementById('edit-expense-submit-btn');
+      const amountInput = document.getElementById('edit-expense-amount');
+
+      const checkSubmitBtn = () => {
+         const amt = parseFloat(amountInput.value) || 0;
+         if (amt > 0 && catSelect.value) {
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+         } else {
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.5';
+            submitBtn.style.cursor = 'not-allowed';
+         }
+      };
 
       const updateEditVisibility = () => {
         const cat = catSelect.value;
@@ -1853,25 +1905,37 @@ const Expenses = {
         const medHint = document.getElementById('edit-medical-hint');
         
         if (cat === 'Health / Medical') {
-           deductibleSelect.value = 'false';
+           deductibleSelect.value = 'company';
            deductibleSelect.disabled = true;
            medHint.style.display = 'block';
         } else {
            deductibleSelect.disabled = false;
            medHint.style.display = 'none';
+           if (['Advance', 'Food', 'Cash Relay'].includes(cat)) {
+              if (riderSelect.value) {
+                 deductibleSelect.value = 'deductible';
+              } else {
+                 deductibleSelect.value = 'supervisor';
+              }
+           } else if (deductibleSelect.value === 'false' || deductibleSelect.value === 'true') {
+              deductibleSelect.value = 'company';
+           }
         }
         
         if (cat === 'Other' || riderSelect.value === '') {
           vendorGroup.style.display = 'block';
-          document.getElementById('edit-vendor-input').required = true;
+          vendorInput.required = true;
         } else {
           vendorGroup.style.display = 'none';
-          document.getElementById('edit-vendor-input').required = false;
+          vendorInput.required = false;
         }
+        
+        checkSubmitBtn();
       };
 
       catSelect.addEventListener('change', updateEditVisibility);
       riderSelect.addEventListener('change', updateEditVisibility);
+      amountInput.addEventListener('input', checkSubmitBtn);
       updateEditVisibility();
 
       this.initMultiUpload('edit-receipt-upload', 'edit-receipt-base64-hidden', 'edit-receipt-preview-area', 'edit-expense-form');
@@ -1879,12 +1943,13 @@ const Expenses = {
       document.getElementById('edit-expense-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
-        const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
-        submitBtn.innerText = 'Uploading...';
+        submitBtn.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="spinner" style="width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div> Saving...</span>';
+        submitBtn.style.opacity = '0.7';
 
         const category = fd.get('category');
-        const isDeductible = document.getElementById('edit-expense-deductible').value === 'true';
+        const deductType = document.getElementById('edit-expense-deductible').value;
+        const isDeductible = deductType !== 'company';
         
         const data = {
           expense_date: fd.get('expense_date'),
@@ -1892,23 +1957,34 @@ const Expenses = {
           amount: parseFloat(fd.get('amount')) || 0,
           is_deductible: isDeductible,
           notes: fd.get('notes'),
-          rider_id: fd.get('rider_id') ? parseInt(fd.get('rider_id')) : null,
-          vendor_name: fd.get('vendor_name'),
           receipt_base64: document.getElementById('edit-receipt-base64-hidden').value || null
         };
+
+        if (fd.get('rider_id')) {
+          data.rider_id = parseInt(fd.get('rider_id'));
+        } else {
+          data.rider_id = null;
+        }
+        if (fd.get('vendor_name')) {
+          data.vendor_name = fd.get('vendor_name');
+        } else {
+          data.vendor_name = '';
+        }
 
         try {
           this.showProcessingOverlay(category, data.amount, false);
           await API.updateExpense(id, data);
           Utils.closeModal();
           this.finishProcessingOverlay();
+          Utils.showToast('Expense updated successfully', 'success');
           this.deductionsData = null; // Clear cache
           setTimeout(() => this.render(), 1200);
         } catch (err) {
           this.hideProcessingOverlayError();
           Utils.showToast(err.message, 'error');
           submitBtn.disabled = false;
-          submitBtn.innerText = 'Update Expense';
+          submitBtn.innerText = 'Save Expense';
+          submitBtn.style.opacity = '1';
         }
       });
     } catch (err) {
