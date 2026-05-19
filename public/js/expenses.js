@@ -1760,7 +1760,11 @@ const Expenses = {
         }
       });
     } catch (err) {
-       async openEditExpenseModal(id) {
+      Utils.showToast(err.message, 'error');
+    }
+  },
+
+  async openEditExpenseModal(id) {
     Utils.showLoading('Loading', 'Preparing form');
     try {
       let exp;
