@@ -173,6 +173,7 @@ const Expenses = {
             <button class="btn btn-outline" style="border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px;" onclick="Reports.generateExpenseReport('last_month')">Last Month</button>
             <button class="btn btn-outline" style="border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px;" onclick="Reports.generateExpenseReport('all')">Full History</button>
             <button class="btn btn-primary" style="background:#1E3A8A; border-color:#1E3A8A; border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px; color:#FFFFFF;" onclick="Reports.openSponsorReportModal()">Sponsor Report</button>
+            <button class="btn btn-success" style="background:#10B981; border-color:#10B981; border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px; color:#FFFFFF;" onclick="Expenses.openCustomExcelReportModal()">Excel Report</button>
           </div>
         </div>
         
@@ -2285,5 +2286,436 @@ const Expenses = {
        : `<img src="${first.data}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
        
     return `<div onclick="${onclickStr}" style="position:relative; cursor:pointer; display:inline-block; border:1px solid #E5E7EB; border-radius:6px; overflow:visible; width:36px; height:36px; background:#F9FAFB; transition: 0.2s;" onmouseover="this.style.opacity=0.8; transform:scale(1.05);" onmouseout="this.style.opacity=1; transform:scale(1);" title="Click to view receipt(s)">${previewHtml}${countBadge}</div>`;
-  }
+  },
+
+  openCustomExcelReportModal() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];
+
+    const html = `
+      <form id="custom-excel-form" class="form-grid">
+        <div class="form-group" style="grid-column: 1 / 2;">
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-input" name="start_date" required value="${firstDay}">
+        </div>
+        <div class="form-group" style="grid-column: 2 / 3;">
+          <label class="form-label">End Date</label>
+          <input type="date" class="form-input" name="end_date" required value="${today}">
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1; background:#EFF6FF; border: 1px solid #BFDBFE; padding: 12px; border-radius: 8px; font-size: 13px; color: #1E3A8A; line-height: 1.5; margin-bottom: 8px;">
+          <strong>Custom Excel Statement Overview:</strong>
+          <ul style="margin: 4px 0 0 16px; padding: 0; list-style-type: disc;">
+            <li>Fetches transaction rows matching only your chosen custom period.</li>
+            <li>Renders a beautifully styled single-sheet financial workbook.</li>
+            <li>Clearly highlights all-time <strong>global remaining funds</strong> and owner out-of-pocket balance at the top of the statement.</li>
+          </ul>
+        </div>
+        <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-end; margin-top: 10px;">
+          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success" style="background:#10B981; border-color:#10B981; color:#FFFFFF;">Export Excel</button>
+        </div>
+      </form>
+    `;
+
+    Utils.openModal('Custom Date Range Excel Report', html);
+
+    document.getElementById('custom-excel-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const start = fd.get('start_date');
+      const end = fd.get('end_date');
+      Expenses.generateCustomExcelReport(start, end);
+    });
+  },
+
+  async generateCustomExcelReport(start, end) {
+    if (!start || !end) {
+      Utils.showToast('Please select a valid date range.', 'error');
+      return;
+    }
+    if (new Date(start) > new Date(end)) {
+      Utils.showToast('Start Date cannot be after End Date.', 'error');
+      return;
+    }
+
+    Utils.showLoading('Generating Excel Report...', 'Fetching data and building sheet...');
+
+    try {
+      if (typeof ExcelJS === 'undefined') {
+        throw new Error('ExcelJS library not loaded. Please refresh the page and try again.');
+      }
+
+      // Fetch period details and globalStats
+      const [expenses, funds, globalStats] = await Promise.all([
+        API.getExpenses(start, end),
+        API.getFunds(start, end),
+        API.getExpenseStats()
+      ]);
+
+      const totalFundsPeriod = funds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+      const totalExpensesPeriod = expenses.reduce((sum, e) => {
+        if (e.category === 'Manual Deduction') return sum;
+        return sum + (parseFloat(e.amount) || 0);
+      }, 0);
+      const netPeriod = totalFundsPeriod - totalExpensesPeriod;
+
+      const gStats = globalStats || {
+        total_received: 0,
+        total_expenses: 0,
+        remaining_irl: 0,
+        from_my_pocket: 0
+      };
+
+      // Create workbook
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Inspiring Roads Logistics';
+      wb.title = 'Custom Financial Statement';
+
+      const ws = wb.addWorksheet('Financial Statement', {
+        views: [{ showGridLines: true }]
+      });
+
+      // Define grid columns A-F
+      ws.columns = [
+        { width: 15 }, // A: Date
+        { width: 22 }, // B: Category / Source
+        { width: 22 }, // C: Rider / Description
+        { width: 18 }, // D: Amount (SAR)
+        { width: 36 }, // E: Notes / Description
+        { width: 16 }  // F: Type / Status
+      ];
+
+      // Palette styling constants
+      const C = {
+        dark: 'FF0F172A',
+        blue: 'FF1E3A8A',
+        green: 'FF16A34A',
+        red: 'FFDC2626',
+        white: 'FFFFFFFF',
+        border: 'FFE2E8F0',
+        muted: 'FF64748B',
+        zebra: 'FFF8FAFC'
+      };
+
+      const thinBorder = {
+        top: { style: 'thin', color: { argb: C.border } },
+        bottom: { style: 'thin', color: { argb: C.border } },
+        left: { style: 'thin', color: { argb: C.border } },
+        right: { style: 'thin', color: { argb: C.border } }
+      };
+
+      // ── Title Banner ──
+      ws.mergeCells(1, 1, 1, 6);
+      const h1 = ws.getCell('A1');
+      h1.value = 'INSPIRING ROADS LOGISTICS';
+      h1.font = { name: 'Calibri', bold: true, size: 16, color: { argb: C.white } };
+      h1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
+      h1.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(1).height = 32;
+
+      ws.mergeCells(2, 1, 2, 6);
+      const h2 = ws.getCell('A2');
+      const startFmt = new Date(start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const endFmt = new Date(end + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      h2.value = `Custom Financial Statement  |  Period: ${startFmt} to ${endFmt}`;
+      h2.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF94A3B8' } };
+      h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
+      h2.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(2).height = 24;
+
+      ws.mergeCells(3, 1, 3, 6);
+      const h3 = ws.getCell('A3');
+      h3.value = `Generated: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}`;
+      h3.font = { name: 'Calibri', italic: true, size: 9, color: { argb: C.muted } };
+      h3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+      h3.alignment = { vertical: 'middle', horizontal: 'center' };
+      h3.border = { bottom: { style: 'medium', color: { argb: C.blue } } };
+      ws.getRow(3).height = 20;
+
+      // ── Dashboard Overview Grid ──
+      let r = 5;
+      ws.mergeCells(r, 1, r, 6);
+      const secTitle = ws.getCell(`A${r}`);
+      secTitle.value = '  FINANCIAL OVERVIEW';
+      secTitle.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.white } };
+      secTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue } };
+      ws.getRow(r).height = 24;
+
+      r++;
+      // Columns sub-headers
+      ws.mergeCells(r, 1, r, 3);
+      ws.getCell(`A${r}`).value = 'PERIOD METRICS';
+      ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.muted } };
+      ws.getCell(`A${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+
+      ws.mergeCells(r, 4, r, 6);
+      ws.getCell(`D${r}`).value = 'GLOBAL METRICS (ALL-TIME)';
+      ws.getCell(`D${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.muted } };
+      ws.getCell(`D${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`D${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+      ws.getRow(r).height = 20;
+
+      const kpiRow = (rowNum, pLabel, pVal, pColor, gLabel, gVal, gColor) => {
+        const row = ws.getRow(rowNum);
+        row.height = 24;
+        
+        // Period Part
+        ws.mergeCells(rowNum, 1, rowNum, 2);
+        const pl = row.getCell(1);
+        pl.value = pLabel;
+        pl.font = { name: 'Calibri', size: 10, bold: true };
+        pl.border = thinBorder;
+        pl.alignment = { vertical: 'middle' };
+
+        const pv = row.getCell(3);
+        pv.value = pVal;
+        pv.numFmt = '#,##0.00 "SAR"';
+        pv.font = { name: 'Calibri', size: 11, bold: true, color: { argb: pColor } };
+        pv.border = thinBorder;
+        pv.alignment = { vertical: 'middle', horizontal: 'right' };
+
+        // Global Part
+        ws.mergeCells(rowNum, 4, rowNum, 5);
+        const gl = row.getCell(4);
+        gl.value = gLabel;
+        gl.font = { name: 'Calibri', size: 10, bold: true };
+        gl.border = thinBorder;
+        gl.alignment = { vertical: 'middle' };
+
+        const gv = row.getCell(6);
+        gv.value = gVal;
+        gv.numFmt = '#,##0.00 "SAR"';
+        gv.font = { name: 'Calibri', size: 11, bold: true, color: { argb: gColor } };
+        gv.border = thinBorder;
+        gv.alignment = { vertical: 'middle', horizontal: 'right' };
+      };
+
+      r++;
+      kpiRow(r, 'Period Received', totalFundsPeriod, C.green, 'Global Received', gStats.total_received, C.green);
+      r++;
+      kpiRow(r, 'Period Expenses', totalExpensesPeriod, C.red, 'Global Expenses', gStats.total_expenses, C.red);
+      r++;
+      
+      const pNetColor = netPeriod >= 0 ? C.green : C.red;
+      const gBalLabel = gStats.from_my_pocket > 0 ? 'Global Out of Pocket' : 'Global Remaining Funds';
+      const gBalVal = gStats.from_my_pocket > 0 ? gStats.from_my_pocket : gStats.remaining_irl;
+      const gBalColor = gStats.from_my_pocket > 0 ? C.red : C.green;
+      kpiRow(r, 'Period Net Status', netPeriod, pNetColor, gBalLabel, gBalVal, gBalColor);
+
+      // ── Detailed Tables Section ──
+      // 1. Funds table
+      r += 3;
+      ws.mergeCells(r, 1, r, 6);
+      const fundsTitle = ws.getCell(`A${r}`);
+      fundsTitle.value = '  1. FUNDS RECEIVED FROM COMPANY (Within Selected Period Only)';
+      fundsTitle.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.white } };
+      fundsTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
+      ws.getRow(r).height = 24;
+
+      r++;
+      r++;
+      // Style headers for table 1
+      const styleTableHeader = (rowNum, headers) => {
+        const row = ws.getRow(rowNum);
+        row.height = 22;
+        headers.forEach((h, i) => {
+          const cell = row.getCell(i + 1);
+          cell.value = h;
+          cell.font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.white } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
+          cell.alignment = { vertical: 'middle', horizontal: i === 3 ? 'right' : 'center' };
+          cell.border = thinBorder;
+        });
+      };
+
+      styleTableHeader(r, ['Date', 'Source / Description', 'Reference / Notes', 'Amount', '', '']);
+      ws.mergeCells(r, 4, r, 6);
+
+      const fundsStartRow = r + 1;
+
+      if (funds.length === 0) {
+        r++;
+        ws.mergeCells(r, 1, r, 6);
+        const cell = ws.getCell(`A${r}`);
+        cell.value = 'No funds received during this period.';
+        cell.font = { name: 'Calibri', italic: true, size: 10, color: { argb: C.muted } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = thinBorder;
+        ws.getRow(r).height = 22;
+      } else {
+        funds.forEach(f => {
+          r++;
+          const row = ws.getRow(r);
+          row.height = 20;
+
+          const cDate = row.getCell(1);
+          cDate.value = f.receive_date ? new Date(f.receive_date + 'T00:00:00') : '';
+          cDate.numFmt = 'yyyy-mm-dd';
+          cDate.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cDesc = row.getCell(2);
+          cDesc.value = f.description || 'IRL Transfer';
+
+          const cNotes = row.getCell(3);
+          cNotes.value = f.notes || '-';
+
+          ws.mergeCells(r, 4, r, 6);
+          const cAmt = row.getCell(4);
+          cAmt.value = parseFloat(f.amount) || 0;
+          cAmt.numFmt = '#,##0.00 "SAR"';
+          cAmt.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.green } };
+          cAmt.alignment = { horizontal: 'right', vertical: 'middle' };
+
+          for (let col = 1; col <= 6; col++) {
+            const cell = row.getCell(col);
+            cell.font = cell.font || { name: 'Calibri', size: 10 };
+            cell.border = thinBorder;
+            if ((r - fundsStartRow) % 2 === 1) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+            }
+          }
+        });
+
+        // Funds Total Row
+        r++;
+        ws.mergeCells(r, 1, r, 3);
+        ws.getCell(`A${r}`).value = 'TOTAL RECEIVED IN PERIOD';
+        ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10 };
+        ws.getCell(`A${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
+        ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+
+        ws.mergeCells(r, 4, r, 6);
+        const totFCell = ws.getCell(`D${r}`);
+        totFCell.value = totalFundsPeriod;
+        totFCell.numFmt = '#,##0.00 "SAR"';
+        totFCell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.green } };
+        totFCell.alignment = { horizontal: 'right', vertical: 'middle' };
+        totFCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+
+        for (let col = 1; col <= 6; col++) {
+          ws.getRow(r).getCell(col).border = thinBorder;
+        }
+        ws.getRow(r).height = 24;
+      }
+
+      // 2. Expenses Table
+      r += 3;
+      ws.mergeCells(r, 1, r, 6);
+      const expTitle = ws.getCell(`A${r}`);
+      expTitle.value = '  2. OPERATIONAL EXPENSES LOGGED (Within Selected Period Only)';
+      expTitle.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.white } };
+      expTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF4444' } };
+      ws.getRow(r).height = 24;
+
+      r++;
+      r++;
+      styleTableHeader(r, ['Date', 'Category', 'Rider / Recipient', 'Amount', 'Description / Notes', 'Deductible']);
+
+      const expStartRow = r + 1;
+      const validExpenses = expenses.filter(e => e.category !== 'Manual Deduction');
+
+      if (validExpenses.length === 0) {
+        r++;
+        ws.mergeCells(r, 1, r, 6);
+        const cell = ws.getCell(`A${r}`);
+        cell.value = 'No expenses logged during this period.';
+        cell.font = { name: 'Calibri', italic: true, size: 10, color: { argb: C.muted } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = thinBorder;
+        ws.getRow(r).height = 22;
+      } else {
+        validExpenses.forEach(e => {
+          r++;
+          const row = ws.getRow(r);
+          row.height = 20;
+
+          const cDate = row.getCell(1);
+          cDate.value = e.expense_date ? new Date(e.expense_date + 'T00:00:00') : '';
+          cDate.numFmt = 'yyyy-mm-dd';
+          cDate.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cCat = row.getCell(2);
+          cCat.value = e.category || 'Other';
+          cCat.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cRider = row.getCell(3);
+          cRider.value = e.rider_name || 'Company Covered';
+
+          const cAmt = row.getCell(4);
+          cAmt.value = parseFloat(e.amount) || 0;
+          cAmt.numFmt = '#,##0.00 "SAR"';
+          cAmt.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.red } };
+          cAmt.alignment = { horizontal: 'right', vertical: 'middle' };
+
+          const cNotes = row.getCell(5);
+          cNotes.value = e.notes || e.description || '-';
+
+          const cDed = row.getCell(6);
+          const isDed = e.is_deductible === 1 || e.is_deductible === true;
+          cDed.value = isDed ? 'Deductible' : 'Company Paid';
+          cDed.font = { name: 'Calibri', size: 9, bold: true, color: { argb: isDed ? 'FFD97706' : C.muted } };
+          cDed.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          for (let col = 1; col <= 6; col++) {
+            const cell = row.getCell(col);
+            cell.font = cell.font || { name: 'Calibri', size: 10 };
+            cell.border = thinBorder;
+            if ((r - expStartRow) % 2 === 1) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+            }
+          }
+        });
+
+        // Expenses Total Row
+        r++;
+        ws.mergeCells(r, 1, r, 3);
+        ws.getCell(`A${r}`).value = 'TOTAL EXPENSES IN PERIOD';
+        ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10 };
+        ws.getCell(`A${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
+        ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+
+        const totExpCell = ws.getCell(`D${r}`);
+        totExpCell.value = totalExpensesPeriod;
+        totExpCell.numFmt = '#,##0.00 "SAR"';
+        totExpCell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.red } };
+        totExpCell.alignment = { horizontal: 'right', vertical: 'middle' };
+        totExpCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+
+        ws.mergeCells(r, 5, r, 6);
+        ws.getCell(`E${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+
+        for (let col = 1; col <= 6; col++) {
+          ws.getRow(r).getCell(col).border = thinBorder;
+        }
+        ws.getRow(r).height = 24;
+      }
+
+      // ── Download Workbook ──
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `IRL_Custom_Financial_Report_${start}_to_${end}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 200);
+
+      Utils.hideLoading();
+      Utils.showToast('Custom Excel Report exported successfully!', 'success');
+      Utils.closeModal();
+
+    } catch (err) {
+      console.error('Custom Excel Export Error:', err);
+      Utils.hideLoading();
+      Utils.showToast('Failed to export Custom Excel Report: ' + err.message, 'error');
+    }
+  },
+
+  renderThumbnail(base64Str, onclickStr) {
 };
