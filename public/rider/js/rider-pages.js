@@ -204,26 +204,60 @@ const RiderPages = {
         <div class="r-stat-card"><div class="r-stat-value">${Math.floor(avgMins/60)}<span style="font-size:14px">h</span></div><div class="r-stat-label">Avg/Day</div></div>
       `;
 
-      // Check for missing days and show alert
+      // Check for missing days and show alerts
       try {
-        const missingData = await RiderAPI.getMissingDays(cycle.start, effectiveEnd);
+        const prevCycle = RiderApp.getPreviousCycle();
+        const [missingData, prevMissingData] = await Promise.all([
+          RiderAPI.getMissingDays(cycle.start, effectiveEnd).catch(() => ({ missing: [], total: 0 })),
+          RiderAPI.getMissingDays(prevCycle.start, prevCycle.end).catch(() => ({ missing: [], total: 0 }))
+        ]);
+
         const alertEl = document.getElementById('r-home-missing-alert');
-        if (missingData && missingData.total > 0 && alertEl) {
-          const missingDatesFormatted = missingData.missing.slice(0, 5).map(d => {
-            const dt = new Date(d + 'T00:00:00');
-            return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          }).join(', ');
-          const moreText = missingData.total > 5 ? ` and ${missingData.total - 5} more` : '';
-          alertEl.innerHTML = `
-            <div class="r-missing-alert">
-              <div class="r-missing-alert-icon">⚠️</div>
-              <div class="r-missing-alert-body">
-                <div class="r-missing-alert-title">You have ${missingData.total} missing day${missingData.total > 1 ? 's' : ''}</div>
-                <div class="r-missing-alert-text">Please lodge your data for: ${missingDatesFormatted}${moreText}. Keeping records up to date helps ensure accurate payroll.</div>
-                <button class="r-btn r-btn-sm r-btn-warning" onclick="RiderApp.navigate('log')" style="margin-top:8px;">Lodge Missing Data</button>
+        if (alertEl) {
+          let alertHtml = '';
+
+          // 1. Previous Cycle Alert (Urgently Red/Orange)
+          if (prevMissingData && prevMissingData.total > 0) {
+            const missingDatesFormatted = prevMissingData.missing.slice(0, 5).map(d => {
+              const dt = new Date(d + 'T00:00:00');
+              return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }).join(', ');
+            const moreText = prevMissingData.total > 5 ? ` and ${prevMissingData.total - 5} more` : '';
+            const fmtCycle = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+            
+            alertHtml += `
+              <div class="r-missing-alert" style="background: linear-gradient(135deg, #FEF2F2, #FFF5F5); border: 1px solid #FCA5A5; color: #991B1B; margin-bottom:16px;">
+                <div class="r-missing-alert-icon" style="background: #FEE2E2; color: #EF4444;">⏰</div>
+                <div class="r-missing-alert-body">
+                  <div class="r-missing-alert-title" style="color: #991B1B; font-weight:700; font-size:14px; margin-bottom:4px;">Past Month: ${prevMissingData.total} Missing Day${prevMissingData.total > 1 ? 's' : ''}!</div>
+                  <div class="r-missing-alert-text" style="color: #7F1D1D; font-size:12px; line-height:1.4;">You have unlodged logs from the last cycle (${fmtCycle(prevCycle.start)} — ${fmtCycle(prevCycle.end)}). Lodge them now to ensure accurate payroll: <strong>${missingDatesFormatted}${moreText}</strong></div>
+                  <button class="r-btn r-btn-sm" onclick="RiderApp.navigate('log')" style="margin-top:8px; background:#EF4444; border:none; color:white; font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">Lodge Last Month's Data</button>
+                </div>
               </div>
-            </div>
-          `;
+            `;
+          }
+
+          // 2. Current Cycle Alert (Warning Amber)
+          if (missingData && missingData.total > 0) {
+            const missingDatesFormatted = missingData.missing.slice(0, 5).map(d => {
+              const dt = new Date(d + 'T00:00:00');
+              return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }).join(', ');
+            const moreText = missingData.total > 5 ? ` and ${missingData.total - 5} more` : '';
+            
+            alertHtml += `
+              <div class="r-missing-alert" style="margin-bottom:16px;">
+                <div class="r-missing-alert-icon">⚠️</div>
+                <div class="r-missing-alert-body">
+                  <div class="r-missing-alert-title">Current Cycle: ${missingData.total} Missing Day${missingData.total > 1 ? 's' : ''}</div>
+                  <div class="r-missing-alert-text">Please lodge your data for: <strong>${missingDatesFormatted}${moreText}</strong>. Keeping records up to date helps ensure accurate payroll.</div>
+                  <button class="r-btn r-btn-sm r-btn-warning" onclick="RiderApp.navigate('log')" style="margin-top:8px;">Lodge Missing Data</button>
+                </div>
+              </div>
+            `;
+          }
+
+          alertEl.innerHTML = alertHtml;
         }
       } catch (e) { /* silent */ }
       
@@ -248,6 +282,14 @@ const RiderPages = {
 
         <div id="r-log-missing-hint" style="display:none; background:linear-gradient(135deg,#FFF7ED,#FFFBEB); color:#92400E; padding:12px; border-radius:8px; font-size:13px; font-weight:500; margin-bottom:16px; border:1px solid #FDE68A;">
           💡 You can select a past date to fill in missing data. Please keep your records complete.
+        </div>
+
+        <!-- Quick-Select Missing Days Pills -->
+        <div id="r-log-missing-dates-section" style="display:none; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 14px; border-radius: 12px; margin-bottom: 20px;">
+          <div style="font-size: 13px; font-weight: 700; color: #1E293B; margin-bottom: 8px; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ Quick-Select Missing Days:</span>
+          </div>
+          <div id="r-log-missing-dates-pills" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
         </div>
         
         <form id="r-log-form">
@@ -313,6 +355,81 @@ const RiderPages = {
     const workedFields = document.getElementById('r-log-worked-fields');
     const absentFields = document.getElementById('r-log-absent-fields');
     const missingHint = document.getElementById('r-log-missing-hint');
+    const dateInput = document.getElementById('r-log-date');
+    const submitBtn = document.getElementById('r-log-submit');
+
+    // Load missing days from both current and previous cycles to generate quick select pills
+    (async () => {
+      try {
+        const cycle = RiderApp.getCurrentCycle();
+        const prevCycle = RiderApp.getPreviousCycle();
+        const today = RiderApp.getTodayLocal();
+        const effectiveEnd = today < cycle.end ? today : cycle.end;
+
+        const [currentMissing, prevMissing] = await Promise.all([
+          RiderAPI.getMissingDays(cycle.start, effectiveEnd).catch(() => ({ missing: [], total: 0 })),
+          RiderAPI.getMissingDays(prevCycle.start, prevCycle.end).catch(() => ({ missing: [], total: 0 }))
+        ]);
+
+        const pillsContainer = document.getElementById('r-log-missing-dates-pills');
+        const sectionContainer = document.getElementById('r-log-missing-dates-section');
+
+        if (pillsContainer && sectionContainer) {
+          const prevDates = prevMissing.missing || [];
+          const currDates = currentMissing.missing || [];
+
+          if (prevDates.length === 0 && currDates.length === 0) {
+            sectionContainer.style.display = 'none';
+          } else {
+            sectionContainer.style.display = 'block';
+            let html = '';
+
+            // Render previous cycle missing dates (Urgent styling)
+            prevDates.forEach(date => {
+              const dt = new Date(date + 'T00:00:00');
+              const label = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              html += `
+                <button type="button" class="r-pill-btn r-pill-urgent" data-date="${date}" style="background:#FEF2F2; color:#DC2626; border:1px solid #FCA5A5; border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+                  <span style="font-size:10px;">⏰</span> ${label} (Last Month)
+                </button>
+              `;
+            });
+
+            // Render current cycle missing dates (Standard styling)
+            currDates.forEach(date => {
+              const dt = new Date(date + 'T00:00:00');
+              const label = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              html += `
+                <button type="button" class="r-pill-btn r-pill-normal" data-date="${date}" style="background:#EFF6FF; color:#2563EB; border:1px solid #93C5FD; border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+                  <span>📅</span> ${label}
+                </button>
+              `;
+            });
+
+            pillsContainer.innerHTML = html;
+
+            // Wire up click event for each pill button
+            pillsContainer.querySelectorAll('.r-pill-btn').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const date = btn.dataset.date;
+                dateInput.value = date;
+                dateInput.dispatchEvent(new Event('change'));
+
+                // Highlight chosen pill
+                pillsContainer.querySelectorAll('.r-pill-btn').forEach(b => {
+                  b.style.transform = 'scale(1)';
+                  b.style.boxShadow = 'none';
+                });
+                btn.style.transform = 'scale(1.05)';
+                btn.style.boxShadow = '0 0 0 2px var(--r-primary)';
+              });
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading missing days for pills:', err);
+      }
+    })();
     
     // Toggle fields based on status
     statusSelect.addEventListener('change', () => {
@@ -325,9 +442,6 @@ const RiderPages = {
     });
     
     statusSelect.dispatchEvent(new Event('change'));
-
-    const dateInput = document.getElementById('r-log-date');
-    const submitBtn = document.getElementById('r-log-submit');
 
     const checkDate = async () => {
       try {

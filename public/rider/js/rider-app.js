@@ -166,6 +166,25 @@ const RiderApp = {
     return { start, end };
   },
 
+  /** Get previous cycle boundaries relative to the current active cycle */
+  getPreviousCycle() {
+    const current = this.getCurrentCycle();
+    const [y, m, d] = current.start.split('-').map(Number);
+    
+    // Previous cycle starts on the 21st of the month before current.start
+    let prevStartM = m - 1;
+    let prevStartY = y;
+    if (prevStartM === 0) { prevStartM = 12; prevStartY--; }
+    
+    // Previous cycle ends on the 20th of the month of current.start
+    let prevEndM = m;
+    let prevEndY = y;
+    
+    const start = `${prevStartY}-${String(prevStartM).padStart(2, '0')}-21`;
+    const end = `${prevEndY}-${String(prevEndM).padStart(2, '0')}-20`;
+    return { start, end };
+  },
+
   /** Get cycle for a given month string like "2026-05" */
   getCycleForMonth(monthStr) {
     const [y, m] = monthStr.split('-').map(Number);
