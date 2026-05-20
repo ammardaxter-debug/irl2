@@ -2718,4 +2718,31 @@ const Expenses = {
   },
 
   renderThumbnail(base64Str, onclickStr) {
+    if (!base64Str) return `<span style="font-size:12px; color:#9CA3AF;">None</span>`;
+    let files = [];
+    try {
+      files = JSON.parse(base64Str);
+      if (!Array.isArray(files)) throw new Error();
+    } catch(e) {
+      if (base64Str.startsWith('data:')) {
+         files = [{ type: base64Str.startsWith('data:application/pdf') ? 'pdf' : 'image', data: base64Str }];
+      } else {
+         return `<span style="font-size:12px; color:#9CA3AF;">None</span>`;
+      }
+    }
+    
+    if (files.length === 0) return `<span style="font-size:12px; color:#9CA3AF;">None</span>`;
+    
+    let countBadge = '';
+    if (files.length > 1) {
+      countBadge = `<div style="position:absolute; bottom:-6px; right:-6px; background:#2563EB; color:white; border-radius:50%; font-size:10px; font-weight:bold; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); z-index:10;">+${files.length - 1}</div>`;
+    }
+    
+    const first = files[0];
+    const previewHtml = first.type === 'pdf' 
+       ? `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#dc2626; font-size:10px; border-radius:6px; overflow:hidden;">PDF</div>`
+       : `<img src="${first.data}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
+       
+    return `<div onclick="${onclickStr}" style="position:relative; cursor:pointer; display:inline-block; border:1px solid #E5E7EB; border-radius:6px; overflow:visible; width:36px; height:36px; background:#F9FAFB; transition: 0.2s;" onmouseover="this.style.opacity=0.8; transform:scale(1.05);" onmouseout="this.style.opacity=1; transform:scale(1);" title="Click to view receipt(s)">${previewHtml}${countBadge}</div>`;
+  }
 };
