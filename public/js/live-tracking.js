@@ -81,13 +81,6 @@ const LiveTracking = {
                     <!-- Premium Map Container -->
                     <div style="background:white; border-radius:20px; overflow:hidden; border:1px solid #e2e8f0; position:relative; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
                         <div id="tracking-map" style="height:100%; width:100%; background:#f8fafc;"></div>
-                        <div style="position:absolute; bottom:20px; left:20px; z-index:1000; background:rgba(255,255,255,0.9); padding:12px; border-radius:12px; backdrop-filter:blur(8px); border:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                            <span style="font-weight:800; color:#0f172a; margin-bottom:2px;">OPERATIONAL BOUNDS</span>
-                            <div style="display:flex; align-items:center; gap:6px;"><span style="width:12px; height:12px; background:rgba(59,130,246,0.15); border:1.5px dashed #3b82f6; border-radius:3px; display:inline-block;"></span> Laban Zone</div>
-                            <div style="display:flex; align-items:center; gap:6px;"><span style="width:12px; height:12px; background:rgba(16,185,129,0.15); border:1.5px dashed #10b981; border-radius:3px; display:inline-block;"></span> Irqah Zone</div>
-                            <div style="height:1px; background:#e2e8f0; margin:4px 0;"></div>
-                            <div><b>Pins:</b> <span style="color:#10b981;">● Online</span> | <span style="color:#94a3b8;">● Offline</span></div>
-                        </div>
                     </div>
 
                     <!-- Rider Console -->
@@ -217,21 +210,6 @@ const LiveTracking = {
             maxZoom: 20
         }).addTo(this._map);
 
-        // Clear existing overlays
-        this._zonesLayers = [];
-        // Add Geofences as overlays
-        this.zones.forEach(z => {
-            const polygon = L.rectangle(z.coords, {
-                color: z.color,
-                weight: 1.5,
-                fillColor: z.color,
-                fillOpacity: 0.08,
-                dashArray: '4, 6'
-            }).addTo(this._map);
-            
-            polygon.bindTooltip(`<b>${z.name} Geofence</b>`, { sticky: true, className: 'zone-tooltip' });
-            this._zonesLayers.push(polygon);
-        });
     },
 
     async startSync() {
@@ -333,8 +311,7 @@ const LiveTracking = {
 
     getPopupHtml(r, isOnline) {
         const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
-        const zone = this.getZone(r.lat, r.lng);
-        const zoneName = zone ? zone.name + ' Zone' : 'Out of Geofence';
+        const hasLocation = r.lat && r.lng;
         
         return `
             <div style="font-family:'Inter', sans-serif; min-width:240px; border-radius:12px; overflow:hidden; background:white;">
@@ -356,8 +333,8 @@ const LiveTracking = {
                         <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? '#ecfdf5' : '#f1f5f9'}; color:${isOnline ? '#059669' : '#64748b'}; letter-spacing:0.02em;">
                             ${isOnline ? '● ONLINE' : '● OFFLINE'}
                         </span>
-                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${zone ? '#eff6ff' : '#fff7ed'}; color:${zone ? '#2563eb' : '#ea580c'}; letter-spacing:0.02em;">
-                            📍 ${zoneName}
+                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? (hasLocation ? '#ecfdf5' : '#fff7ed') : '#f1f5f9'}; color:${isOnline ? (hasLocation ? '#059669' : '#c2410c') : '#64748b'}; letter-spacing:0.02em;">
+                            📍 ${isOnline ? (hasLocation ? 'GPS SYNCED' : 'NO GPS SIGNAL') : 'OFFLINE'}
                         </span>
                     </div>
 
@@ -461,21 +438,24 @@ const LiveTracking = {
             const hasLocation = r.lat && r.lng;
             const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
             
-            // Get Geofence Zone name if online and has location
-            let zoneTag = 'No GPS Signal';
-            let zoneColor = '#cbd5e1';
-            let zoneTextColor = '#475569';
-            if (hasLocation) {
-                const zone = this.getZone(r.lat, r.lng);
-                if (zone) {
-                    zoneTag = zone.name + ' Geofence';
-                    zoneColor = zone.color === '#10b981' ? '#ecfdf5' : '#eff6ff';
-                    zoneTextColor = zone.color === '#10b981' ? '#059669' : '#2563eb';
+            let badgeText = 'Offline';
+            let badgeBg = '#f1f5f9';
+            let badgeColor = '#64748b';
+
+            if (r.isOnline) {
+                if (hasLocation) {
+                    badgeText = 'GPS Synced';
+                    badgeBg = '#ecfdf5';
+                    badgeColor = '#059669';
                 } else {
-                    zoneTag = 'Out of Bounds';
-                    zoneColor = '#fff7ed';
-                    zoneTextColor = '#ea580c';
+                    badgeText = 'No GPS Signal';
+                    badgeBg = '#fff7ed';
+                    badgeColor = '#c2410c';
                 }
+            } else {
+                badgeText = 'No GPS Signal';
+                badgeBg = '#f1f5f9';
+                badgeColor = '#64748b';
             }
 
             const avatarMarkup = r.photo 
@@ -499,10 +479,10 @@ const LiveTracking = {
                 <div style="flex:1; min-width:0;">
                     <div style="font-weight:800; font-size:14px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r.name}</div>
                     
-                    <!-- Sub-text Badge with Zone/Status -->
+                    <!-- Sub-text Badge with Status -->
                     <div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
-                        <span style="font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; background:${zoneColor}; color:${zoneTextColor}; display:inline-flex; align-items:center; gap:3px;">
-                            ${zoneTag}
+                        <span style="font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; background:${badgeBg}; color:${badgeColor}; display:inline-flex; align-items:center; gap:3px;">
+                            ${badgeText}
                         </span>
                     </div>
                 </div>
