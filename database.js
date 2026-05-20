@@ -266,10 +266,23 @@ async function getDashboardStats(start, end) {
 
 // ========== EXPENSE OPERATIONS ==========
 
-async function getExpenseStats() {
+async function getExpenseStats(start, end) {
+  let fundsQuery = supabase.from('company_funds').select('amount');
+  let expensesQuery = supabase.from('expenses').select('amount, category');
+
+  if (start && end) {
+    fundsQuery = fundsQuery.gte('receive_date', start).lte('receive_date', end);
+    
+    const sDate = new Date(start + 'T00:00:00');
+    const expLastDay = new Date(sDate.getFullYear(), sDate.getMonth() + 2, 0);
+    const expenseEnd = `${expLastDay.getFullYear()}-${String(expLastDay.getMonth() + 1).padStart(2, '0')}-${String(expLastDay.getDate()).padStart(2, '0')}`;
+    
+    expensesQuery = expensesQuery.gte('expense_date', start).lte('expense_date', expenseEnd);
+  }
+
   const [funds, expenses] = await Promise.all([
-    supabase.from('company_funds').select('amount'),
-    supabase.from('expenses').select('amount, category')
+    fundsQuery,
+    expensesQuery
   ]);
 
   const totalReceived = (funds.data || []).reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
@@ -539,7 +552,15 @@ async function calculatePayroll(periodStart, periodEnd) {
 
       // Bonuses
       let totalBonuses = 0;
-      (bonuses.data || []).filter(b => String(b.rider_id) === riderId).forEach(b => { totalBonuses += b.amount || 0; });
+      (bonuses.data || []).filter(b => {
+        const matchesRider = String(b.rider_id) === riderId;
+        if (!matchesRider) return false;
+        if (b.cycle_start && b.cycle_end) {
+          return b.cycle_start === periodStart && b.cycle_end === periodEnd;
+        }
+        const dateStr = (b.created_at || '').slice(0, 10);
+        return dateStr >= periodStart && dateStr <= periodEnd;
+      }).forEach(b => { totalBonuses += b.amount || 0; });
 
       // Deductions
       let totalDeductions = 0;

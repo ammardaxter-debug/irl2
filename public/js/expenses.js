@@ -7,8 +7,16 @@ const Expenses = {
   currentDeductionTab: 'pending',
   deductionsData: null,
   riders: [],
+  _initialized: false,
 
   async render() {
+    if (!this._initialized) {
+      window.addEventListener('cycleChanged', () => {
+        if (App.currentPage === 'expenses') this.render();
+      });
+      this._initialized = true;
+    }
+
     const root = document.getElementById('page-expenses');
     if (!root) return;
 
@@ -39,7 +47,8 @@ const Expenses = {
 
   async renderDashboard(root) {
     try {
-      const stats = await API.getExpenseStats();
+      const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const stats = await API.getExpenseStats(cycle.start, cycle.end);
       const outOfPocketTotal = stats.from_my_pocket;
       const isPocketWarn = outOfPocketTotal > 0;
       
@@ -260,7 +269,11 @@ const Expenses = {
 
     if (this.currentTab === 'expenses') {
       this.deductionsData = null; // Clear deductions cache
-      const expenses = await API.getExpenses();
+      const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const sDate = new Date(cycle.start + 'T00:00:00');
+      const expLastDay = new Date(sDate.getFullYear(), sDate.getMonth() + 2, 0);
+      const expenseEnd = `${expLastDay.getFullYear()}-${String(expLastDay.getMonth() + 1).padStart(2, '0')}-${String(expLastDay.getDate()).padStart(2, '0')}`;
+      const expenses = await API.getExpenses(cycle.start, expenseEnd);
       this.cachedExpenses = expenses; // Cache for edit modal
       let html = `
         <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center;">
@@ -491,7 +504,8 @@ const Expenses = {
         if (e.key === 'Enter') handleQuickAdd();
       });
     } else if (this.currentTab === 'funds') {
-      const funds = await API.getFunds();
+      const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const funds = await API.getFunds(cycle.start, cycle.end);
       let html = `
         <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
           <table class="table-clean">
@@ -568,7 +582,11 @@ const Expenses = {
         `;
 
         try {
-          const expenses = await API.getExpenses();
+          const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+          const sDate = new Date(cycle.start + 'T00:00:00');
+          const expLastDay = new Date(sDate.getFullYear(), sDate.getMonth() + 2, 0);
+          const expenseEnd = `${expLastDay.getFullYear()}-${String(expLastDay.getMonth() + 1).padStart(2, '0')}-${String(expLastDay.getDate()).padStart(2, '0')}`;
+          const expenses = await API.getExpenses(cycle.start, expenseEnd);
           const riderExpenses = expenses.filter(e => {
             const isMedical = (e.category || '').toLowerCase().includes('medical');
             return !isMedical && (e.is_deductible === 1 || e.is_deductible === true) && e.rider_id;

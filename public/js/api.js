@@ -176,9 +176,10 @@ const API = {
     return this.request(`/audit-logs?limit=${limit}`);
   },
 
-  // ── Expenses & Funds ──
-  getExpenseStats() {
-    return this.request('/expenses/stats');
+  getExpenseStats(start, end) {
+    let url = '/expenses/stats';
+    if (start && end) url += `?start=${start}&end=${end}`;
+    return this.request(url);
   },
 
   getExpenses(start, end) {
