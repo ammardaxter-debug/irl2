@@ -1191,7 +1191,8 @@ app.get('/api/admin/fleet-locations', async (req, res) => {
       lastUpdate: r.last_location_update,
       isOnline: r.is_online,
       status: r.status,
-      photo: r.profile_photo || r.photo_url
+      photo: r.profile_photo || r.photo_url,
+      phone: r.phone
     }));
     res.json(activeRiders);
   } catch (err) {

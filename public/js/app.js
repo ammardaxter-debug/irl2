@@ -179,6 +179,11 @@ const App = {
   navigate(page) {
     this.currentPage = page;
 
+    // Clear live tracking interval if navigating away
+    if (page !== 'live-tracking' && typeof LiveTracking !== 'undefined' && LiveTracking.stopSync) {
+      LiveTracking.stopSync();
+    }
+
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.page === page);

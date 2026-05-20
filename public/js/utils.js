@@ -206,6 +206,50 @@ const Utils = {
     }, 3500);
   },
 
+  // Custom Alert Dialog replacing browser native alert()
+  alert(message, title = 'Notification', buttonText = 'OK') {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay active';
+      overlay.style.zIndex = '9999';
+      
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:400px; animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);">
+          <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
+            <h2 class="modal-title" style="display:flex; align-items:center; gap:8px; font-size:18px; font-weight:700; color:#0f172a;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-600)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              ${this.escapeHtml(title)}
+            </h2>
+          </div>
+          <div class="modal-body" style="padding-top:12px;">
+            <p style="color:#4b5563; font-size:14px; line-height:1.5; margin-bottom:24px;">${this.escapeHtml(message)}</p>
+            <div style="display:flex; justify-content:flex-end;">
+              <button class="btn alert-ok-btn" style="background:var(--primary-600); color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; transition:background 0.2s; font-size:14px;">${buttonText}</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      const cleanup = () => {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 200);
+      };
+      
+      const okBtn = overlay.querySelector('.alert-ok-btn');
+      okBtn.onclick = () => { cleanup(); resolve(); };
+      
+      // ESC key to close
+      overlay.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup();
+          resolve();
+        }
+      };
+    });
+  },
+
   // Custom Confirm Dialog replacing browser native confirm()
   confirm(message, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel', isDanger = true) {
     return new Promise((resolve) => {

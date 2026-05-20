@@ -8,10 +8,14 @@ const LiveTracking = {
     _riderMarkers: {},
     _refreshInterval: null,
     _lastCenter: [24.7136, 46.6753],
+    _searchTerm: '',
+    _filterStatus: 'all',
+    _lastRidersData: [],
+    _zonesLayers: [],
 
     zones: [
-        { id: "laban", name: "Laban", color: "#3B82F6", coords: [[24.6890, 46.5340], [24.7150, 46.5520]] },
-        { id: "irqah", name: "Irqah", color: "#22C55E", coords: [[24.6890, 46.5520], [24.7150, 46.5700]] }
+        { id: "laban", name: "Laban", color: "#3b82f6", coords: [[24.6890, 46.5340], [24.7150, 46.5520]] },
+        { id: "irqah", name: "Irqah", color: "#10b981", coords: [[24.6890, 46.5520], [24.7150, 46.5700]] }
     ],
 
     async render() {
@@ -19,32 +23,56 @@ const LiveTracking = {
         container.innerHTML = `
             <div class="tracking-container" style="display:flex; flex-direction:column; height: calc(100vh - 120px); gap: 20px; font-family: 'Inter', sans-serif;">
                 
-                <!-- Header & Stats Bar -->
-                <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:20px; border-radius:16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
-                    <div>
-                        <h1 style="font-size:24px; font-weight:800; color:#0f172a; margin:0;">🛰️ Fleet Command Center</h1>
-                        <p style="font-size:14px; color:#64748b; margin:4px 0 0 0;">Real-time intelligence • Riyadh Operations</p>
+                <!-- KPI Section -->
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr) 280px; gap:16px;">
+                    
+                    <!-- Card 1: Online -->
+                    <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);">
+                        <div>
+                            <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Active Now</span>
+                            <div id="online-count" style="font-size:28px; font-weight:800; color:#10b981; margin-top:4px; line-height:1;">0</div>
+                            <span style="font-size:11px; color:#10b981; font-weight:600; display:flex; align-items:center; gap:4px; margin-top:6px;">
+                                <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 2s infinite;"></span>
+                                Shift Active & GPS Synced
+                            </span>
+                        </div>
+                        <div style="width:48px; height:48px; background:#ecfdf5; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; color:#10b981;">🚴</div>
                     </div>
-                    <div style="display:flex; gap:24px;">
-                        <div class="stat-group">
-                            <span style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em;">Online</span>
-                            <div id="online-count" style="font-size:24px; font-weight:800; color:#22c55e;">0</div>
+
+                    <!-- Card 2: Offline -->
+                    <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);">
+                        <div>
+                            <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Checked Out</span>
+                            <div id="offline-count" style="font-size:28px; font-weight:800; color:#64748b; margin-top:4px; line-height:1;">0</div>
+                            <span style="font-size:11px; color:#64748b; font-weight:600; display:flex; align-items:center; gap:4px; margin-top:6px;">
+                                On Standby/Off-duty
+                            </span>
                         </div>
-                        <div style="width:1px; background:#e2e8f0;"></div>
-                        <div class="stat-group">
-                            <span style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em;">Idle</span>
-                            <div id="offline-count" style="font-size:24px; font-weight:800; color:#64748b;">0</div>
+                        <div style="width:48px; height:48px; background:#f8fafc; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; color:#64748b;">💤</div>
+                    </div>
+
+                    <!-- Card 3: Total -->
+                    <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);">
+                        <div>
+                            <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Rider Fleet</span>
+                            <div id="total-count" style="font-size:28px; font-weight:800; color:var(--primary-600); margin-top:4px; line-height:1;">0</div>
+                            <span style="font-size:11px; color:var(--primary-500); font-weight:600; display:flex; align-items:center; gap:4px; margin-top:6px;">
+                                Total Registered Team
+                            </span>
                         </div>
-                        <div style="width:1px; background:#e2e8f0;"></div>
-                        <div class="stat-group">
-                            <span style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em;">Total</span>
-                            <div id="total-count" style="font-size:24px; font-weight:800; color:#2563eb;">0</div>
-                        </div>
-                        <div id="sync-status" style="display:flex; align-items:center; gap:8px; background:#f0fdf4; padding:8px 16px; border-radius:12px; border:1px solid #bbf7d0; margin-left:10px;">
-                            <div style="width:6px; height:6px; background:#22c55e; border-radius:50%; animation: pulse 2s infinite;"></div>
-                            <span id="sync-text" style="font-size:12px; font-weight:700; color:#16a34a;">SYNCING</span>
+                        <div style="width:48px; height:48px; background:var(--primary-50); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--primary-600);">👥</div>
+                    </div>
+
+                    <!-- Clock & Connection Status Card -->
+                    <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01); background:linear-gradient(135deg, #0f172a, #1e293b); color:white;">
+                        <span style="font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">SYNC STATUS</span>
+                        <div id="sync-text" style="font-size:18px; font-weight:800; font-family:'Courier New', monospace; letter-spacing:1px; color:#10b981;">LIVE: --:--:--</div>
+                        <div id="sync-status" style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+                            <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
+                            <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE DATA CHANNEL</span>
                         </div>
                     </div>
+
                 </div>
 
                 <!-- Main Workspace -->
@@ -53,21 +81,44 @@ const LiveTracking = {
                     <!-- Premium Map Container -->
                     <div style="background:white; border-radius:20px; overflow:hidden; border:1px solid #e2e8f0; position:relative; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
                         <div id="tracking-map" style="height:100%; width:100%; background:#f8fafc;"></div>
-                        <div style="position:absolute; bottom:20px; left:20px; z-index:1000; background:rgba(255,255,255,0.9); padding:12px; border-radius:12px; backdrop-filter:blur(8px); border:1px solid #e2e8f0; font-size:12px; color:#475569;">
-                            <b>Legend:</b> <span style="color:#22c55e;">● Active</span> | <span style="color:#94a3b8;">● Offline</span>
+                        <div style="position:absolute; bottom:20px; left:20px; z-index:1000; background:rgba(255,255,255,0.9); padding:12px; border-radius:12px; backdrop-filter:blur(8px); border:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                            <span style="font-weight:800; color:#0f172a; margin-bottom:2px;">OPERATIONAL BOUNDS</span>
+                            <div style="display:flex; align-items:center; gap:6px;"><span style="width:12px; height:12px; background:rgba(59,130,246,0.15); border:1.5px dashed #3b82f6; border-radius:3px; display:inline-block;"></span> Laban Zone</div>
+                            <div style="display:flex; align-items:center; gap:6px;"><span style="width:12px; height:12px; background:rgba(16,185,129,0.15); border:1.5px dashed #10b981; border-radius:3px; display:inline-block;"></span> Irqah Zone</div>
+                            <div style="height:1px; background:#e2e8f0; margin:4px 0;"></div>
+                            <div><b>Pins:</b> <span style="color:#10b981;">● Online</span> | <span style="color:#94a3b8;">● Offline</span></div>
                         </div>
                     </div>
 
                     <!-- Rider Console -->
                     <div style="background:white; border-radius:20px; border:1px solid #e2e8f0; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
-                        <div style="padding:20px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
-                            <h3 style="margin:0; font-size:16px; font-weight:800; color:#0f172a;">Rider Fleet</h3>
-                            <button onclick="LiveTracking.recenter()" style="background:#f1f5f9; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#475569; cursor:pointer;">Recenter All</button>
+                        
+                        <!-- Console Header with Search & Filter -->
+                        <div style="padding:16px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h3 style="margin:0; font-size:16px; font-weight:800; color:#0f172a;">Rider Fleet</h3>
+                                <button onclick="LiveTracking.recenter()" style="background:var(--primary-50); border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; color:var(--primary-600); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='var(--primary-100)'" onmouseout="this.style.background='var(--primary-50)'">Recenter All</button>
+                            </div>
+                            
+                            <!-- Real-time search box -->
+                            <div style="position:relative;">
+                                <input type="text" id="rider-search" placeholder="Search riders..." style="width:100%; padding:10px 12px 10px 36px; border-radius:10px; border:1px solid #cbd5e1; font-size:13px; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary-500)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none'">
+                                <svg style="position:absolute; left:12px; top:12px; color:#94a3b8;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </div>
+                            
+                            <!-- Filter Tabs -->
+                            <div style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:8px;">
+                                <button id="filter-btn-all" onclick="LiveTracking.setFilter('all')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:white; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,0.05);">All</button>
+                                <button id="filter-btn-active" onclick="LiveTracking.setFilter('active')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:transparent; color:#64748b;">Active</button>
+                                <button id="filter-btn-inactive" onclick="LiveTracking.setFilter('inactive')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:transparent; color:#64748b;">Inactive</button>
+                            </div>
                         </div>
-                        <div id="rider-list" style="flex:1; overflow-y:auto; padding:15px; background:#fbfcfe;">
+
+                        <!-- Sidebar list container -->
+                        <div id="rider-list" style="flex:1; overflow-y:auto; padding:15px; background:#fbfcfe; display:flex; flex-direction:column; gap:10px;">
                             <div style="text-align:center; padding:40px; color:#94a3b8;">
-                                <div style="font-size:40px; margin-bottom:10px;">📡</div>
-                                <div>Scanning fleet...</div>
+                                <div class="scanner-icon" style="font-size:40px; margin-bottom:10px;">📡</div>
+                                <div>Scanning fleet channels...</div>
                             </div>
                         </div>
                     </div>
@@ -75,14 +126,69 @@ const LiveTracking = {
             </div>
 
             <style>
-                @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-                .rider-item { cursor:pointer; transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid transparent; }
-                .rider-item:hover { transform: translateY(-2px); border-color: #2563eb; background:white !important; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
-                .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
-                .leaflet-popup-content { margin: 0; }
-                .custom-marker { transition: all 0.5s ease-in-out; }
+                .leaflet-control-attribution {
+                    display: none !important;
+                }
+                @keyframes active-pulse { 
+                    0% { transform: scale(0.85); opacity: 0.6; } 
+                    50% { transform: scale(1.15); opacity: 0.9; } 
+                    100% { transform: scale(0.85); opacity: 0.6; } 
+                }
+                .rider-card { 
+                    cursor: pointer; 
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+                    border: 1px solid #eef2f6; 
+                    background: white;
+                    border-radius: 14px;
+                    padding: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .rider-card:hover { 
+                    transform: translateY(-2px); 
+                    border-color: var(--primary-300); 
+                    box-shadow: 0 8px 16px -4px rgba(59, 130, 246, 0.08); 
+                }
+                .rider-card.selected {
+                    border-color: var(--primary-500);
+                    background: #eff6ff;
+                    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.05);
+                }
+                .leaflet-popup-content-wrapper { 
+                    border-radius: 16px; 
+                    padding: 0; 
+                    overflow: hidden; 
+                    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1) !important;
+                }
+                .leaflet-popup-content { margin: 0 !important; }
+                .zone-tooltip {
+                    background: rgba(15, 23, 42, 0.95) !important;
+                    border: none !important;
+                    border-radius: 6px !important;
+                    color: white !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    padding: 4px 8px !important;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+                }
+                .scanner-icon {
+                    animation: scanning-pulse 2s infinite ease-in-out;
+                }
+                @keyframes scanning-pulse {
+                    0% { opacity: 0.4; transform: scale(0.9); }
+                    50% { opacity: 1; transform: scale(1.1); }
+                    100% { opacity: 0.4; transform: scale(0.9); }
+                }
             </style>
         `;
+
+        // Attach event listener to search input
+        document.getElementById('rider-search').addEventListener('input', (e) => {
+            this._searchTerm = e.target.value;
+            this.updateRiderList(this._lastRidersData);
+        });
 
         await this.loadLeaflet();
         this.initMap();
@@ -101,27 +207,66 @@ const LiveTracking = {
 
     initMap() {
         if (this._map) this._map.remove();
-        this._map = L.map('tracking-map', { zoomControl: false }).setView(this._lastCenter, 12);
+        this._map = L.map('tracking-map', { zoomControl: false, attributionControl: false }).setView(this._lastCenter, 12);
         L.control.zoom({ position: 'topleft' }).addTo(this._map);
         
-        // CartoDB Voyager tiles (Premium clean look)
+        // Premium Light Voyager tiles
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; CartoDB',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(this._map);
+
+        // Clear existing overlays
+        this._zonesLayers = [];
+        // Add Geofences as overlays
+        this.zones.forEach(z => {
+            const polygon = L.rectangle(z.coords, {
+                color: z.color,
+                weight: 1.5,
+                fillColor: z.color,
+                fillOpacity: 0.08,
+                dashArray: '4, 6'
+            }).addTo(this._map);
+            
+            polygon.bindTooltip(`<b>${z.name} Geofence</b>`, { sticky: true, className: 'zone-tooltip' });
+            this._zonesLayers.push(polygon);
+        });
     },
 
     async startSync() {
-        if (this._refreshInterval) clearInterval(this._refreshInterval);
+        this.stopSync();
         this.fetchFleet(true); // Initial center
         this._refreshInterval = setInterval(() => this.fetchFleet(false), 5000);
+    },
+
+    stopSync() {
+        if (this._refreshInterval) {
+            clearInterval(this._refreshInterval);
+            this._refreshInterval = null;
+        }
+    },
+
+    getZone(lat, lng) {
+        for (const z of this.zones) {
+            const [[lat1, lng1], [lat2, lng2]] = z.coords;
+            const minLat = Math.min(lat1, lat2);
+            const maxLat = Math.max(lat1, lat2);
+            const minLng = Math.min(lng1, lng2);
+            const maxLng = Math.max(lng1, lng2);
+            if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+                return z;
+            }
+        }
+        return null;
     },
 
     async fetchFleet(shouldCenter) {
         try {
             const res = await fetch('/api/admin/fleet-locations');
             const riders = await res.json();
+            
+            this._lastRidersData = riders;
             
             this.updateMapMarkers(riders);
             this.updateRiderList(riders);
@@ -132,11 +277,28 @@ const LiveTracking = {
             }
 
             document.getElementById('sync-text').textContent = 'LIVE: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            const syncStatusEl = document.getElementById('sync-status');
+            const syncTextEl = document.getElementById('sync-text');
+            if (syncStatusEl) {
+                syncStatusEl.innerHTML = `
+                    <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
+                    <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE DATA CHANNEL</span>
+                `;
+                syncTextEl.style.color = '#10b981';
+            }
         } catch (e) {
             console.error('Fleet sync error:', e);
-            document.getElementById('sync-text').textContent = 'OFFLINE';
-            document.getElementById('sync-status').style.background = '#fef2f2';
-            document.getElementById('sync-status').style.borderColor = '#fecaca';
+            const syncStatusEl = document.getElementById('sync-status');
+            const syncTextEl = document.getElementById('sync-text');
+            if (syncStatusEl) {
+                syncStatusEl.innerHTML = `
+                    <span style="width:6px; height:6px; background:#ef4444; border-radius:50%; display:inline-block;"></span>
+                    <span style="font-size:10px; font-weight:800; color:#ef4444; letter-spacing:0.05em;">CHANNEL CONNECTION LOST</span>
+                `;
+                syncTextEl.textContent = 'OFFLINE';
+                syncTextEl.style.color = '#ef4444';
+            }
         }
     },
 
@@ -145,23 +307,22 @@ const LiveTracking = {
             if (!r.lat || !r.lng) return;
             
             const isOnline = r.isOnline === true;
+            const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
             const popupContent = this.getPopupHtml(r, isOnline);
             
             if (this._riderMarkers[r.id]) {
                 this._riderMarkers[r.id].setLatLng([r.lat, r.lng]);
-                
-                // Update popup content live
                 this._riderMarkers[r.id].setPopupContent(popupContent);
                 
-                // Update icon if status changed (detecting by color in HTML)
+                // Update icon if online/offline status changed
                 const currentHtml = this._riderMarkers[r.id].options.icon.options.html;
-                const targetColor = isOnline ? '#2563eb' : '#64748b';
+                const targetColor = isOnline ? '#10b981' : '#cbd5e1';
                 if (!currentHtml.includes(targetColor)) {
-                    this._riderMarkers[r.id].setIcon(this.createIcon(isOnline));
+                    this._riderMarkers[r.id].setIcon(this.createIcon(isOnline, initials, r.photo));
                 }
             } else {
                 const marker = L.marker([r.lat, r.lng], { 
-                    icon: this.createIcon(isOnline) 
+                    icon: this.createIcon(isOnline, initials, r.photo) 
                 }).addTo(this._map);
                 
                 marker.bindPopup(popupContent);
@@ -171,103 +332,246 @@ const LiveTracking = {
     },
 
     getPopupHtml(r, isOnline) {
+        const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
+        const zone = this.getZone(r.lat, r.lng);
+        const zoneName = zone ? zone.name + ' Zone' : 'Out of Geofence';
+        
         return `
-            <div style="padding:15px; min-width:200px;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <div style="width:40px; height:40px; background:#f8fafc; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div>
+            <div style="font-family:'Inter', sans-serif; min-width:240px; border-radius:12px; overflow:hidden; background:white;">
+                <!-- Header -->
+                <div style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid #f1f5f9; background:#f8fafc;">
+                    <div style="width:40px; height:40px; background:#eff6ff; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #3b82f6; overflow:hidden; position:relative;">
+                        ${r.photo ? `<img src="${r.photo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:700; color:#2563eb; font-size:13px;\\'>${initials}</span>'" />` : `<span style="font-weight:700; color:#2563eb; font-size:13px;">${initials}</span>`}
+                    </div>
                     <div>
-                        <div style="font-weight:800; color:#0f172a; font-size:14px;">${r.name}</div>
-                        <div style="font-size:11px; color:${isOnline ? '#16a34a' : '#64748b'}; font-weight:700;">${isOnline ? '● ONLINE' : '● OFFLINE'}</div>
+                        <div style="font-weight:800; color:#0f172a; font-size:14px; line-height:1.2;">${r.name}</div>
+                        <div style="font-size:11px; color:#64748b; margin-top:2px;">ID: #${r.id.substring(0, 8)}</div>
                     </div>
                 </div>
-                <div style="background:#f1f5f9; padding:8px; border-radius:8px; font-size:12px; color:#475569;">
-                    <div>📍 ${r.status || 'Active'}</div>
-                    <div>🕒 Last Update: ${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString() : 'N/A'}</div>
+                
+                <!-- Body -->
+                <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
+                    <!-- Badges -->
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? '#ecfdf5' : '#f1f5f9'}; color:${isOnline ? '#059669' : '#64748b'}; letter-spacing:0.02em;">
+                            ${isOnline ? '● ONLINE' : '● OFFLINE'}
+                        </span>
+                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${zone ? '#eff6ff' : '#fff7ed'}; color:${zone ? '#2563eb' : '#ea580c'}; letter-spacing:0.02em;">
+                            📍 ${zoneName}
+                        </span>
+                    </div>
+
+                    <!-- Details -->
+                    <div style="background:#f8fafc; border:1px solid #f1f5f9; padding:10px; border-radius:8px; font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">Status:</span> <span style="font-weight:700; color:#334155;">${r.status || 'Active Shift'}</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">Last Synced:</span> <span style="font-weight:700; color:#334155;">${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : 'N/A'}</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">GPS Link:</span> <span style="font-family:monospace; color:#64748b; font-size:10px;">${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}</span></div>
+                    </div>
+
+                    <!-- WhatsApp CTA -->
+                    ${r.phone ? `
+                    <a href="https://wa.me/${r.phone.replace(/[^0-9]/g, '')}" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; background:#25d366; color:white; font-size:12px; font-weight:700; padding:10px; border-radius:8px; text-align:center; transition:all 0.2s; box-shadow: 0 2px 4px rgba(37,211,102,0.15);" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 12.008 0c3.237.001 6.279 1.26 8.567 3.551 2.289 2.291 3.547 5.337 3.545 8.577-.005 6.678-5.33 12.001-12.007 12.001-1.996-.001-3.957-.492-5.7-1.423L0 24zm6.09-3.722c1.642.975 3.238 1.488 4.904 1.489 5.58 0 10.121-4.512 10.125-10.063.002-2.69-1.043-5.22-2.94-7.117C16.328 2.69 13.805 1.64 11.121 1.64 5.541 1.64 1 6.15 1 11.7.099 13.535.59 15.3 1.5 16.8l-.99 3.614 3.702-.97.16.096z"/></svg>
+                        WhatsApp Rider
+                    </a>
+                    ` : ''}
                 </div>
             </div>
         `;
     },
 
-    createIcon(isOnline) {
-        const color = isOnline ? '#2563eb' : '#64748b';
-        const shadow = isOnline ? 'rgba(37, 99, 235, 0.4)' : 'transparent';
-        const pulse = isOnline ? `
-            <div style="position:absolute; width:100%; height:100%; border-radius:12px; background:${color}; opacity:0.3; animation: rider-pulse 2s infinite;"></div>
-        ` : '';
+    createIcon(isOnline, initialText, photoUrl) {
+        const color = isOnline ? '#10b981' : '#64748b';
+        const border = isOnline ? '3px solid #10b981' : '3px solid #cbd5e1';
+        const glow = isOnline ? 'box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);' : 'box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);';
+        
+        const innerContent = photoUrl 
+            ? `<img src="${photoUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:800; font-size:12px; color:#334155;\\'>${initialText}</span>'" />` 
+            : `<span style="font-weight:800; font-size:12px; color:#334155;">${initialText}</span>`;
+
+        const pulseMarkup = isOnline 
+            ? `<div style="position:absolute; width:44px; height:44px; border-radius:50%; background:#10b981; opacity:0.25; animation: active-pulse 2s infinite; z-index:-1;"></div>`
+            : '';
 
         return L.divIcon({
             html: `
-                <div style="position:relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center;">
-                    ${pulse}
-                    <div class="custom-marker" style="width:34px; height:34px; background:white; border:2.5px solid ${color}; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 16px -4px rgba(0,0,0,0.2); position:relative; z-index:2;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
-                        </svg>
+                <div style="position:relative; width:44px; height:44px; display:flex; align-items:center; justify-content:center;">
+                    ${pulseMarkup}
+                    <div style="width:36px; height:36px; background:white; border:${border}; border-radius:50%; display:flex; align-items:center; justify-content:center; ${glow} position:relative; overflow:hidden; z-index:2;">
+                         ${innerContent}
                     </div>
-                    <style>
-                        @keyframes rider-pulse {
-                            0% { transform: scale(0.8); opacity: 0.5; }
-                            100% { transform: scale(1.6); opacity: 0; }
-                        }
-                    </style>
+                    <div style="position:absolute; bottom:0px; left:18px; width:8px; height:8px; background:${isOnline ? '#10b981' : '#cbd5e1'}; transform:rotate(45deg); z-index:1;"></div>
                 </div>
             `,
-            className: '', iconSize: [42, 42], iconAnchor: [21, 21]
+            className: '',
+            iconSize: [44, 44],
+            iconAnchor: [22, 40]
         });
+    },
+
+    setFilter(status) {
+        this._filterStatus = status;
+        
+        // Update tab buttons style
+        const tabs = ['all', 'active', 'inactive'];
+        tabs.forEach(t => {
+            const btn = document.getElementById(`filter-btn-${t}`);
+            if (btn) {
+                if (t === status) {
+                    btn.style.background = 'white';
+                    btn.style.color = '#0f172a';
+                    btn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#64748b';
+                    btn.style.boxShadow = 'none';
+                }
+            }
+        });
+        
+        this.updateRiderList(this._lastRidersData);
     },
 
     updateRiderList(riders) {
         const list = document.getElementById('rider-list');
-        list.innerHTML = riders.map(r => {
-            const hasLocation = r.lat && r.lng;
-            return `
-            <div class="rider-item" onclick="LiveTracking.focusRider(${r.lat || 'null'}, ${r.lng || 'null'}, '${r.id}')" style="padding:15px; border-radius:16px; margin-bottom:10px; background:white; border:1px solid #eef2f6; display:flex; align-items:center; gap:12px; opacity: ${hasLocation ? '1' : '0.7'};">
-                <div style="width:44px; height:44px; background:${r.isOnline ? '#f0fdf4' : '#f8fafc'}; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:20px; border:1px solid ${r.isOnline ? '#bbf7d0' : '#e2e8f0'};">
-                    ${r.isOnline ? '🚴' : '💤'}
+        if (!list) return;
+
+        // Apply filters
+        const q = (this._searchTerm || '').toLowerCase().trim();
+        const filtered = riders.filter(r => {
+            const matchesSearch = r.name.toLowerCase().includes(q);
+            const matchesFilter = this._filterStatus === 'all' || 
+                (this._filterStatus === 'active' && r.isOnline) || 
+                (this._filterStatus === 'inactive' && !r.isOnline);
+            return matchesSearch && matchesFilter;
+        });
+
+        if (filtered.length === 0) {
+            list.innerHTML = `
+                <div style="text-align:center; padding:40px 20px; color:#94a3b8;">
+                    <div style="font-size:32px; margin-bottom:10px;">🔍</div>
+                    <div style="font-weight:600; font-size:13px; color:#475569;">No matching riders</div>
+                    <div style="font-size:11px; margin-top:2px; color:#94a3b8;">Try a different keyword or tab</div>
                 </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = filtered.map(r => {
+            const hasLocation = r.lat && r.lng;
+            const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
+            
+            // Get Geofence Zone name if online and has location
+            let zoneTag = 'No GPS Signal';
+            let zoneColor = '#cbd5e1';
+            let zoneTextColor = '#475569';
+            if (hasLocation) {
+                const zone = this.getZone(r.lat, r.lng);
+                if (zone) {
+                    zoneTag = zone.name + ' Geofence';
+                    zoneColor = zone.color === '#10b981' ? '#ecfdf5' : '#eff6ff';
+                    zoneTextColor = zone.color === '#10b981' ? '#059669' : '#2563eb';
+                } else {
+                    zoneTag = 'Out of Bounds';
+                    zoneColor = '#fff7ed';
+                    zoneTextColor = '#ea580c';
+                }
+            }
+
+            const avatarMarkup = r.photo 
+                ? `<img src="${r.photo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:700; color:#2563eb; font-size:13px;\\'>${initials}</span>'" />` 
+                : `<span style="font-weight:700; color:#2563eb; font-size:13px;">${initials}</span>`;
+
+            const statusDot = r.isOnline 
+                ? `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; background:#10b981; border:2px solid white; border-radius:50%; box-shadow:0 0 4px rgba(16,185,129,0.4);"></span>`
+                : `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; background:#94a3b8; border:2px solid white; border-radius:50%;"></span>`;
+
+            return `
+            <div class="rider-card" id="rider-card-${r.id}" onclick="LiveTracking.focusRider(${r.lat || 'null'}, ${r.lng || 'null'}, '${r.id}')">
+                
+                <!-- Avatar block -->
+                <div style="position:relative; width:44px; height:44px; background:#eff6ff; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid ${r.isOnline ? '#10b981' : '#cbd5e1'}; overflow:hidden; flex-shrink:0;">
+                    ${avatarMarkup}
+                    ${statusDot}
+                </div>
+                
+                <!-- Text Details -->
                 <div style="flex:1; min-width:0;">
                     <div style="font-weight:800; font-size:14px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r.name}</div>
-                    <div style="font-size:12px; color:#64748b;">${r.isOnline ? '<span style="color:#22c55e; font-weight:700;">Active Now</span>' : 'Inactive'}</div>
+                    
+                    <!-- Sub-text Badge with Zone/Status -->
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
+                        <span style="font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; background:${zoneColor}; color:${zoneTextColor}; display:inline-flex; align-items:center; gap:3px;">
+                            ${zoneTag}
+                        </span>
+                    </div>
                 </div>
-                <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-                    <button style="background:${hasLocation ? '#2563eb' : '#cbd5e1'}; color:white; border:none; width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:${hasLocation ? 'pointer' : 'not-allowed'};" title="Track Rider">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
+                
+                <!-- Action / Time Column -->
+                <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                    <div style="display:flex; gap:4px;">
+                        <!-- WhatsApp button -->
+                        ${r.phone ? `
+                        <a href="https://wa.me/${r.phone.replace(/[^0-9]/g, '')}" target="_blank" onclick="event.stopPropagation();" style="background:#25d366; color:white; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="WhatsApp Rider">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 12.008 0c3.237.001 6.279 1.26 8.567 3.551 2.289 2.291 3.547 5.337 3.545 8.577-.005 6.678-5.33 12.001-12.007 12.001-1.996-.001-3.957-.492-5.7-1.423L0 24zm6.09-3.722c1.642.975 3.238 1.488 4.904 1.489 5.58 0 10.121-4.512 10.125-10.063.002-2.69-1.043-5.22-2.94-7.117C16.328 2.69 13.805 1.64 11.121 1.64 5.541 1.64 1 6.15 1 11.7.099 13.535.59 15.3 1.5 16.8l-.99 3.614 3.702-.97.16.096z"/></svg>
+                        </a>
+                        ` : ''}
+
+                        <!-- Track button -->
+                        <button style="background:${hasLocation ? 'var(--primary-600)' : '#cbd5e1'}; color:white; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:${hasLocation ? 'pointer' : 'not-allowed'};" title="Focus Location">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                     <div style="font-size:10px; font-weight:700; color:#94a3b8;">${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}</div>
                 </div>
+
             </div>
-        `}).join('') || '<div style="text-align:center; padding:40px; color:#94a3b8;">No riders registered</div>';
+            `;
+        }).join('');
     },
 
     updateStats(riders) {
-        document.getElementById('online-count').textContent = riders.filter(r => r.isOnline).length;
-        document.getElementById('offline-count').textContent = riders.filter(r => !r.isOnline).length;
-        document.getElementById('total-count').textContent = riders.length;
+        const activeCount = riders.filter(r => r.isOnline).length;
+        const offlineCount = riders.filter(r => !r.isOnline).length;
+        const totalCount = riders.length;
+
+        const elOnline = document.getElementById('online-count');
+        const elOffline = document.getElementById('offline-count');
+        const elTotal = document.getElementById('total-count');
+
+        if (elOnline) elOnline.textContent = activeCount;
+        if (elOffline) elOffline.textContent = offlineCount;
+        if (elTotal) elTotal.textContent = totalCount;
     },
 
     focusRider(lat, lng, id) {
+        // Toggle selected active state on rider card in list
+        document.querySelectorAll('.rider-card').forEach(el => el.classList.remove('selected'));
+        const activeCard = document.getElementById(`rider-card-${id}`);
+        if (activeCard) activeCard.classList.add('selected');
+
         if (!lat || !lng) {
-            alert('Waiting for this rider to sync their GPS...');
+            Utils.alert('Waiting for this rider to establish a GPS sync signal...', 'GPS Lock Required');
             return;
         }
-        this._map.flyTo([lat, lng], 18, { 
-            duration: 1.5,
-            easeLinearity: 0.25 
+
+        this._map.flyTo([lat, lng], 17, { 
+            duration: 1.2,
+            easeLinearity: 0.2 
         });
         
-        // Wait for flyTo to finish or just open popup immediately
         if (this._riderMarkers[id]) {
             setTimeout(() => {
                 this._riderMarkers[id].openPopup();
-            }, 500);
+            }, 400);
         }
     },
 
     recenter() {
-        const markers = Object.values(this._riderMarkers);
+        const markers = Object.values(this._riderMarkers).filter(m => m.getLatLng());
         if (markers.length === 0) return;
         const group = new L.featureGroup(markers);
-        this._map.fitBounds(group.getBounds().pad(0.1));
+        this._map.fitBounds(group.getBounds().pad(0.12));
     },
 
     refresh() {
