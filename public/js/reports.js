@@ -54,9 +54,10 @@ const Reports = {
         title = `Complete Financial History Report`;
       }
 
-      const [expenses, funds] = await Promise.all([
+      const [expenses, funds, globalStats] = await Promise.all([
         API.getExpenses(start, expenseEnd || end),
-        API.getFunds(start, end)
+        API.getFunds(start, end),
+        API.getExpenseStats()
       ]);
 
       let lastTotalExp = null, lastTotalFunds = null;
@@ -123,32 +124,32 @@ const Reports = {
       // Summary card background
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(226, 232, 240);
-      doc.roundedRect(20, currentY, 170, 35, 3, 3, 'FD');
+      doc.roundedRect(20, currentY, 170, 56, 3, 3, 'FD');
       
-      // Column headers
+      // Column headers - Row 1 (Cycle Info)
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 116, 139);
-      doc.text('TOTAL RECEIVED', 35, currentY + 10);
-      doc.text('TOTAL EXPENSES', 90, currentY + 10);
-      doc.text('NET STATUS', 150, currentY + 10);
+      doc.text('CYCLE RECEIVED', 35, currentY + 10);
+      doc.text('CYCLE EXPENSES', 90, currentY + 10);
+      doc.text('CYCLE NET STATUS', 150, currentY + 10);
       
-      // Column values
-      doc.setFontSize(16);
+      // Column values - Row 1
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       
       doc.setTextColor(5, 150, 105);
-      doc.text(totalFunds.toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 35, currentY + 22);
+      doc.text(totalFunds.toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 35, currentY + 20);
       
       doc.setTextColor(225, 29, 72);
-      doc.text(totalExp.toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 90, currentY + 22);
+      doc.text(totalExp.toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 90, currentY + 20);
       
       if (net >= 0) {
         doc.setTextColor(5, 150, 105);
-        doc.text('+' + net.toLocaleString('en-US') + ' SAR', 150, currentY + 22);
+        doc.text('+' + net.toLocaleString('en-US') + ' SAR', 150, currentY + 20);
       } else {
         doc.setTextColor(225, 29, 72);
-        doc.text('-' + Math.abs(net).toLocaleString('en-US') + ' SAR', 150, currentY + 22);
+        doc.text('-' + Math.abs(net).toLocaleString('en-US') + ' SAR', 150, currentY + 20);
       }
 
       // Comparative (vs Last Month)
@@ -159,22 +160,80 @@ const Reports = {
         // Income diff
         const incDiff = totalFunds - lastTotalFunds;
         doc.setTextColor(incDiff >= 0 ? 5 : 225, incDiff >= 0 ? 150 : 29, incDiff >= 0 ? 105 : 72);
-        doc.text(`vs ${lastTotalFunds.toLocaleString()} SAR last mo`, 35, currentY + 28);
+        doc.text(`vs ${lastTotalFunds.toLocaleString()} SAR last mo`, 35, currentY + 26);
         
         // Exp diff
         const expDiff = totalExp - lastTotalExp;
         doc.setTextColor(expDiff <= 0 ? 5 : 225, expDiff <= 0 ? 150 : 29, expDiff <= 0 ? 105 : 72);
-        doc.text(`vs ${lastTotalExp.toLocaleString()} SAR last mo`, 90, currentY + 28);
+        doc.text(`vs ${lastTotalExp.toLocaleString()} SAR last mo`, 90, currentY + 26);
       } else {
         // Status indicator fallback
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         const statusText = net >= 0 ? 'SURPLUS' : 'DEFICIT';
-        doc.text(statusText, 150, currentY + 28);
+        doc.text(statusText, 150, currentY + 26);
+      }
+
+      // Divider line
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(25, currentY + 31, 185, currentY + 31);
+
+      // Row 2 (Global Info)
+      const gStats = globalStats || {
+        total_received: 0,
+        total_expenses: 0,
+        remaining_irl: 0,
+        from_my_pocket: 0
+      };
+
+      // Headers - Row 2
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('GLOBAL RECEIVED', 35, currentY + 38);
+      doc.text('GLOBAL EXPENSES', 90, currentY + 38);
+      if (gStats.from_my_pocket > 0) {
+        doc.text('GLOBAL OUT OF POCKET', 150, currentY + 38);
+      } else {
+        doc.text('GLOBAL REMAINING', 150, currentY + 38);
+      }
+
+      // Column values - Row 2
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+
+      // Global Received
+      doc.setTextColor(5, 150, 105);
+      doc.text((gStats.total_received || 0).toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 35, currentY + 48);
+
+      // Global Expenses
+      doc.setTextColor(225, 29, 72);
+      doc.text((gStats.total_expenses || 0).toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 90, currentY + 48);
+
+      // Global Balance (Remaining or Out of Pocket)
+      if (gStats.from_my_pocket > 0) {
+        doc.setTextColor(225, 29, 72);
+        doc.text((gStats.from_my_pocket || 0).toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 150, currentY + 48);
+      } else {
+        doc.setTextColor(5, 150, 105);
+        doc.text((gStats.remaining_irl || 0).toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' SAR', 150, currentY + 48);
+      }
+
+      // Sub-text - Row 2
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text('ALL-TIME', 35, currentY + 53);
+      doc.text('ALL-TIME', 90, currentY + 53);
+      if (gStats.from_my_pocket > 0) {
+        doc.text('OWNER COVERED', 150, currentY + 53);
+      } else {
+        doc.text('UNSPENT BALANCE', 150, currentY + 53);
       }
       
-      currentY += 48;
+      currentY += 68;
 
       // ═══════════════════════════════════════════
       // SECTION 1: FUNDS RECEIVED

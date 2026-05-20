@@ -424,7 +424,7 @@ app.get('/api/backup/download', async (req, res) => {
 
 app.get('/api/expenses/stats', async (req, res) => {
   try {
-    res.json(await db.getExpenseStats(req.query.start, req.query.end));
+    res.json(await db.getExpenseStats());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
