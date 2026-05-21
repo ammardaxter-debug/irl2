@@ -18,6 +18,62 @@ const LiveTracking = {
         { id: "irqah", name: "Irqah", color: "#10b981", coords: [[24.6890, 46.5520], [24.7150, 46.5700]] }
     ],
 
+    getGpsStatus(r, isOnline) {
+        if (!isOnline) {
+            return {
+                text: 'OFFLINE',
+                bg: '#f1f5f9',
+                color: '#64748b',
+                isStale: true
+            };
+        }
+        if (!r.lat || !r.lng || !r.lastUpdate) {
+            return {
+                text: 'NO GPS SIGNAL',
+                bg: '#fff7ed',
+                color: '#c2410c',
+                isStale: true
+            };
+        }
+        
+        const lastTime = new Date(r.lastUpdate).getTime();
+        const now = Date.now();
+        const diffMs = now - lastTime;
+        const diffMins = diffMs / 60000;
+        
+        if (diffMins < 5) {
+            return {
+                text: 'GPS SYNCED',
+                bg: '#ecfdf5',
+                color: '#059669',
+                isStale: false
+            };
+        } else if (diffMins < 30) {
+            return {
+                text: `STALE (${Math.round(diffMins)}m ago)`,
+                bg: '#fff7ed',
+                color: '#c2410c',
+                isStale: true
+            };
+        } else if (diffMins < 1440) {
+            const hours = Math.round(diffMins / 60);
+            return {
+                text: `SIGNAL LOST (${hours}h ago)`,
+                bg: '#fef2f2',
+                color: '#ef4444',
+                isStale: true
+            };
+        } else {
+            const days = Math.round(diffMins / 1440);
+            return {
+                text: `SIGNAL LOST (${days}d ago)`,
+                bg: '#fef2f2',
+                color: '#ef4444',
+                isStale: true
+            };
+        }
+    },
+
     async render() {
         const container = document.getElementById('page-live-tracking');
         container.innerHTML = `
@@ -287,23 +343,24 @@ const LiveTracking = {
             const isOnline = r.isOnline === true;
             const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
             const popupContent = this.getPopupHtml(r, isOnline);
+            const gpsStatus = this.getGpsStatus(r, isOnline);
+            const statusKey = `${isOnline}_${gpsStatus.text}_${r.photo}`;
             
             if (this._riderMarkers[r.id]) {
                 this._riderMarkers[r.id].setLatLng([r.lat, r.lng]);
                 this._riderMarkers[r.id].setPopupContent(popupContent);
                 
-                // Update icon if online/offline status changed
-                const currentHtml = this._riderMarkers[r.id].options.icon.options.html;
-                const targetColor = isOnline ? '#10b981' : '#cbd5e1';
-                if (!currentHtml.includes(targetColor)) {
-                    this._riderMarkers[r.id].setIcon(this.createIcon(isOnline, initials, r.photo));
+                if (this._riderMarkers[r.id]._statusKey !== statusKey) {
+                    this._riderMarkers[r.id].setIcon(this.createIcon(isOnline, initials, r.photo, gpsStatus));
+                    this._riderMarkers[r.id]._statusKey = statusKey;
                 }
             } else {
                 const marker = L.marker([r.lat, r.lng], { 
-                    icon: this.createIcon(isOnline, initials, r.photo) 
+                    icon: this.createIcon(isOnline, initials, r.photo, gpsStatus) 
                 }).addTo(this._map);
                 
                 marker.bindPopup(popupContent);
+                marker._statusKey = statusKey;
                 this._riderMarkers[r.id] = marker;
             }
         });
@@ -333,8 +390,8 @@ const LiveTracking = {
                         <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? '#ecfdf5' : '#f1f5f9'}; color:${isOnline ? '#059669' : '#64748b'}; letter-spacing:0.02em;">
                             ${isOnline ? '● ONLINE' : '● OFFLINE'}
                         </span>
-                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? (hasLocation ? '#ecfdf5' : '#fff7ed') : '#f1f5f9'}; color:${isOnline ? (hasLocation ? '#059669' : '#c2410c') : '#64748b'}; letter-spacing:0.02em;">
-                            📍 ${isOnline ? (hasLocation ? 'GPS SYNCED' : 'NO GPS SIGNAL') : 'OFFLINE'}
+                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${this.getGpsStatus(r, isOnline).bg}; color:${this.getGpsStatus(r, isOnline).color}; letter-spacing:0.02em;">
+                            📍 ${this.getGpsStatus(r, isOnline).text}
                         </span>
                     </div>
 
@@ -357,17 +414,33 @@ const LiveTracking = {
         `;
     },
 
-    createIcon(isOnline, initialText, photoUrl) {
-        const color = isOnline ? '#10b981' : '#64748b';
-        const border = isOnline ? '3px solid #10b981' : '3px solid #cbd5e1';
-        const glow = isOnline ? 'box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);' : 'box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);';
+    createIcon(isOnline, initialText, photoUrl, gpsStatus = null) {
+        let color = '#64748b';
+        let border = '3px solid #cbd5e1';
+        let glow = 'box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);';
+        let pulseColor = '';
+
+        if (isOnline) {
+            if (gpsStatus && gpsStatus.isStale) {
+                const statusColor = gpsStatus.color;
+                color = statusColor;
+                border = `3px solid ${statusColor}`;
+                glow = `box-shadow: 0 0 12px ${statusColor}4d;`;
+                pulseColor = statusColor;
+            } else {
+                color = '#10b981';
+                border = '3px solid #10b981';
+                glow = 'box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);';
+                pulseColor = '#10b981';
+            }
+        }
         
         const innerContent = photoUrl 
             ? `<img src="${photoUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:800; font-size:12px; color:#334155;\\'>${initialText}</span>'" />` 
             : `<span style="font-weight:800; font-size:12px; color:#334155;">${initialText}</span>`;
 
-        const pulseMarkup = isOnline 
-            ? `<div style="position:absolute; width:44px; height:44px; border-radius:50%; background:#10b981; opacity:0.25; animation: active-pulse 2s infinite; z-index:-1;"></div>`
+        const pulseMarkup = (isOnline && pulseColor) 
+            ? `<div style="position:absolute; width:44px; height:44px; border-radius:50%; background:${pulseColor}; opacity:0.25; animation: active-pulse 2s infinite; z-index:-1;"></div>`
             : '';
 
         return L.divIcon({
@@ -438,33 +511,28 @@ const LiveTracking = {
             const hasLocation = r.lat && r.lng;
             const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
             
-            let badgeText = 'Offline';
-            let badgeBg = '#f1f5f9';
-            let badgeColor = '#64748b';
-
-            if (r.isOnline) {
-                if (hasLocation) {
-                    badgeText = 'GPS Synced';
-                    badgeBg = '#ecfdf5';
-                    badgeColor = '#059669';
-                } else {
-                    badgeText = 'No GPS Signal';
-                    badgeBg = '#fff7ed';
-                    badgeColor = '#c2410c';
-                }
-            } else {
-                badgeText = 'No GPS Signal';
-                badgeBg = '#f1f5f9';
-                badgeColor = '#64748b';
-            }
+            const gpsStatus = this.getGpsStatus(r, r.isOnline);
+            const badgeText = gpsStatus.text;
+            const badgeBg = gpsStatus.bg;
+            const badgeColor = gpsStatus.color;
 
             const avatarMarkup = r.photo 
                 ? `<img src="${r.photo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:700; color:#2563eb; font-size:13px;\\'>${initials}</span>'" />` 
                 : `<span style="font-weight:700; color:#2563eb; font-size:13px;">${initials}</span>`;
 
-            const statusDot = r.isOnline 
-                ? `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; background:#10b981; border:2px solid white; border-radius:50%; box-shadow:0 0 4px rgba(16,185,129,0.4);"></span>`
-                : `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; background:#94a3b8; border:2px solid white; border-radius:50%;"></span>`;
+            let dotColor = '#94a3b8';
+            let dotGlow = '';
+            if (r.isOnline) {
+                if (gpsStatus.isStale) {
+                    dotColor = gpsStatus.color;
+                    dotGlow = `box-shadow:0 0 4px ${gpsStatus.color}66;`;
+                } else {
+                    dotColor = '#10b981';
+                    dotGlow = 'box-shadow:0 0 4px rgba(16,185,129,0.4);';
+                }
+            }
+
+            const statusDot = `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; background:${dotColor}; border:2px solid white; border-radius:50%; ${dotGlow}"></span>`;
 
             return `
             <div class="rider-card" id="rider-card-${r.id}" onclick="LiveTracking.focusRider(${r.lat || 'null'}, ${r.lng || 'null'}, '${r.id}')">
