@@ -301,6 +301,13 @@ const API = {
     return this.request(`/payroll/lock-status?cycle_key=${cycleKey}`);
   },
 
+  deleteRiderCycleData(riderId, start, end) {
+    return this.request('/payroll/delete-rider-cycle', {
+      method: 'POST',
+      body: JSON.stringify({ rider_id: riderId, start, end })
+    });
+  },
+
   // ── Warning Message Status ──
   getWarningMessageStatus(cycleKey) {
     return this.request(`/warning-message-status?cycle_key=${cycleKey}`);

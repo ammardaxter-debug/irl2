@@ -617,6 +617,29 @@ async function getPaymentStatuses(cycleKey) {
   return result;
 }
 
+async function deleteRiderCycleLogs(riderId, start, end) {
+  const cycleKey = `${start}_${end}`;
+  
+  // 1. Delete daily logs in range for this rider
+  const { error: logsError } = await supabase
+    .from('daily_logs')
+    .delete()
+    .eq('rider_id', parseInt(riderId))
+    .gte('log_date', start)
+    .lte('log_date', end);
+  if (logsError) throw logsError;
+
+  // 2. Delete payment status override for this rider and cycle key
+  const { error: payError } = await supabase
+    .from('payment_status')
+    .delete()
+    .eq('rider_id', String(riderId))
+    .eq('cycle_key', cycleKey);
+  if (payError) throw payError;
+
+  return { success: true };
+}
+
 // ========== BIKES ==========
 async function getAllBikes() {
   const { data, error } = await supabase.from('bikes').select('*');
@@ -850,8 +873,8 @@ module.exports = {
   settleRiderDeductions, getAdvances, createAdvance, updateAdvanceStatus,
   getBonuses, createBonus, deleteBonus, getFunds, createFund, updateFund,
   deleteFund, isPayrollLocked, lockPayroll, unlockPayroll, setPaymentStatus,
-  getPaymentStatuses, getAllBikes, createBike, updateBike, deleteBike,
-  getAuditLogs, migrateFromSQLite,
+  getPaymentStatuses, deleteRiderCycleLogs, getAllBikes, createBike, updateBike, deleteBike,
+  getAuditLogs, logAudit, migrateFromSQLite,
   // Rider Portal
   // Rider Portal
   setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,

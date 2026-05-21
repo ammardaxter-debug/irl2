@@ -389,6 +389,46 @@ app.get('/api/payroll/lock-status', async (req, res) => {
   }
 });
 
+app.post('/api/payroll/delete-rider-cycle', async (req, res) => {
+  try {
+    const { rider_id, start, end } = req.body;
+    if (!rider_id || !start || !end) {
+      return res.status(400).json({ error: 'rider_id, start, and end dates are required' });
+    }
+
+    const cycleKey = `${start}_${end}`;
+    const locked = await db.isPayrollLocked(cycleKey);
+    if (locked) {
+      return res.status(400).json({ error: 'Cannot delete rider cycle logs because this payroll cycle is locked.' });
+    }
+
+    // Call the database function to delete cycle logs and payment status override
+    await db.deleteRiderCycleLogs(rider_id, start, end);
+
+    // Audit logging
+    let adminUser = 'Admin';
+    if (req.cookies?.irl_session) {
+      try {
+        const decoded = jwt.verify(req.cookies.irl_session, DASHBOARD_SECRET);
+        adminUser = decoded.name || 'Admin';
+      } catch (err) {
+        // Fallback to 'Admin'
+      }
+    }
+
+    await db.logAudit(
+      'DELETE',
+      'Rider Cycle Logs',
+      `Deleted all cycle logs and payment overrides for rider ID ${rider_id} from ${start} to ${end}`,
+      adminUser
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========== DASHBOARD ROUTES ==========
 
 app.get('/api/dashboard/stats', async (req, res) => {

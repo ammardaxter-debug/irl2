@@ -336,6 +336,9 @@ const Payroll = {
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </button>
+                        <button onclick="Payroll.deleteRiderCycleData(${r.rider_id}, '${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}')" style="background:transparent; border:none; cursor:pointer; color:#EF4444; padding:4px;" title="Reset Cycle Data">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -423,6 +426,9 @@ const Payroll = {
                         </button>
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </button>
+                        <button onclick="Payroll.deleteRiderCycleData(${r.rider_id}, '${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}')" style="background:transparent; border:none; cursor:pointer; color:#EF4444; padding:4px;" title="Reset Cycle Data">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                         </button>
                       </div>
                     </td>
@@ -575,6 +581,40 @@ const Payroll = {
       Utils.showToast(err.message, 'error');
     } finally {
       Utils.hideLoading();
+    }
+  },
+
+  async deleteRiderCycleData(riderId, riderName) {
+    const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
+    try {
+      // 1. Check if payroll is locked first
+      const status = await API.getPayrollLockStatus(cycleKey);
+      if (status.locked) {
+        Utils.showToast('Cannot delete cycle logs because this payroll cycle is locked.', 'error');
+        return;
+      }
+
+      // 2. Destructive confirmation dialog
+      const message = `Are you sure you want to permanently delete all logs and payment status overrides for ${riderName} for the cycle ${this.currentPeriod.label}? This will delete their daily logs, work hours, and payment status, allowing them to submit again. This action cannot be undone.`;
+      const confirmed = await Utils.confirm(message, 'Reset Rider Cycle Data', 'Yes, Delete All', 'Cancel', true);
+      
+      if (!confirmed) return;
+
+      Utils.showLoading('Resetting rider cycle data', `Deleting logs for ${riderName}...`);
+      
+      const result = await API.deleteRiderCycleData(riderId, this.currentPeriod.start, this.currentPeriod.end);
+      
+      Utils.hideLoading();
+      
+      if (result.success) {
+        Utils.showToast(`Successfully reset cycle data for ${riderName}`, 'success');
+        this.render(); // Refresh the dashboard/payroll tables
+      } else {
+        Utils.showToast(result.error || 'Failed to delete cycle data', 'error');
+      }
+    } catch (err) {
+      Utils.hideLoading();
+      Utils.showToast(err.message || 'Error occurred while resetting cycle data', 'error');
     }
   },
 
