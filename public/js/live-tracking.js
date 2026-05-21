@@ -322,7 +322,7 @@ const LiveTracking = {
                     </div>
                     <div>
                         <div style="font-weight:800; color:#0f172a; font-size:14px; line-height:1.2;">${r.name}</div>
-                        <div style="font-size:11px; color:#64748b; margin-top:2px;">ID: #${r.id.substring(0, 8)}</div>
+                        <div style="font-size:11px; color:#64748b; margin-top:2px;">ID: #${String(r.id).substring(0, 8)}</div>
                     </div>
                 </div>
                 

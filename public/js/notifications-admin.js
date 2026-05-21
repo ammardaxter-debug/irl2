@@ -230,7 +230,7 @@ const NotificationsAdmin = {
   },
 
   buildRiderCardHtml(rider) {
-    const isChecked = this.selectedRiders.has(rider.id);
+    const isChecked = this.selectedRiders.has(String(rider.id));
     const hasPushToken = !!rider.push_token;
     
     const missingFieldLabels = {
@@ -392,9 +392,9 @@ const NotificationsAdmin = {
     selectAllCb?.addEventListener('change', (e) => {
       const filtered = this.getFilteredRiders();
       if (e.target.checked) {
-        filtered.forEach(r => this.selectedRiders.add(r.id));
+        filtered.forEach(r => this.selectedRiders.add(String(r.id)));
       } else {
-        filtered.forEach(r => this.selectedRiders.delete(r.id));
+        filtered.forEach(r => this.selectedRiders.delete(String(r.id)));
       }
       this.updateRiderList();
       this.onSelectionChanged();
@@ -404,7 +404,7 @@ const NotificationsAdmin = {
     const root = document.getElementById('page-notifications');
     root?.addEventListener('change', (e) => {
       if (e.target.classList.contains('rider-select-cb')) {
-        const id = parseInt(e.target.dataset.id);
+        const id = String(e.target.dataset.id);
         if (e.target.checked) {
           this.selectedRiders.add(id);
         } else {
@@ -424,7 +424,7 @@ const NotificationsAdmin = {
     // 7. Quick Select Button
     root?.addEventListener('click', (e) => {
       if (e.target.classList.contains('quick-select-btn')) {
-        const id = parseInt(e.target.dataset.id);
+        const id = String(e.target.dataset.id);
         const cb = document.querySelector(`.rider-select-cb[data-id="${id}"]`);
         if (cb) {
           cb.checked = !cb.checked;
@@ -436,8 +436,8 @@ const NotificationsAdmin = {
     // 8. Link redirect to profile
     root?.addEventListener('click', (e) => {
       if (e.target.classList.contains('rider-name-link')) {
-        const id = parseInt(e.target.dataset.id);
-        const rider = this.riders.find(r => r.id === id);
+        const id = String(e.target.dataset.id);
+        const rider = this.riders.find(r => String(r.id) === id);
         if (rider) {
           App.navigate('riders');
           setTimeout(() => {
@@ -483,7 +483,7 @@ const NotificationsAdmin = {
     // Sync Select All checkbox
     const selectAllCb = document.getElementById('select-all-riders');
     if (selectAllCb) {
-      selectAllCb.checked = filtered.length > 0 && filtered.every(r => this.selectedRiders.has(r.id));
+      selectAllCb.checked = filtered.length > 0 && filtered.every(r => this.selectedRiders.has(String(r.id)));
     }
 
     if (filtered.length === 0) {
@@ -537,7 +537,7 @@ const NotificationsAdmin = {
 
       if (this.selectedRiders.size === 1) {
         const targetId = Array.from(this.selectedRiders)[0];
-        const r = this.riders.find(x => x.id === targetId);
+        const r = this.riders.find(x => String(x.id) === String(targetId));
         if (r) {
           greeting = r.name.split(' ')[0];
           
