@@ -827,6 +827,15 @@ app.get('/api/rider/me', verifyRiderToken, async (req, res) => {
 app.put('/api/rider/me', verifyRiderToken, async (req, res) => {
   try {
     const updated = await db.updateRiderSelfService(req.riderId, req.body);
+    if (updated.bike_id) {
+      try {
+        const bikes = await db.getAllBikes();
+        const bike = bikes.find(b => String(b.id) === String(updated.bike_id));
+        if (bike) updated.bike = bike;
+      } catch (err) {
+        console.error('Error fetching bike for rider on update', err);
+      }
+    }
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1054,6 +1063,120 @@ app.put('/api/admin/profile', verifyAdminToken, async (req, res) => {
     if (!emailKey) return res.status(400).json({ error: 'Cannot identify admin' });
     await db.updateAdminProfile(emailKey, { name, title, photo_url, role: req.adminRole });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== RIDER ALERTS & COMPLIANCE ==========
+
+app.get('/api/admin/riders-compliance', verifyAdminToken, async (req, res) => {
+  try {
+    const targetDate = req.query.date || new Date(Date.now() + 3 * 3600000).toISOString().split('T')[0];
+    const riders = await db.getAllRiders('active');
+    const logs = await db.getDailyLogs(targetDate);
+    
+    const loggedRiderIds = new Set(logs.map(l => String(l.rider_id)));
+    
+    const compliance = riders.map(r => {
+      const missing = [];
+      if (!r.noon_id) missing.push('noon_id');
+      if (!r.bank_name || !r.bank_account || !r.iban) missing.push('bank_details');
+      if (!r.iqama_number || !r.iqama_expiry) missing.push('iqama');
+      if (!r.nationality || !r.date_of_birth) missing.push('personal_info');
+      
+      let emergencyMissing = true;
+      let licenseMissing = true;
+      if (r.doc_vault) {
+        try {
+          const vault = typeof r.doc_vault === 'string' ? JSON.parse(r.doc_vault) : r.doc_vault;
+          if (vault.emergency_name && vault.emergency_phone && vault.emergency_relation) {
+            emergencyMissing = false;
+          }
+          if (vault.license_number && vault.license_expiry) {
+            licenseMissing = false;
+          }
+        } catch(e) {}
+      }
+      if (emergencyMissing) missing.push('emergency_contact');
+      if (licenseMissing) missing.push('drivers_license');
+
+      const logMissing = !loggedRiderIds.has(String(r.id));
+      
+      return {
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        missing_fields: missing,
+        missing_log: logMissing,
+        push_token: r.push_token
+      };
+    });
+
+    res.json({ date: targetDate, compliance });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/send-notification', verifyAdminToken, async (req, res) => {
+  try {
+    const { rider_ids, rider_id, title, message } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    const ids = Array.isArray(rider_ids) ? rider_ids : (rider_id ? [rider_id] : []);
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'At least one rider_id is required' });
+    }
+
+    const adminName = req.adminName || 'Admin';
+    let adminPhoto = '';
+    try {
+      const emailKey = (req.adminEmail || '').replace(/\./g, '_dot_');
+      if (emailKey) {
+        const profile = await db.getAdminProfile(emailKey);
+        if (profile && profile.photo_url) adminPhoto = profile.photo_url;
+      }
+    } catch (e) { /* ignore */ }
+
+    const results = [];
+    const { Expo } = await import('expo-server-sdk');
+    const expo = new Expo();
+
+    for (const rId of ids) {
+      try {
+        // Create in-app notification
+        await db.createNotification({
+          rider_id: Number(rId),
+          type: 'admin_broadcast',
+          title: title,
+          message: message,
+          processed_by_name: adminName,
+          processed_by_photo: adminPhoto
+        });
+
+        // Send push notification if token exists
+        const rider = await db.getRiderById(Number(rId));
+        let pushSent = false;
+        if (rider && rider.push_token && Expo.isExpoPushToken(rider.push_token)) {
+          await expo.sendPushNotificationsAsync([{
+            to: rider.push_token,
+            sound: 'default',
+            title: title,
+            body: message,
+            data: { type: 'admin_broadcast' }
+          }]);
+          pushSent = true;
+        }
+        results.push({ rider_id: rId, success: true, push_sent: pushSent });
+      } catch (err) {
+        results.push({ rider_id: rId, success: false, error: err.message });
+      }
+    }
+
+    res.json({ success: true, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

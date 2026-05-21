@@ -203,6 +203,7 @@ const App = {
       'expenses': 'Expense Tracker',
       'fleet': 'Fleet Management',
       'reports-center': 'Reports & Export Center',
+      'notifications': 'Rider Alerts & Notifications',
       'live-tracking': 'Live Tracking',
       'backup': 'Backup & Data Management'
     };
@@ -219,6 +220,7 @@ const App = {
       case 'expenses': Expenses.render(); break;
       case 'fleet': Bikes.render(); break;
       case 'reports-center': ReportsCenter.render(); break;
+      case 'notifications': NotificationsAdmin.render(); break;
       case 'live-tracking': LiveTracking.render(); break;
       case 'backup': Backup.render(); break;
     }

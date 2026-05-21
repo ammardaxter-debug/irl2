@@ -323,5 +323,19 @@ const API = {
       method: 'PUT',
       body: JSON.stringify({ status, admin_note: adminNote })
     });
+  },
+
+  // ── Rider Compliance & Alerts ──
+  getRidersCompliance(date) {
+    let url = '/admin/riders-compliance';
+    if (date) url += `?date=${date}`;
+    return this.request(url);
+  },
+
+  sendRiderNotification(riderIds, title, message) {
+    return this.request('/admin/send-notification', {
+      method: 'POST',
+      body: JSON.stringify({ rider_ids: riderIds, title, message })
+    });
   }
 };

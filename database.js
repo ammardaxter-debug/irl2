@@ -678,13 +678,24 @@ async function authenticateRider(phone, plainPassword) {
 }
 
 async function updateRiderSelfService(riderId, riderData) {
-  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry'];
+  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry', 'noon_id', 'doc_vault'];
   const updates = { updated_at: nowISO() };
   for (const key of allowed) {
     if (riderData[key] !== undefined) updates[key] = riderData[key];
   }
   const { data, error } = await supabase.from('riders').update(updates).eq('id', riderId).select().single();
   if (error) throw error;
+
+  // Intercept vehicle authorization and insurance expiry dates to update the assigned bike
+  if (riderData.authorization_expiry !== undefined || riderData.insurance_expiry !== undefined) {
+    if (data.bike_id) {
+      const bikeUpdates = {};
+      if (riderData.authorization_expiry !== undefined) bikeUpdates.authorization_expiry = riderData.authorization_expiry;
+      if (riderData.insurance_expiry !== undefined) bikeUpdates.insurance_expiry = riderData.insurance_expiry;
+      await updateBike(data.bike_id, bikeUpdates);
+    }
+  }
+
   const { portal_password, ...safeRider } = data;
   return safeRider;
 }
