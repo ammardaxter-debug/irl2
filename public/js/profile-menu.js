@@ -220,6 +220,11 @@ const ProfileMenu = {
           <span class="hub-action-label">Export This Cycle (Excel)</span>
           <button class="hub-action-btn" onclick="ProfileMenu.exportCycle()">Export</button>
         </div>
+        <div class="hub-action-row" style="background:#FFF5F5;">
+          <svg class="hub-action-icon" style="color:#EF4444;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="hub-action-label" style="color:#C53030; font-weight:600;">Sign Out Session</span>
+          <button class="hub-action-btn" style="border-color:#FCA5A5; background:#FFF; color:#EF4444;" onclick="ProfileMenu.logout()">Logout</button>
+        </div>
 
         <!-- App Preferences -->
         <div class="hub-expand-header" onclick="ProfileMenu.toggleSection('prefs')">
@@ -549,6 +554,27 @@ const ProfileMenu = {
   exportCycle() {
     Utils.closeModal();
     document.querySelector('[data-page="reports-center"]')?.click();
+  },
+
+  async logout() {
+    Utils.closeModal();
+    Utils.showLoading('Logging out', 'Clearing session...');
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      const result = await res.json();
+      if (result.success) {
+        localStorage.removeItem('irl_supervisor_name');
+        localStorage.removeItem('irl_supervisor_title');
+        localStorage.removeItem('irl_supervisor_photo');
+        window.location.href = '/login.html';
+      } else {
+        Utils.hideLoading();
+        Utils.showToast('Logout failed', 'error');
+      }
+    } catch (err) {
+      Utils.hideLoading();
+      Utils.showToast(err.message || 'Error logging out', 'error');
+    }
   },
 
   // ── Preferences ──
