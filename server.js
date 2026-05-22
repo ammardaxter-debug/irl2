@@ -101,6 +101,14 @@ function verifyAdminToken(req, res, next) {
   }
 }
 
+// Middleware to restrict write operations to admin-only (blocks viewers)
+function requireAdmin(req, res, next) {
+  if (req.adminRole === 'viewer') {
+    return res.status(403).json({ error: 'Insufficient permissions. Admin access required.' });
+  }
+  next();
+}
+
 // ========== RIDER ROUTES ==========
 
 app.get('/api/riders', async (req, res) => {
@@ -123,7 +131,7 @@ app.get('/api/riders/:id', async (req, res) => {
   }
 });
 
-app.post('/api/riders', async (req, res) => {
+app.post('/api/riders', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     if (!req.body.name) return res.status(400).json({ error: 'Name is required' });
     const rider = await db.createRider(req.body);
@@ -143,7 +151,7 @@ app.post('/api/riders', async (req, res) => {
   }
 });
 
-app.put('/api/riders/:id', async (req, res) => {
+app.put('/api/riders/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const riderId = parseInt(req.params.id);
     const oldRider = await db.getRiderById(riderId);
@@ -172,7 +180,7 @@ app.put('/api/riders/:id', async (req, res) => {
   }
 });
 
-app.put('/api/riders/:id/archive', async (req, res) => {
+app.put('/api/riders/:id/archive', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const rider = await db.archiveRider(parseInt(req.params.id));
     if (!rider) return res.status(404).json({ error: 'Rider not found' });
@@ -182,7 +190,7 @@ app.put('/api/riders/:id/archive', async (req, res) => {
   }
 });
 
-app.delete('/api/riders/:id/hard-delete', async (req, res) => {
+app.delete('/api/riders/:id/hard-delete', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const success = await db.deleteRiderPermanently(parseInt(req.params.id));
     if (!success) return res.status(404).json({ error: 'Rider not found' });
@@ -239,7 +247,7 @@ app.get('/api/daily-logs/rider/:id', async (req, res) => {
   }
 });
 
-app.post('/api/daily-logs', async (req, res) => {
+app.post('/api/daily-logs', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     if (!req.body.rider_id || !req.body.log_date) {
       return res.status(400).json({ error: 'rider_id and log_date are required' });
@@ -254,7 +262,7 @@ app.post('/api/daily-logs', async (req, res) => {
   }
 });
 
-app.put('/api/daily-logs/:id', async (req, res) => {
+app.put('/api/daily-logs/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const log = await db.updateDailyLog(parseInt(req.params.id), req.body);
     if (!log) return res.status(404).json({ error: 'Log not found' });
@@ -288,7 +296,7 @@ app.get('/api/bonuses', async (req, res) => {
   }
 });
 
-app.post('/api/bonuses', async (req, res) => {
+app.post('/api/bonuses', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     if (!req.body.rider_id || !req.body.amount) return res.status(400).json({ error: 'rider_id and amount required' });
     res.json(await db.createBonus(req.body));
@@ -297,7 +305,7 @@ app.post('/api/bonuses', async (req, res) => {
   }
 });
 
-app.delete('/api/bonuses/:id', async (req, res) => {
+app.delete('/api/bonuses/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteBonus(parseInt(req.params.id));
     res.json({ success: true });
@@ -317,7 +325,7 @@ app.get('/api/salary-advances', async (req, res) => {
   }
 });
 
-app.post('/api/salary-advances', async (req, res) => {
+app.post('/api/salary-advances', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     if (!req.body.rider_id || !req.body.amount) return res.status(400).json({ error: 'rider_id and amount required' });
     res.json(await db.createAdvance(req.body));
@@ -338,7 +346,7 @@ app.put('/api/salary-advances/:id', async (req, res) => {
 
 // ========== PAYMENT STATUS ROUTES ==========
 
-app.put('/api/payroll/payment-status', async (req, res) => {
+app.put('/api/payroll/payment-status', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { rider_id, cycle_key, status, final_paid_amount, notes, manual_deductions, manual_bonus } = req.body;
     if (!rider_id || !cycle_key || !status) return res.status(400).json({ error: 'rider_id, cycle_key, and status required' });
@@ -358,7 +366,7 @@ app.get('/api/payroll/payment-statuses', async (req, res) => {
 
 // ========== PAYROLL LOCK ROUTES ==========
 
-app.post('/api/payroll/lock', async (req, res) => {
+app.post('/api/payroll/lock', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { cycle_key } = req.body;
     if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
@@ -369,7 +377,7 @@ app.post('/api/payroll/lock', async (req, res) => {
   }
 });
 
-app.post('/api/payroll/unlock', async (req, res) => {
+app.post('/api/payroll/unlock', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { cycle_key } = req.body;
     if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
@@ -389,7 +397,7 @@ app.get('/api/payroll/lock-status', async (req, res) => {
   }
 });
 
-app.post('/api/payroll/delete-rider-cycle', async (req, res) => {
+app.post('/api/payroll/delete-rider-cycle', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { rider_id, start, end } = req.body;
     if (!rider_id || !start || !end) {
@@ -478,7 +486,7 @@ app.get('/api/expenses', async (req, res) => {
   }
 });
 
-app.post('/api/expenses', async (req, res) => {
+app.post('/api/expenses', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     res.json(await db.createExpense(req.body));
   } catch (err) {
@@ -486,7 +494,7 @@ app.post('/api/expenses', async (req, res) => {
   }
 });
 
-app.put('/api/expenses/:id', async (req, res) => {
+app.put('/api/expenses/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     res.json(await db.updateExpense(parseInt(req.params.id), req.body));
   } catch (err) {
@@ -494,7 +502,7 @@ app.put('/api/expenses/:id', async (req, res) => {
   }
 });
 
-app.put('/api/expenses/:id/settle', async (req, res) => {
+app.put('/api/expenses/:id/settle', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { settledBy } = req.body;
     if (!settledBy) return res.status(400).json({ error: 'settledBy required' });
@@ -505,7 +513,7 @@ app.put('/api/expenses/:id/settle', async (req, res) => {
   }
 });
 
-app.put('/api/expenses/settle/rider/:riderId', async (req, res) => {
+app.put('/api/expenses/settle/rider/:riderId', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { settledBy } = req.body;
     if (!settledBy) return res.status(400).json({ error: 'settledBy required' });
@@ -516,7 +524,7 @@ app.put('/api/expenses/settle/rider/:riderId', async (req, res) => {
   }
 });
 
-app.delete('/api/expenses/:id', async (req, res) => {
+app.delete('/api/expenses/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteExpense(parseInt(req.params.id));
     res.json({ success: true });
@@ -533,7 +541,7 @@ app.get('/api/funds', async (req, res) => {
   }
 });
 
-app.post('/api/funds', async (req, res) => {
+app.post('/api/funds', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     res.json(await db.createFund(req.body));
   } catch (err) {
@@ -541,7 +549,7 @@ app.post('/api/funds', async (req, res) => {
   }
 });
 
-app.put('/api/funds/:id', async (req, res) => {
+app.put('/api/funds/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     res.json(await db.updateFund(parseInt(req.params.id), req.body));
   } catch (err) {
@@ -549,7 +557,7 @@ app.put('/api/funds/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/funds/:id', async (req, res) => {
+app.delete('/api/funds/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteFund(parseInt(req.params.id));
     res.json({ success: true });
@@ -634,7 +642,7 @@ app.get('/api/bikes', async (req, res) => {
   }
 });
 
-app.post('/api/bikes', async (req, res) => {
+app.post('/api/bikes', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     res.json(await db.createBike(req.body));
   } catch (err) {
@@ -642,7 +650,7 @@ app.post('/api/bikes', async (req, res) => {
   }
 });
 
-app.put('/api/bikes/:id', async (req, res) => {
+app.put('/api/bikes/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const bike = await db.updateBike(parseInt(req.params.id), req.body);
     if (!bike) return res.status(404).json({ error: 'Bike not found' });
@@ -652,7 +660,7 @@ app.put('/api/bikes/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/bikes/:id', async (req, res) => {
+app.delete('/api/bikes/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteBike(parseInt(req.params.id));
     res.json({ success: true });
@@ -779,7 +787,7 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-app.post('/api/settings', async (req, res) => {
+app.post('/api/settings', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { key, value } = req.body;
     if (!key) return res.status(400).json({ error: 'Key is required' });
@@ -805,7 +813,7 @@ app.get('/api/warning-message-status', async (req, res) => {
   }
 });
 
-app.put('/api/warning-message-status', async (req, res) => {
+app.put('/api/warning-message-status', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { rider_id, cycle_key } = req.body;
     if (!rider_id || !cycle_key) return res.status(400).json({ error: 'rider_id and cycle_key required' });
@@ -883,7 +891,7 @@ app.put('/api/rider/me', verifyRiderToken, async (req, res) => {
 });
 
 // Delete daily log
-app.delete('/api/daily-logs/:id', async (req, res) => {
+app.delete('/api/daily-logs/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteDailyLog(req.params.id);
     res.json({ success: true });
@@ -1159,7 +1167,7 @@ app.get('/api/admin/riders-compliance', verifyAdminToken, async (req, res) => {
   }
 });
 
-app.post('/api/admin/send-notification', verifyAdminToken, async (req, res) => {
+app.post('/api/admin/send-notification', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { rider_ids, rider_id, title, message } = req.body;
     if (!title || !message) {
@@ -1355,9 +1363,22 @@ app.get('/api/admin/fleet-locations', async (req, res) => {
       isOnline: r.is_online,
       status: r.status,
       photo: r.profile_photo || r.photo_url,
-      phone: r.phone
+      phone: r.phone,
+      gpsStatus: r.gps_status || null
     }));
     res.json(activeRiders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update GPS status (Rider App heartbeat)
+app.post('/api/rider/gps-status', verifyRiderToken, async (req, res) => {
+  try {
+    const { gps_status } = req.body;
+    if (!gps_status) return res.status(400).json({ error: 'gps_status required' });
+    await db.updateRiderGpsStatus(req.riderId, gps_status);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1393,7 +1414,7 @@ app.put('/api/rider/notifications/:id/read', verifyRiderToken, async (req, res) 
 });
 
 // Admin: set rider portal password
-app.put('/api/riders/:id/set-password', async (req, res) => {
+app.put('/api/riders/:id/set-password', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { password } = req.body;
     if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
@@ -1414,7 +1435,7 @@ app.get('/api/settings/logo', async (req, res) => {
   }
 });
 
-app.post('/api/settings/logo', async (req, res) => {
+app.post('/api/settings/logo', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { logo } = req.body;
     await db.updateSettings('company_logo', logo);

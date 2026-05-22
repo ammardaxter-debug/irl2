@@ -164,24 +164,30 @@ const ProfileMenu = {
       </style>
 
       <div class="hub-identity-card" id="hub-identity-card">
-        <div class="hub-avatar-box" onclick="document.getElementById('hub-photo-input').click()">
+        <div class="hub-avatar-box" ${App.isViewer() ? '' : 'onclick="document.getElementById(\'hub-photo-input\').click()"'} style="${App.isViewer() ? 'cursor:default;' : ''}">
           ${avatarHtml}
+          ${App.isViewer() ? '' : `
           <div class="hub-avatar-overlay">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             <div style="font-size:10px; margin-top:2px;">Change</div>
           </div>
+          `}
         </div>
         <div style="flex:1;">
           <div class="hub-inline-edit" id="hub-name-wrap">
-            <div class="hub-name-val" id="hub-name-val" onclick="ProfileMenu.editField('name')">${Utils.escapeHtml(supervisorName)}</div>
+            <div class="hub-name-val" id="hub-name-val" ${App.isViewer() ? '' : 'onclick="ProfileMenu.editField(\'name\')"'}>${Utils.escapeHtml(supervisorName)}</div>
+            ${App.isViewer() ? '' : `
             <input type="text" class="hub-inline-input" id="hub-name-input" value="${Utils.escapeHtml(supervisorName)}" onblur="ProfileMenu.saveField('name')" onkeypress="if(event.key==='Enter') { this.blur(); }">
             <svg class="edit-icon" id="hub-name-edit-icon" onclick="ProfileMenu.editField('name')" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            `}
           </div>
           
           <div class="hub-inline-edit" style="margin-top:2px;" id="hub-title-wrap">
-            <div class="hub-title-val" id="hub-title-val" onclick="ProfileMenu.editField('title')">${Utils.escapeHtml(supervisorTitle)}</div>
+            <div class="hub-title-val" id="hub-title-val" ${App.isViewer() ? '' : 'onclick="ProfileMenu.editField(\'title\')"'}>${Utils.escapeHtml(supervisorTitle)}</div>
+            ${App.isViewer() ? '' : `
             <input type="text" class="hub-inline-input" style="font-size:13px; font-weight:500; color:#6B7280;" id="hub-title-input" placeholder="e.g. Manager, Supervisor, Admin" value="${Utils.escapeHtml(supervisorTitle)}" onblur="ProfileMenu.saveField('title')" onkeypress="if(event.key==='Enter') { this.blur(); }">
             <svg class="edit-icon" id="hub-title-edit-icon" onclick="ProfileMenu.editField('title')" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            `}
           </div>
           
           <div style="margin-top:8px;">
@@ -210,6 +216,7 @@ const ProfileMenu = {
 
       <!-- Section 1: System Actions -->
       <div class="hub-section">
+        ${App.isViewer() ? '' : `
         <div class="hub-action-row">
           <svg class="hub-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           <span class="hub-action-label">Backup All Data</span>
@@ -220,6 +227,7 @@ const ProfileMenu = {
           <span class="hub-action-label">Export This Cycle (Excel)</span>
           <button class="hub-action-btn" onclick="ProfileMenu.exportCycle()">Export</button>
         </div>
+        `}
         <div class="hub-action-row" style="background:#FFF5F5;">
           <svg class="hub-action-icon" style="color:#EF4444;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span class="hub-action-label" style="color:#C53030; font-weight:600;">Sign Out Session</span>
@@ -294,6 +302,7 @@ const ProfileMenu = {
   },
 
   editField(field) {
+    if (App.isViewer()) return;
     document.getElementById(`hub-${field}-val`).style.display = 'none';
     document.getElementById(`hub-${field}-edit-icon`).style.display = 'none';
     const input = document.getElementById(`hub-${field}-input`);
@@ -302,6 +311,7 @@ const ProfileMenu = {
   },
 
   async saveField(field) {
+    if (App.isViewer()) return;
     const input = document.getElementById(`hub-${field}-input`);
     const val = input.value.trim();
     if (!val) {
@@ -546,6 +556,7 @@ const ProfileMenu = {
 
   // ── System Actions ──
   backupNow() {
+    if (App.isViewer()) return;
     Utils.closeModal();
     API.downloadBackup();
     Utils.showToast('Database backup started', 'success');

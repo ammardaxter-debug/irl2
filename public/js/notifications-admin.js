@@ -134,16 +134,18 @@ const NotificationsAdmin = {
       </div>
 
       <!-- Composer Panel Layout -->
-      <div style="display: grid; grid-template-columns: 5fr 3fr; gap: 24px; align-items: start;">
+      <div style="display: grid; grid-template-columns: ${App.isViewer() ? '1fr' : '5fr 3fr'}; gap: 24px; align-items: start;">
         
         <!-- Left: Rider Compliance Cards List -->
         <div class="card" style="padding: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
             <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Riders List (${filteredRiders.length})</h3>
+            ${App.isViewer() ? '' : `
             <div style="display: flex; align-items: center; gap: 8px;">
               <input type="checkbox" id="select-all-riders" style="cursor: pointer;" ${filteredRiders.length > 0 && filteredRiders.every(r => this.selectedRiders.has(r.id)) ? 'checked' : ''}>
               <label for="select-all-riders" style="font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">Select All</label>
             </div>
+            `}
           </div>
 
           <div style="max-height: 580px; overflow-y: auto; padding-right: 4px;">
@@ -161,6 +163,7 @@ const NotificationsAdmin = {
         </div>
 
         <!-- Right: Alert Message Composer -->
+        ${App.isViewer() ? '' : `
         <div class="card" style="padding: 24px; position: sticky; top: calc(var(--header-height) + 24px);">
           <h3 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--primary-500);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -224,6 +227,7 @@ const NotificationsAdmin = {
             </button>
           </div>
         </div>
+        `}
 
       </div>
     `;
@@ -232,6 +236,7 @@ const NotificationsAdmin = {
   buildRiderCardHtml(rider) {
     const isChecked = this.selectedRiders.has(String(rider.id));
     const hasPushToken = !!rider.push_token;
+    const isViewer = App.isViewer();
     
     const missingFieldLabels = {
       'noon_id': 'Noon ID',
@@ -248,9 +253,11 @@ const NotificationsAdmin = {
     return `
       <div class="rider-compliance-card" style="display: flex; gap: 12px; padding: 12px; border: 1px solid ${isChecked ? 'var(--primary-300)' : 'var(--border-light)'}; border-radius: var(--radius-md); background: ${isChecked ? 'var(--primary-50)' : 'var(--bg-card)'}; align-items: center; transition: all 150ms;">
         
+        ${isViewer ? '' : `
         <div style="display: flex; align-items: center;">
           <input type="checkbox" class="rider-select-cb" data-id="${rider.id}" style="width: 16px; height: 16px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
         </div>
+        `}
 
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
@@ -299,11 +306,13 @@ const NotificationsAdmin = {
           </div>
         </div>
 
+        ${isViewer ? '' : `
         <div>
           <button class="btn btn-outline btn-sm quick-select-btn" data-id="${rider.id}" style="padding: 4px 8px; font-size: 11px;">
             Select
           </button>
         </div>
+        `}
       </div>
     `;
   },
@@ -576,6 +585,7 @@ const NotificationsAdmin = {
   },
 
   async sendBroadcastAlerts() {
+    if (App.isViewer()) return;
     const titleInput = document.getElementById('composer-title');
     const messageTextarea = document.getElementById('composer-message');
     const sendBtn = document.getElementById('send-broadcast-btn');

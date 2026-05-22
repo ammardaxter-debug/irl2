@@ -5,14 +5,35 @@
 const App = {
   currentPage: 'dashboard',
 
-  init() {
+  async init() {
     this.setupNavigation();
     this.setupModal();
     this.setupMobileMenu();
     this.setupCommandPalette();
     this.updateHeaderDate();
+    await this.loadUserRole();
     window.addEventListener('cycleChanged', () => this.updateHeaderDate());
     this.navigate('dashboard');
+  },
+
+  async loadUserRole() {
+    try {
+      const res = await fetch('/api/auth/session');
+      const session = await res.json();
+      if (session && session.user) {
+        window._irlUserRole = session.user.role || 'admin';
+        window._irlUserEmail = session.user.email || '';
+        window._irlUserName = session.user.name || '';
+      } else {
+        window._irlUserRole = 'admin';
+      }
+    } catch (e) {
+      window._irlUserRole = 'admin';
+    }
+  },
+
+  isViewer() {
+    return window._irlUserRole === 'viewer';
   },
 
   setupNavigation() {

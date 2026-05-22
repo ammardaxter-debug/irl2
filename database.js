@@ -79,6 +79,18 @@ async function updateRiderLocation(id, lat, lng) {
       last_lat: lat,
       last_lng: lng,
       last_location_update: nowISO(),
+      gps_status: 'synced',
+      updated_at: nowISO()
+    })
+    .eq('id', id);
+  if (error) throw error;
+  return { success: true };
+}
+
+async function updateRiderGpsStatus(id, gpsStatus) {
+  const { error } = await supabase.from('riders')
+    .update({
+      gps_status: gpsStatus,
       updated_at: nowISO()
     })
     .eq('id', id);
@@ -881,7 +893,7 @@ module.exports = {
   getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
   getMyRequests, deleteRiderRequest,
   // Tracking
-  updateRiderOnlineStatus, updateRiderLocation,
+  updateRiderOnlineStatus, updateRiderLocation, updateRiderGpsStatus,
   // Notifications
   saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead,
   // Admin Profiles
@@ -950,7 +962,8 @@ async function updateRiderLocation(riderId, lat, lng) {
     .update({ 
       last_lat: lat, 
       last_lng: lng, 
-      last_location_update: nowISO() 
+      last_location_update: nowISO(),
+      gps_status: 'synced'
     })
     .eq('id', riderId);
   if (error) throw error;

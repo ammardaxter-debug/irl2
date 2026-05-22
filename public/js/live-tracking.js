@@ -40,38 +40,57 @@ const LiveTracking = {
         const now = Date.now();
         const diffMs = now - lastTime;
         const diffMins = diffMs / 60000;
-        
-        if (diffMins < 5) {
-            return {
-                text: 'GPS SYNCED',
-                bg: '#ecfdf5',
-                color: '#059669',
-                isStale: false
+
+        // Use server-reported GPS status if available and location is stale (>5min)
+        if (r.gpsStatus && r.gpsStatus !== 'synced' && diffMins >= 5) {
+            const statusMap = {
+                'gps_off':     { text: '📍 GPS DISABLED',    bg: '#fef2f2', color: '#dc2626' },
+                'no_permission': { text: '🔒 NO PERMISSION', bg: '#fef2f2', color: '#dc2626' },
+                'app_backgrounded': { text: '⏸️ APP SUSPENDED', bg: '#fff7ed', color: '#c2410c' },
+                'network_error':    { text: '📡 NO NETWORK',   bg: '#fff7ed', color: '#ea580c' },
+                'offline':          { text: '💤 GOING OFFLINE', bg: '#f1f5f9', color: '#64748b' },
             };
-        } else if (diffMins < 30) {
-            return {
-                text: `STALE (${Math.round(diffMins)}m ago)`,
-                bg: '#fff7ed',
-                color: '#c2410c',
-                isStale: true
-            };
-        } else if (diffMins < 1440) {
-            const hours = Math.round(diffMins / 60);
-            return {
-                text: `SIGNAL LOST (${hours}h ago)`,
-                bg: '#fef2f2',
-                color: '#ef4444',
-                isStale: true
-            };
-        } else {
-            const days = Math.round(diffMins / 1440);
-            return {
-                text: `SIGNAL LOST (${days}d ago)`,
-                bg: '#fef2f2',
-                color: '#ef4444',
-                isStale: true
-            };
+            const mapped = statusMap[r.gpsStatus];
+            if (mapped) {
+                return { ...mapped, isStale: true };
+            }
         }
+
+        // If gpsStatus is 'synced' but time diff > 5min, likely app was killed
+        if (diffMins >= 5 && (!r.gpsStatus || r.gpsStatus === 'synced')) {
+            if (diffMins < 30) {
+                return {
+                    text: `⚠️ STALE (${Math.round(diffMins)}m ago)`,
+                    bg: '#fff7ed',
+                    color: '#c2410c',
+                    isStale: true
+                };
+            } else if (diffMins < 1440) {
+                const hours = Math.round(diffMins / 60);
+                return {
+                    text: `🚫 APP KILLED (${hours}h ago)`,
+                    bg: '#fef2f2',
+                    color: '#ef4444',
+                    isStale: true
+                };
+            } else {
+                const days = Math.round(diffMins / 1440);
+                return {
+                    text: `🚫 SIGNAL LOST (${days}d ago)`,
+                    bg: '#fef2f2',
+                    color: '#ef4444',
+                    isStale: true
+                };
+            }
+        }
+        
+        // Fresh & synced
+        return {
+            text: '✅ GPS SYNCED',
+            bg: '#ecfdf5',
+            color: '#059669',
+            isStale: false
+        };
     },
 
     async render() {
@@ -369,6 +388,7 @@ const LiveTracking = {
     getPopupHtml(r, isOnline) {
         const initials = r.name ? r.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
         const hasLocation = r.lat && r.lng;
+        const gpsStatus = this.getGpsStatus(r, isOnline);
         
         return `
             <div style="font-family:'Inter', sans-serif; min-width:240px; border-radius:12px; overflow:hidden; background:white;">
@@ -390,8 +410,8 @@ const LiveTracking = {
                         <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? '#ecfdf5' : '#f1f5f9'}; color:${isOnline ? '#059669' : '#64748b'}; letter-spacing:0.02em;">
                             ${isOnline ? '● ONLINE' : '● OFFLINE'}
                         </span>
-                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${this.getGpsStatus(r, isOnline).bg}; color:${this.getGpsStatus(r, isOnline).color}; letter-spacing:0.02em;">
-                            📍 ${this.getGpsStatus(r, isOnline).text}
+                        <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${gpsStatus.bg}; color:${gpsStatus.color}; letter-spacing:0.02em;">
+                            ${gpsStatus.text}
                         </span>
                     </div>
 
@@ -399,6 +419,7 @@ const LiveTracking = {
                     <div style="background:#f8fafc; border:1px solid #f1f5f9; padding:10px; border-radius:8px; font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">Status:</span> <span style="font-weight:700; color:#334155;">${r.status || 'Active Shift'}</span></div>
                         <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">Last Synced:</span> <span style="font-weight:700; color:#334155;">${r.lastUpdate ? new Date(r.lastUpdate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : 'N/A'}</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">GPS Status:</span> <span style="font-weight:700; color:${gpsStatus.color};">${gpsStatus.text}</span></div>
                         <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8; font-weight:600;">GPS Link:</span> <span style="font-family:monospace; color:#64748b; font-size:10px;">${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}</span></div>
                     </div>
 

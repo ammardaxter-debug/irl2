@@ -34,10 +34,12 @@ const Backup = {
             </h2>
           </div>
           <p class="text-secondary mb-24">Download all current records (Riders, Logs, Expenses, Funds) into a single Excel file for review or external backup.</p>
+          ${App.isViewer() ? '<p style="color:var(--warning-600); font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Viewer Role: Download Restricted</p>' : `
           <button class="btn btn-primary" onclick="API.exportExcel(); Utils.showToast('Excel export started', 'success');">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download Excel (.xlsx)
           </button>
+          `}
         </div>
 
         <!-- Firebase Backup Section -->
@@ -49,10 +51,12 @@ const Backup = {
             </h2>
           </div>
           <p class="text-secondary mb-24">Create a raw JSON database backup of your Firebase Realtime DB. Useful for total system disaster recovery.</p>
+          ${App.isViewer() ? '<p style="color:var(--warning-600); font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Viewer Role: Backup Restricted</p>' : `
           <button class="btn btn-outline" onclick="API.downloadBackup(); Utils.showToast('Database backup started', 'success');">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download JSON Snapshot
           </button>
+          `}
         </div>
       </div>
 

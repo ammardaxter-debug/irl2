@@ -68,7 +68,7 @@ const Riders = {
             <button class="filter-tab ${this.currentFilter === 'company' ? 'active' : ''}" data-filter="company">Company</button>
             <button class="filter-tab ${this.currentFilter === 'freelancer' ? 'active' : ''}" data-filter="freelancer">Freelancer</button>
           </div>
-          <button id="btn-add-rider" style="background:#2563EB; color:white; font-size:14px; font-weight:500; height:36px; padding:0 16px; border-radius:12px; box-shadow:0 2px 4px rgba(37,99,235,0.2); cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;">
+          <button id="btn-add-rider" style="background:#2563EB; color:white; font-size:14px; font-weight:500; height:36px; padding:0 16px; border-radius:12px; box-shadow:0 2px 4px rgba(37,99,235,0.2); cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
             + Add Rider
           </button>
         </div>
@@ -364,13 +364,12 @@ const Riders = {
          <div style="font-size:12px; color:#9CA3AF; font-style:italic;">No deductions this cycle</div>
       </div>
 
-      <!-- View 2: Attendance Calendar + Actions -->
       <div style="margin-bottom:24px;">
          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px;">
             <label style="font-size:13px; font-weight:500; color:#374151;">Internal Notes</label>
-            <button class="btn btn-sm" onclick="Riders.saveVaultNotes(${rider.id})" style="height:28px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#374151; font-size:12px; font-weight:500; padding:0 12px; cursor:pointer;">Save Notes</button>
+            ${App.isViewer() ? '' : `<button class="btn btn-sm" onclick="Riders.saveVaultNotes(${rider.id})" style="height:28px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#374151; font-size:12px; font-weight:500; padding:0 12px; cursor:pointer;">Save Notes</button>`}
          </div>
-         <textarea id="vault-notes-${rider.id}" placeholder="Iqama location, notes, Google Drive links..." style="width:100%; height:80px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:12px; font-size:13px; color:#0F0F0F; outline:none; resize:none; font-family:inherit; box-sizing:border-box;">${Utils.escapeHtml(rider.doc_vault || '')}</textarea>
+         <textarea id="vault-notes-${rider.id}" ${App.isViewer() ? 'readonly' : ''} placeholder="${App.isViewer() ? 'No notes added' : 'Iqama location, notes, Google Drive links...'}" style="width:100%; height:80px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:12px; font-size:13px; color:#0F0F0F; outline:none; resize:none; font-family:inherit; box-sizing:border-box;">${Utils.escapeHtml(rider.doc_vault || '')}</textarea>
       </div>
 
       <div style="margin-bottom:24px;">
@@ -397,6 +396,14 @@ const Riders = {
             Export Official Payslip
          </button>
          
+         ${App.isViewer() ? `
+         <div style="display:flex; gap:12px;">
+            <button type="button" id="btn-view-logs" style="flex:1; height:64px; background:white; border:1px solid #E5E7EB; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:13px; color:#374151; font-weight:500; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#F9FAFB'; this.style.borderColor='#D1D5DB'" onmouseout="this.style.background='white'; this.style.borderColor='#E5E7EB'">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+               View Logs
+            </button>
+         </div>
+         ` : `
          <div style="display:flex; gap:12px;">
             <button type="button" id="btn-edit-rider" style="flex:1; height:64px; background:white; border:1px solid #E5E7EB; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:13px; color:#374151; font-weight:500; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#F9FAFB'; this.style.borderColor='#D1D5DB'" onmouseout="this.style.background='white'; this.style.borderColor='#E5E7EB'">
                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -418,6 +425,8 @@ const Riders = {
                Permanently Delete Rider Data
             </button>
          </div>
+         `}
+      </div>
       </div>
     `;
 

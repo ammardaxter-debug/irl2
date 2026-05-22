@@ -95,10 +95,12 @@ const Bikes = {
           <button class="filter-chip ${this.currentFilter === 'maintenance' ? 'active' : ''}" data-filter="maintenance">Maintenance</button>
           <button class="filter-chip ${this.currentFilter === 'expiring' ? 'active' : ''}" data-filter="expiring">Expiring Soon</button>
         </div>
+        ${App.isViewer() ? '' : `
         <button class="btn btn-primary" id="btn-add-bike">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add New Bike
         </button>
+        `}
       </div>
 
       <!-- Bike Grid -->
@@ -217,6 +219,7 @@ const Bikes = {
 
   openBikeForm(bike) {
     const isEdit = !!bike;
+    const isViewer = App.isViewer();
     
     // We need to fetch riders to see who could be assigned this bike, if we were taking a rider-centric approach here.
     // However, the rider form is where bike assignment happens generally.
@@ -226,15 +229,15 @@ const Bikes = {
       <form id="bike-form" class="form-grid">
         <div class="form-group">
           <label>Plate Number <span class="required">*</span></label>
-          <input type="text" id="bf-plate" class="form-control" required value="${isEdit ? Utils.escapeHtml(bike.plate_number) : ''}" placeholder="e.g. ABC 1234">
+          <input type="text" id="bf-plate" class="form-control" ${isViewer ? 'disabled' : ''} required value="${isEdit ? Utils.escapeHtml(bike.plate_number) : ''}" placeholder="e.g. ABC 1234">
         </div>
         <div class="form-group">
           <label>Bike Model</label>
-          <input type="text" id="bf-model" class="form-control" value="${isEdit ? Utils.escapeHtml(bike.model || '') : ''}" placeholder="e.g. Honda 2023">
+          <input type="text" id="bf-model" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit ? Utils.escapeHtml(bike.model || '') : ''}" placeholder="e.g. Honda 2023">
         </div>
         <div class="form-group">
           <label>Status</label>
-          <select id="bf-status" class="form-select">
+          <select id="bf-status" class="form-select" ${isViewer ? 'disabled' : ''}>
             <option value="active" ${isEdit && bike.status === 'active' ? 'selected' : ''}>Active (On Road)</option>
             <option value="maintenance" ${isEdit && bike.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
             <option value="retired" ${isEdit && bike.status === 'retired' ? 'selected' : ''}>Retired / Sold</option>
@@ -242,25 +245,25 @@ const Bikes = {
         </div>
         <div class="form-group">
           <label>Insurance Start Date</label>
-          <input type="date" id="bf-ins-start" class="form-control" value="${isEdit && bike.insurance_start ? bike.insurance_start : ''}">
+          <input type="date" id="bf-ins-start" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_start ? bike.insurance_start : ''}">
         </div>
         <div class="form-group">
           <label>Authorization Expiry</label>
-          <input type="date" id="bf-auth-expiry" class="form-control" value="${isEdit && bike.authorization_expiry ? bike.authorization_expiry : ''}">
+          <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.authorization_expiry ? bike.authorization_expiry : ''}">
         </div>
         <div class="form-group">
           <label>Insurance Expiry Date</label>
-          <input type="date" id="bf-ins-expiry" class="form-control" value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}">
+          <input type="date" id="bf-ins-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}">
         </div>
         <div class="form-group" style="grid-column: 1 / -1;">
           <label>Notes</label>
-          <input type="text" id="bf-notes" class="form-control" value="${isEdit ? Utils.escapeHtml(bike.notes || '') : ''}" placeholder="Any service notes...">
+          <input type="text" id="bf-notes" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit ? Utils.escapeHtml(bike.notes || '') : ''}" placeholder="Any service notes...">
         </div>
         
         <div class="form-actions mt-24" style="grid-column: 1 / -1;">
-          ${isEdit ? `<button type="button" class="btn btn-danger" id="bf-delete" style="margin-right: auto;">Delete Bike</button>` : '<div></div>'}
-          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">${isEdit ? 'Save Changes' : 'Add Bike'}</button>
+          ${isEdit && !isViewer ? `<button type="button" class="btn btn-danger" id="bf-delete" style="margin-right: auto;">Delete Bike</button>` : '<div></div>'}
+          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Close</button>
+          ${isViewer ? '' : `<button type="submit" class="btn btn-primary">${isEdit ? 'Save Changes' : 'Add Bike'}</button>`}
         </div>
       </form>
     `;
@@ -269,6 +272,7 @@ const Bikes = {
 
     document.getElementById('bike-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (App.isViewer()) return;
       
       const submitBtn = e.target.querySelector('button[type="submit"]');
       if (submitBtn) {
@@ -308,8 +312,9 @@ const Bikes = {
       }
     });
 
-    if (isEdit) {
+    if (isEdit && !isViewer) {
       document.getElementById('bf-delete')?.addEventListener('click', async () => {
+        if (App.isViewer()) return;
         if (confirm(`Are you sure you want to completely delete bike ${bike.plate_number}?`)) {
           try {
             Utils.showLoading('Deleting');

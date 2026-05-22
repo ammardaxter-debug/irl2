@@ -41,12 +41,11 @@ const DailyLogs = {
 
   buildHTML(logged, missing) {
     return `
-      <!-- Page Header & Actions -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
         <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Daily Logs</h1>
         <div style="display:flex; align-items:center; gap:12px;">
           <span style="background:#FEF3C7; color:#D97706; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">${Utils.formatDate(this.currentDate)}</span>
-          <button id="bulk-lodge-btn" style="background:#FFFFFF; color:#2563EB; border:1px solid #2563EB; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;">
+          <button id="bulk-lodge-btn" style="background:#FFFFFF; color:#2563EB; border:1px solid #2563EB; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             Bulk Lodge Data
           </button>
@@ -149,10 +148,12 @@ const DailyLogs = {
           </div>
         </div>
         <div>
+          ${App.isViewer() ? '' : `
           <button class="log-now-btn" data-rider-id="${rider.id}" data-rider-name="${Utils.escapeHtml(rider.name)}" style="background:#2563EB; color:white; border:none; height:28px; padding:0 12px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:4px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Log
           </button>
+          `}
         </div>
       </div>
     `;
@@ -194,12 +195,14 @@ const DailyLogs = {
           <button class="view-proof-btn" data-log-id="${log.id}" style="background:transparent; border:none; color:#2563EB; cursor:pointer; padding:4px;" title="View Screenshot">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </button>` : ''}
+          ${App.isViewer() ? '' : `
           <button class="delete-log-btn" data-log-id="${log.id}" data-rider-name="${Utils.escapeHtml(log.rider_name)}" style="background:transparent; border:none; color:#DC2626; cursor:pointer; padding:4px;" title="Delete Log">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
           <button style="background:transparent; border:none; color:#9CA3AF; cursor:pointer; padding:4px;" title="Edit Log">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
+          `}
         </div>
       </div>
     `;
@@ -241,6 +244,7 @@ const DailyLogs = {
     // Edit logged entries
     document.querySelectorAll('[data-action="edit"]').forEach(card => {
       card.addEventListener('click', (e) => {
+        if (App.isViewer()) return;
         // Ignore if they clicked the view proof or delete button
         if (e.target.closest('.view-proof-btn') || e.target.closest('.delete-log-btn')) return;
         const logId = card.dataset.logId;
@@ -286,6 +290,7 @@ const DailyLogs = {
     // Clicking missing card also opens log form
     document.querySelectorAll('[data-action="log"]').forEach(card => {
       card.addEventListener('click', (e) => {
+        if (App.isViewer()) return;
         if (e.target.closest('.log-now-btn')) return; // already handled by button
         const riderId = parseInt(card.dataset.riderId);
         const rider = missing.find(r => r.id === riderId);

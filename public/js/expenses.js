@@ -157,10 +157,12 @@ const Expenses = {
         
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
           <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Expense Tracker</h1>
+          ${App.isViewer() ? '' : `
           <div class="btn-group">
             <button class="btn-group-outline" onclick="Expenses.openAddFundsModal()">Log IRL Funds</button>
             <button class="btn-group-filled" onclick="Expenses.openAddExpenseModal()">Add Expense</button>
           </div>
+          `}
         </div>
         
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid #E5E7EB;">
@@ -285,11 +287,12 @@ const Expenses = {
                 <th>Deductible</th>
                 <th style="text-align:right">Amount</th>
                 <th>Receipt</th>
-                <th>Actions</th>
+                ${App.isViewer() ? '' : '<th>Actions</th>'}
               </tr>
             </thead>
             <tbody>
               <!-- Inline Quick Add Row -->
+              ${App.isViewer() ? '' : `
               <tr class="inline-add-row">
                 <td>
                   <input type="date" id="qa-date" class="inline-input" value="${Utils.today()}">
@@ -324,6 +327,7 @@ const Expenses = {
                   <button class="btn btn-sm" id="btn-qa-save" style="background:#2563EB; color:white; height:36px; font-size:13px; padding:0 16px; border:none; border-radius:12px; cursor:pointer; font-weight:500; transition:background 0.2s;" onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">Add</button>
                 </td>
               </tr>
+              `}
       `;
       
       const displayExpenses = expenses.filter(e => e.category !== 'Manual Deduction');
@@ -374,12 +378,14 @@ const Expenses = {
               <td>
                 ${this.renderThumbnail(e.receipt_base64, `Expenses.viewReceipt(${e.id})`)}
               </td>
+              ${App.isViewer() ? '' : `
               <td>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-sm" style="background:#F3F4F6; color:#4B5563; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.openEditExpenseModal(${e.id})">Edit</button>
                   <button class="btn btn-sm" style="background:#FEF2F2; color:#DC2626; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.deleteExpense(${e.id})">Delete</button>
                 </div>
               </td>
+              `}
             </tr>
           `;
         });
@@ -502,7 +508,7 @@ const Expenses = {
                 <th>Description</th>
                 <th style="text-align:right">Amount</th>
                 <th>Receipt</th>
-                <th>Actions</th>
+                ${App.isViewer() ? '' : '<th>Actions</th>'}
               </tr>
             </thead>
             <tbody>
@@ -528,12 +534,14 @@ const Expenses = {
               <td>
                 ${this.renderThumbnail(f.receipt_base64, `Expenses.viewFundReceipt(${f.id})`)}
               </td>
+              ${App.isViewer() ? '' : `
               <td>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-sm" style="background:#F3F4F6; color:#4B5563; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.openEditFundModal(${f.id})">Edit</button>
                   <button class="btn btn-sm" style="background:#FEF2F2; color:#DC2626; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.deleteFund(${f.id})">Delete</button>
                 </div>
               </td>
+              `}
             </tr>
           `;
         });
@@ -740,10 +748,12 @@ const Expenses = {
           <button id="btn-tab-settled" class="deduction-tab-btn ${!isPendingTab ? 'active' : ''}" onclick="Expenses.switchDeductionTab('settled')">Settled History</button>
         </div>
         <div style="display:flex; gap:12px;">
+          ${App.isViewer() ? '' : `
           <button style="display:flex; align-items:center; gap:6px; border:none; background:#FEF3C7; color:#D97706; padding:8px 18px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'" onclick="Expenses.openAddManualDeductionModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Manual Deduction
           </button>
+          `}
           <button style="display:flex; align-items:center; gap:6px; border:1.5px solid #16A34A; background:#FFFFFF; color:#16A34A; padding:8px 18px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#F0FDF4'" onmouseout="this.style.background='#FFFFFF'" onclick="Expenses.exportDeductionsExcel()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export Excel
@@ -872,7 +882,9 @@ const Expenses = {
                       <div style="font-size:14px; color:#D97706; font-weight:600; margin-top:4px;">Total Pending: SAR ${Utils.formatCurrency(totalPending).replace('﷼ ', '')}</div>
                     </div>
                   </div>
+                  ${App.isViewer() ? '' : `
                   <button class="btn btn-primary" style="${btnStyle}" title="This will settle SAR ${totalPending} for ${Utils.escapeHtml(r.rider_name)}" onclick="event.stopPropagation(); Expenses.settleRiderDeductions(${r.rider_id}, '${Utils.escapeHtml(r.rider_name)}')">${warnIcon} Mark All Settled</button>
+                  `}
                 </div>
                 <div style="max-height:0px; transition:max-height 200ms ease; overflow:hidden;">
                   <div style="width:100%; overflow-x:auto;">
@@ -883,7 +895,7 @@ const Expenses = {
                           <th>Category</th>
                           <th>Amount</th>
                           <th>Status</th>
-                          <th style="text-align:right; padding-right:20px;">Action</th>
+                          ${App.isViewer() ? '' : '<th style="text-align:right; padding-right:20px;">Action</th>'}
                         </tr>
                       </thead>
                       <tbody>
@@ -898,9 +910,11 @@ const Expenses = {
                     <span style="background:#fef3c7; color:#92400e; border-radius:9999px; padding:2px 10px; font-size:12px; font-weight:600; display:inline-block;">PENDING</span>
                     ${exp.notes ? `<div style="font-size:11px; color:#6B7280; margin-top:2px;">${Utils.escapeHtml(exp.notes)}</div>` : ''}
                   </td>
+                  ${App.isViewer() ? '' : `
                   <td style="text-align:right; padding-right:20px;">
                     <button class="btn btn-sm settle-btn" style="border:1px solid #16a34a; background:transparent; color:#16a34a; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 150ms;" onmouseover="this.style.background='#16a34a'; this.style.color='#FFFFFF'" onmouseout="this.style.background='transparent'; this.style.color='#16a34a'" onclick="Expenses.settleSingleDeduction(${exp.id}, ${exp.amount}, '${Utils.escapeHtml(r.rider_name).replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">Mark Settled</button>
                   </td>
+                  `}
                 </tr>
               `;
             }
@@ -970,6 +984,7 @@ const Expenses = {
   },
 
   openAddManualDeductionModal() {
+    if (App.isViewer()) return;
     let riderOptions = '<option value="" disabled selected>-- Select Rider --</option>';
     this.riders.forEach(r => {
       riderOptions += `<option value="${r.id}">${r.name}</option>`;
@@ -1323,6 +1338,7 @@ const Expenses = {
   },
 
   settleRiderDeductions(riderId, riderName) {
+    if (App.isViewer()) return;
     const html = `
       <div style="padding:8px 0;">
         <p style="margin-bottom:20px; font-size:15px; color:#4B5563; line-height:1.5;">Are you sure you want to settle ALL pending deductions for <b>${Utils.escapeHtml(riderName)}</b>?</p>
@@ -1344,6 +1360,7 @@ const Expenses = {
   },
 
   async confirmSettleRider(riderId) {
+    if (App.isViewer()) return;
     const settledBy = document.getElementById('settle-by-select').value;
     Utils.closeModal();
     try {
@@ -1358,6 +1375,7 @@ const Expenses = {
   },
 
   settleSingleDeduction(expenseId, amount, riderName) {
+    if (App.isViewer()) return;
     const html = `
       <div style="padding:8px 0;">
         <p style="margin-bottom:20px; font-size:15px; color:#4B5563; line-height:1.5;">Confirm settlement of <b>SAR ${amount}</b> for <b>${Utils.escapeHtml(riderName)}</b>?</p>
@@ -1379,6 +1397,7 @@ const Expenses = {
   },
 
   async confirmSettleSingle(expenseId) {
+    if (App.isViewer()) return;
     const settledBy = document.getElementById('settle-single-by-select').value;
     Utils.closeModal();
     try {
@@ -1392,6 +1411,7 @@ const Expenses = {
   },
 
   openAddFundsModal() {
+    if (App.isViewer()) return;
     const today = new Date().toISOString().split('T')[0];
     const html = `
       <form id="funds-form" class="form-grid">
@@ -1460,6 +1480,7 @@ const Expenses = {
   },
 
   openAddExpenseModal() {
+    if (App.isViewer()) return;
     const today = new Date().toISOString().split('T')[0];
     
     // Categories matching user spec
@@ -1662,6 +1683,7 @@ const Expenses = {
   },
 
   async deleteExpense(id) {
+    if (App.isViewer()) return;
     const confirmed = await Utils.confirm('Are you sure you want to delete this expense? This affects totals and payroll.', 'Delete Expense', 'Delete', 'Cancel', true);
     if (!confirmed) return;
     try {
@@ -1674,6 +1696,7 @@ const Expenses = {
   },
   
   async deleteFund(id) {
+    if (App.isViewer()) return;
     const confirmed = await Utils.confirm('Are you sure you want to delete this company fund entry?', 'Delete Fund', 'Delete', 'Cancel', true);
     if (!confirmed) return;
     try {
@@ -1685,6 +1708,7 @@ const Expenses = {
   },
 
   async openEditFundModal(id) {
+    if (App.isViewer()) return;
     Utils.showLoading('Loading', 'Preparing form');
     try {
       const funds = await API.getFunds();
@@ -1766,6 +1790,7 @@ const Expenses = {
   },
 
   async openEditExpenseModal(id) {
+    if (App.isViewer()) return;
     Utils.showLoading('Loading', 'Preparing form');
     try {
       let exp;

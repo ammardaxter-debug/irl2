@@ -155,10 +155,15 @@ const Payroll = {
         <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Payroll</h1>
         <div style="display:flex; align-items:center; gap:12px;">
           <span style="background:#F0FDF4; color:#16A34A; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">Noon Cycle: 21st → 20th</span>
+          ${App.isViewer() ? '' : `
+          <button id="btn-lock-payroll" style="background:#2563EB; color:#FFFFFF; border:none; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            🔓 Lock Payroll
+          </button>
           <button id="bulk-msg-btn" onclick="Payroll.startBulkWhatsapp()" disabled style="background:#16A34A; color:#FFFFFF; border:none; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:not-allowed; opacity:0.5; display:flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg> 
             <span id="bulk-msg-text">Bulk Messager</span>
           </button>
+          `}
         </div>
       </div>
 
@@ -200,7 +205,7 @@ const Payroll = {
             <span style="background:#DC2626; color:#fff; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700;">${ridersWithWarnings.length}</span>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
-            ${ridersWithWarnings.length > 0 ? `<button class="wa-send-all-btn" onclick="WarningWhatsApp.sendAllWarnings()">
+            ${(ridersWithWarnings.length > 0 && !App.isViewer()) ? `<button class="wa-send-all-btn" onclick="WarningWhatsApp.sendAllWarnings()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
               Send All <span style="background:rgba(255,255,255,0.3); padding:1px 8px; border-radius:8px; font-size:11px;">${ridersWithWarnings.length}</span>
             </button>` : ''}
@@ -232,11 +237,13 @@ const Payroll = {
                   }).join('')}
                 </div>
                 <div class="warning-card-actions" style="display:flex; align-items:center; gap:12px;">
+                  ${App.isViewer() ? '' : `
                   <button class="wa-send-btn" onclick="WarningWhatsApp.directSend(${r.rider_id})">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                     ${isSent ? 'Resend WhatsApp' : 'Send WhatsApp'}
                   </button>
                   <button class="wa-preview-link" onclick="WarningWhatsApp.prepareAndPreview(${r.rider_id})">Preview Message</button>
+                  `}
                   ${isSent ? `
                     <div style="display:flex; align-items:center; gap:6px; color:#16A34A; font-weight:600; font-size:13px; margin-left:8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><polyline points="20 6 9 17 4 12"/></svg>
@@ -261,7 +268,7 @@ const Payroll = {
           <table class="payroll-table">
             <thead>
               <tr>
-                <th class="col-center" style="width:40px"><input type="checkbox" onchange="Payroll.toggleSelectAll(this)" style="cursor:pointer;" /></th>
+                ${App.isViewer() ? '' : '<th class="col-center" style="width:40px"><input type="checkbox" onchange="Payroll.toggleSelectAll(this)" style="cursor:pointer;" /></th>'}
                 <th class="col-left">Rider</th>
                 <th class="col-center">Attendance</th>
                 <th class="col-right">Orders</th>
@@ -292,9 +299,11 @@ const Payroll = {
 
                 return `
                   <tr class="payroll-row" data-name="${Utils.escapeHtml(r.rider_name).toLowerCase()}">
+                    ${App.isViewer() ? '' : `
                     <td class="col-center">
                       <input type="checkbox" class="rider-checkbox" value="${r.rider_id}" onchange="Payroll.updateBulkButtonState()" style="cursor:pointer;" />
                     </td>
+                    `}
                     <td class="col-left">
                       <div style="display:flex; align-items:center; gap:6px;">
                         <span style="font-weight:600; color:#0F0F0F; font-size:14px;">${Utils.escapeHtml(r.rider_name)}</span>
@@ -317,28 +326,41 @@ const Payroll = {
                       <span style="font-weight:700; color:${netColor}; font-size:14px;">${r.payment_status === 'paid' ? Utils.formatCurrency(r.calculated_salary) : 'Pending'}</span>
                     </td>
                     <td class="col-center">
-                      <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Click to update status">
-                      ${r.payment_status === 'paid' 
-                        ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
-                        : r.payment_status === 'on-hold'
-                          ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
-                          : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
-                      </button>
+                    <td class="col-center">
+                      ${App.isViewer() ? `
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                      ` : `
+                        <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Click to update status">
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                        </button>
+                      `}
                     </td>
                     <td class="col-center">
                       <div style="display:flex; justify-content:center; gap:4px;">
+                        ${App.isViewer() ? '' : `
                         <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Edit Payment Status">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
+                        `}
                         <button onclick="Payroll.shareWhatsApp('${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}', '${r.phone || ''}', '${Utils.formatCurrency(r.total_salary)}', '${Utils.formatCurrency(r.deductions || 0)}', '${Utils.formatCurrency(r.calculated_salary)}', ${r.total_orders}, '${r.rider_type}', '${Payroll.currentPeriod.label}', '${r.payment_status}', JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(r.daily_logs || []))}')))" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
                           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                         </button>
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </button>
+                        ${App.isViewer() ? '' : `
                         <button onclick="Payroll.deleteRiderCycleData(${r.rider_id}, '${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}')" style="background:transparent; border:none; cursor:pointer; color:#EF4444; padding:4px;" title="Reset Cycle Data">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                         </button>
+                        `}
                       </div>
                     </td>
                   </tr>
@@ -360,7 +382,7 @@ const Payroll = {
           <table class="payroll-table">
             <thead>
               <tr>
-                <th class="col-center" style="width:40px"><input type="checkbox" onchange="Payroll.toggleSelectAll(this)" style="cursor:pointer;" /></th>
+                ${App.isViewer() ? '' : '<th class="col-center" style="width:40px"><input type="checkbox" onchange="Payroll.toggleSelectAll(this)" style="cursor:pointer;" /></th>'}
                 <th class="col-left">Rider</th>
                 <th class="col-right">Orders</th>
                 <th class="col-right">Days</th>
@@ -383,9 +405,11 @@ const Payroll = {
 
                 return `
                   <tr class="payroll-row" data-name="${Utils.escapeHtml(r.rider_name).toLowerCase()}">
+                    ${App.isViewer() ? '' : `
                     <td class="col-center">
                       <input type="checkbox" class="rider-checkbox" value="${r.rider_id}" onchange="Payroll.updateBulkButtonState()" style="cursor:pointer;" />
                     </td>
+                    `}
                     <td class="col-left">
                       <div style="display:flex; align-items:center; gap:6px;">
                         <span style="font-weight:600; color:#0F0F0F; font-size:14px;">${Utils.escapeHtml(r.rider_name)}</span>
@@ -408,28 +432,40 @@ const Payroll = {
                       <span style="font-weight:700; color:${netColor}; font-size:14px;">${r.payment_status === 'paid' ? Utils.formatCurrency(r.calculated_salary) : 'Pending'}</span>
                     </td>
                     <td class="col-center">
-                      <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Click to update status">
-                      ${r.payment_status === 'paid' 
-                        ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
-                        : r.payment_status === 'on-hold'
-                          ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
-                          : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
-                      </button>
+                      ${App.isViewer() ? `
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                      ` : `
+                        <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Click to update status">
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                        </button>
+                      `}
                     </td>
                     <td class="col-center">
                       <div style="display:flex; justify-content:center; gap:4px;">
+                        ${App.isViewer() ? '' : `
                         <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Edit Payment Status">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
+                        `}
                         <button onclick="Payroll.shareWhatsApp('${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}', '${r.phone || ''}', '${Utils.formatCurrency(r.total_salary)}', '${Utils.formatCurrency(r.deductions || 0)}', '${Utils.formatCurrency(r.calculated_salary)}', ${r.total_orders}, '${r.rider_type}', '${Payroll.currentPeriod.label}', '${r.payment_status}', JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(r.daily_logs || []))}')))" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
                           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                         </button>
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </button>
+                        ${App.isViewer() ? '' : `
                         <button onclick="Payroll.deleteRiderCycleData(${r.rider_id}, '${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}')" style="background:transparent; border:none; cursor:pointer; color:#EF4444; padding:4px;" title="Reset Cycle Data">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                         </button>
+                        `}
                       </div>
                     </td>
                   </tr>
@@ -507,6 +543,7 @@ const Payroll = {
   },
 
   openPaymentModal(riderId) {
+    if (App.isViewer()) return;
     const rider = this._currentPayrollData.find(r => r.rider_id === riderId);
     if (!rider) return Utils.showToast('Rider not found', 'error');
 
@@ -585,6 +622,7 @@ const Payroll = {
   },
 
   async deleteRiderCycleData(riderId, riderName) {
+    if (App.isViewer()) return;
     const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
     try {
       // 1. Check if payroll is locked first
