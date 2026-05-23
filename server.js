@@ -1317,6 +1317,13 @@ app.post('/api/rider/location', verifyRiderToken, async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
     if (latitude === undefined || longitude === undefined) return res.status(400).json({ error: 'latitude and longitude required' });
+    
+    // Drop updates if tracking is shutdown
+    const isShutdown = await db.isTrackingShutdown();
+    if (isShutdown) {
+      return res.json({ success: true, warning: 'Tracking system is currently shut down' });
+    }
+
     await db.updateRiderLocation(req.riderId, latitude, longitude);
     res.json({ success: true });
   } catch (err) {
@@ -1329,6 +1336,14 @@ app.post('/api/rider/online-status', verifyRiderToken, async (req, res) => {
   try {
     const { is_online } = req.body;
     if (is_online === undefined) return res.status(400).json({ error: 'is_online required' });
+    
+    if (is_online) {
+      const isShutdown = await db.isTrackingShutdown();
+      if (isShutdown) {
+        return res.status(400).json({ error: 'Cannot go online: The location tracking system is currently shut down by administrators.' });
+      }
+    }
+
     await db.updateRiderOnlineStatus(req.riderId, is_online);
     res.json({ success: true });
   } catch (err) {
@@ -1385,11 +1400,54 @@ app.post('/api/admin/force-offline-all', verifyAdminToken, requireAdmin, async (
   }
 });
 
+// GET tracking system shutdown status
+app.get('/api/admin/tracking/status', async (req, res) => {
+  try {
+    const isShutdown = await db.isTrackingShutdown();
+    res.json({ shutdown: isShutdown });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST toggle tracking system shutdown (Admin only)
+app.post('/api/admin/tracking/toggle-shutdown', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const { shutdown } = req.body;
+    if (shutdown === undefined) return res.status(400).json({ error: 'shutdown parameter required' });
+
+    await db.setTrackingShutdown(shutdown);
+
+    let count = 0;
+    if (shutdown) {
+      // Force all active riders offline
+      const riders = await db.getAllRiders();
+      for (const r of riders) {
+        if (r.is_online) {
+          await db.updateRiderOnlineStatus(r.id, false);
+          count++;
+        }
+      }
+    }
+
+    res.json({ success: true, offlined: count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Update GPS status (Rider App heartbeat)
 app.post('/api/rider/gps-status', verifyRiderToken, async (req, res) => {
   try {
     const { gps_status } = req.body;
     if (!gps_status) return res.status(400).json({ error: 'gps_status required' });
+    
+    // Drop updates if tracking is shutdown
+    const isShutdown = await db.isTrackingShutdown();
+    if (isShutdown) {
+      return res.json({ success: true, warning: 'Tracking system is currently shut down' });
+    }
+
     await db.updateRiderGpsStatus(req.riderId, gps_status);
     res.json({ success: true });
   } catch (err) {

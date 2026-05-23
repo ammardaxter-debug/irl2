@@ -95,11 +95,22 @@ const LiveTracking = {
 
     async render() {
         const container = document.getElementById('page-live-tracking');
+        
+        // Fetch current tracking system status
+        try {
+            const statusRes = await fetch('/api/admin/tracking/status');
+            const statusData = await statusRes.json();
+            this._isShutdown = statusData.shutdown;
+        } catch (e) {
+            console.error("Failed to fetch tracking status:", e);
+            this._isShutdown = false;
+        }
+
         container.innerHTML = `
             <div class="tracking-container" style="display:flex; flex-direction:column; height: calc(100vh - 120px); gap: 20px; font-family: 'Inter', sans-serif;">
                 
                 <!-- KPI Section -->
-                <div style="display:grid; grid-template-columns: repeat(3, 1fr) 280px; gap:16px;">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr) 200px 240px; gap:16px;">
                     
                     <!-- Card 1: Online -->
                     <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);">
@@ -144,8 +155,21 @@ const LiveTracking = {
                         <div id="sync-text" style="font-size:18px; font-weight:800; font-family:'Courier New', monospace; letter-spacing:1px; color:#10b981;">LIVE: --:--:--</div>
                         <div id="sync-status" style="display:flex; align-items:center; gap:6px; margin-top:6px;">
                             <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
-                            <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE DATA CHANNEL</span>
+                            <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE CHANNEL</span>
                         </div>
+                    </div>
+
+                    <!-- Card 5: System Control (Shutdown/Resume) -->
+                    <div style="background:${this._isShutdown ? '#fff5f5' : 'white'}; padding:16px 20px; border-radius:16px; border:1px solid ${this._isShutdown ? '#fecaca' : '#eef2f6'}; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);">
+                        <div>
+                            <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Tracking System</span>
+                            <div style="font-size:20px; font-weight:800; color:${this._isShutdown ? '#dc2626' : '#10b981'}; margin-top:4px; line-height:1;">
+                                ${this._isShutdown ? 'SHUT DOWN' : 'ACTIVE'}
+                            </div>
+                        </div>
+                        <button id="tracking-system-toggle" onclick="LiveTracking.toggleSystemShutdown()" style="background:${this._isShutdown ? '#10b981' : '#dc2626'}; color:white; border:none; padding:8px 14px; border-radius:10px; font-size:11px; font-weight:800; cursor:pointer; transition:all 0.2s; text-transform:uppercase;">
+                            ${this._isShutdown ? 'Resume' : 'Shutdown'}
+                        </button>
                     </div>
 
                 </div>
@@ -645,6 +669,75 @@ const LiveTracking = {
         if (markers.length === 0) return;
         const group = new L.featureGroup(markers);
         this._map.fitBounds(group.getBounds().pad(0.12));
+    },
+
+    async forceOfflineRider(riderId) {
+        const confirmed = await Utils.confirm("Are you sure you want to force this rider offline? This will end their shift session.", "Force Offline Rider", "Force Offline", "Cancel", true);
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch(`/api/admin/force-offline/${riderId}`, { method: 'POST' });
+            if (res.ok) {
+                Utils.alert("Rider forced offline successfully.", "Success");
+                await this.fetchFleet(false);
+            } else {
+                const data = await res.json();
+                Utils.alert(data.error || "Failed to force rider offline.", "Error");
+            }
+        } catch (e) {
+            console.error("Force offline error:", e);
+            Utils.alert("Network error: " + e.message, "Error");
+        }
+    },
+
+    async forceOfflineAll() {
+        const confirmed = await Utils.confirm("Are you sure you want to force ALL active riders offline? This will end all active shifts.", "Force Offline All Riders", "Force Offline All", "Cancel", true);
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch('/api/admin/force-offline-all', { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                Utils.alert(`Successfully forced ${data.offlined} riders offline.`, "Success");
+                await this.fetchFleet(false);
+            } else {
+                const data = await res.json();
+                Utils.alert(data.error || "Failed to force riders offline.", "Error");
+            }
+        } catch (e) {
+            console.error("Force offline all error:", e);
+            Utils.alert("Network error: " + e.message, "Error");
+        }
+    },
+
+    async toggleSystemShutdown() {
+        const action = this._isShutdown ? "resume" : "shutdown";
+        const message = this._isShutdown 
+            ? "Are you sure you want to RESUME the location tracking system? Riders will start syncing their locations again."
+            : "Are you sure you want to SHUT DOWN the tracking system? This will immediately force all riders offline and stop recording location updates.";
+            
+        const confirmed = await Utils.confirm(message, `Confirm System ${action.toUpperCase()}`);
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch('/api/admin/tracking/toggle-shutdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shutdown: !this._isShutdown })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                Utils.alert(`Tracking system successfully ${!this._isShutdown ? 'shut down' : 'resumed'}.`, "Success");
+                this._isShutdown = !this._isShutdown;
+                await this.render();
+                await this.fetchFleet(false);
+            } else {
+                Utils.alert(data.error || "Failed to toggle tracking status.", "Error");
+            }
+        } catch (e) {
+            console.error("Toggle shutdown error:", e);
+            Utils.alert("Network error: " + e.message, "Error");
+        }
     },
 
     refresh() {

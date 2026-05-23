@@ -147,11 +147,15 @@ async function updateRiderGpsStatus(id, gpsStatus) {
 }
 
 async function updateRiderOnlineStatus(id, isOnline) {
+  const updates = {
+    is_online: isOnline,
+    updated_at: nowISO()
+  };
+  if (!isOnline) {
+    updates.gps_status = 'offline';
+  }
   const { error } = await supabase.from('riders')
-    .update({
-      is_online: isOnline,
-      updated_at: nowISO()
-    })
+    .update(updates)
     .eq('id', id);
   if (error) throw error;
   return { success: true };
@@ -972,7 +976,9 @@ module.exports = {
   // Settings
   getSettings, updateSettings,
   // App Version
-  getAppVersion, setAppVersion
+  getAppVersion, setAppVersion,
+  // Tracking Shutdown
+  isTrackingShutdown, setTrackingShutdown
 };
 
 async function getSettings(key) {
@@ -984,6 +990,16 @@ async function getSettings(key) {
 async function updateSettings(key, value) {
   const { error } = await supabase.from('app_config').upsert({ key, value, updated_at: nowISO() });
   if (error) throw error;
+  return { success: true };
+}
+
+async function isTrackingShutdown() {
+  const status = await getSettings('tracking_status');
+  return status ? status.shutdown === true : false;
+}
+
+async function setTrackingShutdown(shutdown) {
+  await updateSettings('tracking_status', { shutdown, updated_at: nowISO() });
   return { success: true };
 }
 
