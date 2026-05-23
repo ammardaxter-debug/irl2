@@ -780,8 +780,15 @@ async function authenticateRider(phone, plainPassword) {
   const match = await bcrypt.compare(plainPassword, foundRider.portal_password);
   if (!match) return null;
 
-  await supabase.from('riders').update({ last_login: nowISO() }).eq('id', foundRider.id);
+  // Generate a unique session token for single-device enforcement
+  const sessionToken = require('crypto').randomUUID();
+  await supabase.from('riders').update({ 
+    last_login: nowISO(),
+    session_token: sessionToken
+  }).eq('id', foundRider.id);
+  
   const { portal_password, ...safeRider } = foundRider;
+  safeRider.session_token = sessionToken;
   return safeRider;
 }
 
@@ -887,12 +894,20 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
   await createNotification({ rider_id: request.rider_id, type: status === 'approved' ? 'request_approved' : 'request_rejected', title: `Request ${status.toUpperCase()}`, message: msg, processed_by_name: processedBy, processed_by_photo: processedByPhoto });
 
   if (status === 'approved') {
-    if (request.category === 'Advance') {
-      await createAdvance({ rider_id: request.rider_id, rider_name: request.rider_name, amount: request.amount, notes: `Rider Request: ${request.description || ''}`, source: 'rider_request', request_id: id });
-      await createExpense({ expense_date: todayLocal(), category: request.category, amount: request.amount, rider_id: request.rider_id, rider_name: request.rider_name, is_deductible: false, source: 'rider_request', request_id: id, receipt_base64: receiptBase64 });
-    } else {
-      await createExpense({ expense_date: todayLocal(), category: request.category, amount: request.amount, rider_id: request.rider_id, rider_name: request.rider_name, is_deductible: true, source: 'rider_request', request_id: id, receipt_base64: receiptBase64 });
-    }
+    // ALL approved requests (including advances) create a SINGLE deductible expense.
+    // No separate salary_advances record — prevents double-deduction in payroll.
+    await createExpense({
+      expense_date: todayLocal(),
+      category: request.category,
+      amount: request.amount,
+      rider_id: request.rider_id,
+      rider_name: request.rider_name,
+      is_deductible: true,
+      source: 'rider_request',
+      request_id: id,
+      receipt_base64: receiptBase64,
+      notes: request.description || ''
+    });
   }
   return { success: true, rider_id: request.rider_id, category: request.category };
 }
@@ -1006,56 +1021,22 @@ async function syncApprovedRequests() {
       const reqIdStr = String(req.id);
       const datePart = (req.updated_at || req.created_at || nowISO()).slice(0, 10);
 
-      if (req.category === 'Advance') {
-        // Check if advance record exists
-        if (!advanceRequestIds.has(reqIdStr)) {
-          console.log(`Sync: Creating missing salary advance for request #${req.id}`);
-          await createAdvance({
-            rider_id: req.rider_id,
-            rider_name: req.rider_name,
-            amount: req.amount,
-            notes: `Rider Request: ${req.description || ''}`,
-            source: 'rider_request',
-            request_id: req.id,
-            created_at: req.created_at || nowISO()
-          });
-        }
-        
-        // Check if expense record exists
-        if (!expenseRequestIds.has(reqIdStr)) {
-          console.log(`Sync: Creating missing non-deductible expense for request #${req.id}`);
-          await createExpense({
-            expense_date: datePart,
-            category: req.category,
-            amount: req.amount,
-            rider_id: req.rider_id,
-            rider_name: req.rider_name,
-            is_deductible: false,
-            source: 'rider_request',
-            request_id: req.id,
-            notes: `Sync approved advance: ${req.description || ''}`,
-            created_at: req.created_at || nowISO()
-          });
-          syncedCount++;
-        }
-      } else {
-        // Check if expense record exists
-        if (!expenseRequestIds.has(reqIdStr)) {
-          console.log(`Sync: Creating missing deductible expense for request #${req.id}`);
-          await createExpense({
-            expense_date: datePart,
-            category: req.category,
-            amount: req.amount,
-            rider_id: req.rider_id,
-            rider_name: req.rider_name,
-            is_deductible: true,
-            source: 'rider_request',
-            request_id: req.id,
-            notes: `Sync approved request: ${req.description || ''}`,
-            created_at: req.created_at || nowISO()
-          });
-          syncedCount++;
-        }
+      // ALL approved requests create a SINGLE deductible expense (no separate salary_advances)
+      if (!expenseRequestIds.has(reqIdStr)) {
+        console.log(`Sync: Creating missing deductible expense for request #${req.id} (${req.category})`);
+        await createExpense({
+          expense_date: datePart,
+          category: req.category,
+          amount: req.amount,
+          rider_id: req.rider_id,
+          rider_name: req.rider_name,
+          is_deductible: true,
+          source: 'rider_request',
+          request_id: req.id,
+          notes: `Sync approved ${req.category.toLowerCase()}: ${req.description || ''}`,
+          created_at: req.created_at || nowISO()
+        });
+        syncedCount++;
       }
     }
 

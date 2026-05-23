@@ -80,7 +80,29 @@ function verifyRiderToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.riderId = decoded.riderId;
     req.riderName = decoded.riderName;
-    next();
+    req.sessionToken = decoded.sessionToken || null;
+    
+    // Skip session validation for high-frequency endpoints (location updates)
+    const skipPaths = ['/api/rider/location', '/api/rider/gps-status'];
+    if (skipPaths.includes(req.path)) {
+      return next();
+    }
+    
+    // Validate session token against database for single-device enforcement
+    if (req.sessionToken) {
+      db.getRiderById(decoded.riderId).then(rider => {
+        if (rider && rider.session_token && rider.session_token !== req.sessionToken) {
+          return res.status(401).json({ 
+            error: 'Your account has been logged in on another device. Please log in again.',
+            code: 'SESSION_INVALIDATED'
+          });
+        }
+        next();
+      }).catch(() => next()); // On DB error, allow through
+    } else {
+      // Legacy tokens without session_token — allow through
+      next();
+    }
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -823,7 +845,7 @@ app.post('/api/rider/login', async (req, res) => {
     const rider = await db.authenticateRider(phone, password);
     if (!rider) return res.status(401).json({ error: 'Invalid phone number or password' });
     const token = jwt.sign(
-      { riderId: rider.id, riderName: rider.name },
+      { riderId: rider.id, riderName: rider.name, sessionToken: rider.session_token },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
