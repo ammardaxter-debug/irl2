@@ -254,8 +254,8 @@ async function deleteDailyLog(id) {
 async function getDashboardStats(start, end) {
   const activeRiders = await getAllRiders('active');
   const [pLogs, tLogs] = await Promise.all([
-    fetchPaginated(() => supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end)),
-    fetchPaginated(() => supabase.from('daily_logs').select('*').eq('log_date', todayLocal()))
+    fetchPaginated(() => supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes').gte('log_date', start).lte('log_date', end)),
+    fetchPaginated(() => supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes').eq('log_date', todayLocal()))
   ]);
 
   const now = new Date();
@@ -523,7 +523,7 @@ async function getDailyLogs(periodStart, periodEnd) {
 }
 
 async function getDailyLogsByRider(riderId, start, end) {
-  const logs = await fetchPaginated(() => supabase.from('daily_logs').select('*').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
+  const logs = await fetchPaginated(() => supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
   return logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 }
 
@@ -547,19 +547,45 @@ async function settleRiderDeductions(riderId, settledBy) {
 
 async function calculatePayroll(periodStart, periodEnd) {
   const riders = await getAllRiders();
-  const [bonuses, advances, expenses, payStatuses, logs] = await Promise.all([
-    fetchPaginated(() => supabase.from('bonuses').select('*')),
-    fetchPaginated(() => supabase.from('salary_advances').select('*').eq('status', 'approved').eq('deductionSettled', false)),
-    fetchPaginated(() => supabase.from('expenses').select('*').eq('is_deductible', true).eq('deductionSettled', false)),
-    fetchPaginated(() => supabase.from('payment_status').select('*')),
-    fetchPaginated(() => supabase.from('daily_logs').select('*').gte('log_date', periodStart).lte('log_date', periodEnd))
-  ]);
+  
+  // Run sequentially to avoid connection pool exhaustion and statement timeouts
+  const bonuses = await fetchPaginated(() => 
+    supabase.from('bonuses')
+      .select('*')
+      .gte('created_at', periodStart + 'T00:00:00.000Z')
+      .lte('created_at', periodEnd + 'T23:59:59.999Z')
+  );
+  
+  const advances = await fetchPaginated(() => 
+    supabase.from('salary_advances')
+      .select('*')
+      .eq('status', 'approved')
+      .eq('deductionSettled', false)
+  );
+  
+  const expenses = await fetchPaginated(() => 
+    supabase.from('expenses')
+      .select('*')
+      .eq('is_deductible', true)
+      .eq('deductionSettled', false)
+  );
+  
+  const payStatuses = await fetchPaginated(() => 
+    supabase.from('payment_status')
+      .select('*')
+      .eq('cycle_key', `${periodStart}_${periodEnd}`)
+  );
+  
+  const logs = await fetchPaginated(() => 
+    supabase.from('daily_logs')
+      .select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes')
+      .gte('log_date', periodStart)
+      .lte('log_date', periodEnd)
+  );
 
   const allPayStatuses = {};
   payStatuses.forEach(p => {
-    if (p.cycle_key === `${periodStart}_${periodEnd}`) {
-      allPayStatuses[p.rider_id] = p;
-    }
+    allPayStatuses[p.rider_id] = p;
   });
 
   const logsByRider = {};
