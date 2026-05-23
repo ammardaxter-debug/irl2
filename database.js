@@ -970,7 +970,9 @@ module.exports = {
   // Auth Users
   getAuthUser, upsertAuthUser,
   // Settings
-  getSettings, updateSettings
+  getSettings, updateSettings,
+  // App Version
+  getAppVersion, setAppVersion
 };
 
 async function getSettings(key) {
