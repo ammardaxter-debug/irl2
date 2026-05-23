@@ -152,10 +152,12 @@ const LiveTracking = {
                     <!-- Clock & Connection Status Card -->
                     <div style="background:white; padding:16px 20px; border-radius:16px; border:1px solid #eef2f6; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01); background:linear-gradient(135deg, #0f172a, #1e293b); color:white;">
                         <span style="font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">SYNC STATUS</span>
-                        <div id="sync-text" style="font-size:18px; font-weight:800; font-family:'Courier New', monospace; letter-spacing:1px; color:#10b981;">LIVE: --:--:--</div>
+                        <div id="sync-text" style="font-size:18px; font-weight:800; font-family:'Courier New', monospace; letter-spacing:1px; color:${this._isShutdown ? '#ef4444' : '#10b981'};">
+                            ${this._isShutdown ? 'SYSTEM HALTED' : 'LIVE: --:--:--'}
+                        </div>
                         <div id="sync-status" style="display:flex; align-items:center; gap:6px; margin-top:6px;">
-                            <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
-                            <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE CHANNEL</span>
+                            <span style="width:6px; height:6px; background:${this._isShutdown ? '#ef4444' : '#10b981'}; border-radius:50%; display:inline-block; ${this._isShutdown ? '' : 'animation: active-pulse 1.5s infinite;'}"></span>
+                            <span style="font-size:10px; font-weight:800; color:${this._isShutdown ? '#ef4444' : '#10b981'}; letter-spacing:0.05em;">${this._isShutdown ? 'TRACKING DISABLED' : 'SECURE CHANNEL'}</span>
                         </div>
                     </div>
 
@@ -356,16 +358,31 @@ const LiveTracking = {
                 this.recenter();
             }
 
-            document.getElementById('sync-text').textContent = 'LIVE: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
             const syncStatusEl = document.getElementById('sync-status');
             const syncTextEl = document.getElementById('sync-text');
-            if (syncStatusEl) {
-                syncStatusEl.innerHTML = `
-                    <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
-                    <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE DATA CHANNEL</span>
-                `;
-                syncTextEl.style.color = '#10b981';
+            
+            if (this._isShutdown) {
+                if (syncTextEl) {
+                    syncTextEl.textContent = 'SYSTEM HALTED';
+                    syncTextEl.style.color = '#ef4444';
+                }
+                if (syncStatusEl) {
+                    syncStatusEl.innerHTML = `
+                        <span style="width:6px; height:6px; background:#ef4444; border-radius:50%; display:inline-block;"></span>
+                        <span style="font-size:10px; font-weight:800; color:#ef4444; letter-spacing:0.05em;">TRACKING DISABLED</span>
+                    `;
+                }
+            } else {
+                if (syncTextEl) {
+                    syncTextEl.textContent = 'LIVE: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    syncTextEl.style.color = '#10b981';
+                }
+                if (syncStatusEl) {
+                    syncStatusEl.innerHTML = `
+                        <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block; animation: active-pulse 1.5s infinite;"></span>
+                        <span style="font-size:10px; font-weight:800; color:#10b981; letter-spacing:0.05em;">SECURE DATA CHANNEL</span>
+                    `;
+                }
             }
         } catch (e) {
             console.error('Fleet sync error:', e);
