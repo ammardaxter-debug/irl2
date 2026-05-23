@@ -5,6 +5,7 @@
 const Expenses = {
   currentTab: 'expenses',
   currentDeductionTab: 'pending',
+  currentRequestTab: 'pending',
   deductionsData: null,
   riders: [],
 
@@ -617,9 +618,113 @@ const Expenses = {
   },
 
   async renderRiderRequests(area) {
-    area.innerHTML = `<div class="p-8"><div class="spinner"></div></div>`;
+    const isPendingTab = this.currentRequestTab === 'pending';
+    
+    let html = `
+      <style>
+        .request-tab-btn {
+          border: none;
+          background: transparent;
+          color: #6B7280;
+          padding: 8px 24px;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: background-color 200ms ease, color 200ms ease;
+          position: relative;
+          z-index: 2;
+          flex: 1;
+        }
+        .request-tab-btn:hover:not(.active) {
+          background: #EFF6FF;
+        }
+        .request-tab-btn.active {
+          color: #FFFFFF;
+        }
+        .request-tab-btn-wrapper {
+          position: relative;
+          display: flex;
+          background: #F3F4F6;
+          padding: 4px;
+          border-radius: 24px;
+          width: 320px;
+        }
+        .request-tab-indicator {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          width: calc(50% - 4px);
+          background-color: #2563EB;
+          border-radius: 20px;
+          transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 1;
+        }
+        .request-tab-indicator.pending { transform: translateX(0); }
+        .request-tab-indicator.history { transform: translateX(100%); }
+        
+        #request-tab-content {
+          transition: opacity 100ms ease, transform 150ms ease-out;
+        }
+      </style>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="request-tab-btn-wrapper">
+          <div id="request-tab-bg-indicator" class="request-tab-indicator ${this.currentRequestTab}"></div>
+          <button id="btn-request-tab-pending" class="request-tab-btn ${isPendingTab ? 'active' : ''}" onclick="Expenses.switchRequestTab('pending')">Pending Requests</button>
+          <button id="btn-request-tab-history" class="request-tab-btn ${!isPendingTab ? 'active' : ''}" onclick="Expenses.switchRequestTab('history')">Request History</button>
+        </div>
+      </div>
+      <div id="request-tab-content" style="width:100%;">
+        <div class="p-8"><div class="spinner"></div></div>
+      </div>
+    `;
+    area.innerHTML = html;
+    
+    const container = document.getElementById('request-tab-content');
+    await this.renderRiderRequestsList(container);
+  },
+
+  async switchRequestTab(tab) {
+    this.currentRequestTab = tab;
+    const indicator = document.getElementById('request-tab-bg-indicator');
+    const btnPending = document.getElementById('btn-request-tab-pending');
+    const btnHistory = document.getElementById('btn-request-tab-history');
+    const container = document.getElementById('request-tab-content');
+    
+    if (indicator) {
+      if (tab === 'pending') {
+        indicator.classList.remove('history');
+        indicator.classList.add('pending');
+      } else {
+        indicator.classList.remove('pending');
+        indicator.classList.add('history');
+      }
+    }
+    
+    if (btnPending) {
+      if (tab === 'pending') btnPending.classList.add('active');
+      else btnPending.classList.remove('active');
+    }
+    
+    if (btnHistory) {
+      if (tab === 'history') btnHistory.classList.add('active');
+      else btnHistory.classList.remove('active');
+    }
+    
+    if (container) {
+      container.style.opacity = '0.5';
+      container.style.transform = 'translateY(4px)';
+      await this.renderRiderRequestsList(container);
+      container.style.opacity = '1';
+      container.style.transform = 'translateY(0)';
+    }
+  },
+
+  async renderRiderRequestsList(container) {
     try {
-      const requests = await API.getRiderRequests('pending');
+      const isPending = this.currentRequestTab === 'pending';
+      const requests = await API.getRiderRequests(isPending ? 'pending' : 'history');
+      
       let html = `
         <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
           <table class="table-clean">
@@ -630,65 +735,235 @@ const Expenses = {
                 <th>Category</th>
                 <th>Description</th>
                 <th style="text-align:right">Amount</th>
-                <th>Actions</th>
+                ${isPending ? '<th>Actions</th>' : '<th>Status</th><th>Processed By</th><th>Admin Notes / Reason</th><th>Receipt</th>'}
               </tr>
             </thead>
             <tbody>
       `;
 
       if (requests.length === 0) {
-        html += `<tr><td colspan="6" style="text-align:center; padding:64px 20px;">
-          <div style="font-size:16px; font-weight:500; color:#6B7280;">No pending rider requests</div>
+        html += `<tr><td colspan="${isPending ? 6 : 9}" style="text-align:center; padding:64px 20px;">
+          <div style="font-size:16px; font-weight:500; color:#6B7280;">No requests found</div>
         </td></tr>`;
       } else {
+        // Fetch expenses to match receipts
+        let expenses = [];
+        if (!isPending) {
+          try {
+            expenses = await API.getExpenses();
+          } catch(e) { console.warn('Failed to load expenses for matching receipts:', e); }
+        }
+
         requests.forEach(r => {
           const dateStr = Utils.formatDateTime(r.created_at || r.updated_at);
-          html += `
-            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
-              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
-              <td><div style="font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div></td>
-              <td><span style="background:#EFF6FF; color:#2563EB; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></td>
-              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(r.description || '-')}</div></td>
-              <td style="font-weight:700; color:#0F0F0F; text-align:right;">${Utils.formatCurrency(r.amount)}</td>
+          
+          let actionOrInfo = '';
+          if (isPending) {
+            actionOrInfo = `
               <td>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-sm" style="background:#16A34A; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'approved')">Approve</button>
                   <button class="btn btn-sm" style="background:#DC2626; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'rejected')">Reject</button>
                 </div>
               </td>
+            `;
+          } else {
+            const isApproved = r.status === 'approved';
+            const badgeColor = isApproved ? '#16A34A' : '#DC2626';
+            const badgeBg = isApproved ? '#F0FDF4' : '#FEF2F2';
+            
+            // Check if there is an expense matching this request_id
+            const matchedExp = expenses.find(e => String(e.request_id) === String(r.id));
+            let receiptCell = '<span style="color:#9CA3AF; font-size:12px;">No receipt</span>';
+            if (matchedExp && matchedExp.receipt_base64) {
+              receiptCell = `
+                <button class="btn btn-sm" style="background:#EBF5FF; color:#1E40AF; border:1px solid #BFDBFE; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="Expenses.viewReceipt(${matchedExp.id})">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  View
+                </button>
+              `;
+            }
+            
+            actionOrInfo = `
+              <td>
+                <span style="background:${badgeBg}; color:${badgeColor}; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; text-transform:capitalize;">${r.status}</span>
+              </td>
+              <td style="color:#4B5563; font-size:13px;">${Utils.escapeHtml(r.processed_by || 'Admin')}</td>
+              <td style="color:#4B5563; font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${Utils.escapeHtml(r.admin_note || '-')}">${Utils.escapeHtml(r.admin_note || '-')}</td>
+              <td>${receiptCell}</td>
+            `;
+          }
+
+          html += `
+            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
+              <td><div style="font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div></td>
+              <td><span style="background:#EFF6FF; color:#2563EB; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></td>
+              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(r.description || '-')}</div></td>
+              <td style="font-weight:700; color:#0F0F0F; text-align:right; white-space:nowrap;">${Utils.formatCurrency(r.amount)}</td>
+              ${actionOrInfo}
             </tr>
           `;
         });
       }
       html += `</tbody></table></div>`;
-      area.innerHTML = html;
-    } catch (err) {
-      area.innerHTML = `<div style="color:red; padding:20px;">Error: ${err.message}</div>`;
+      container.innerHTML = html;
+    } catch(err) {
+      container.innerHTML = `<div style="color:red; padding:20px;">Error loading requests: ${err.message}</div>`;
     }
   },
 
   async processRiderRequest(id, status) {
-    const action = status === 'approved' ? 'Approve' : 'Reject';
-    let adminNote = '';
-    
-    if (status === 'rejected') {
-      adminNote = await Utils.prompt('Please enter a reason for rejection (optional):', 'Reject Request', 'e.g. Insufficient documents, Wait for next cycle...');
-      if (adminNote === null) return; // User cancelled the prompt
-    }
-
-    const confirmed = await Utils.confirm(`Are you sure you want to ${action} this request?`, `${action} Request`);
-    if (!confirmed) return;
-
     try {
-      Utils.showLoading(`${action}ing...`);
-      await API.updateRiderRequestStatus(id, status, adminNote);
-      Utils.showToast(`Request ${status} successfully`);
-      this.render();
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    } finally {
+      Utils.showLoading('Loading request details...');
+      // Fetch requests to get details
+      const requests = await API.getRiderRequests(status === 'approved' ? 'pending' : 'all');
+      const r = requests.find(req => String(req.id) === String(id));
       Utils.hideLoading();
+      if (!r) {
+        return Utils.showToast('Request details not found', 'error');
+      }
+
+      if (status === 'rejected') {
+        this.showRejectionModal(r);
+      } else {
+        this.showApprovalModal(r);
+      }
+    } catch(err) {
+      Utils.hideLoading();
+      Utils.showToast(err.message, 'error');
     }
+  },
+
+  showApprovalModal(r) {
+    const html = `
+      <form id="approve-request-form" style="padding:4px 0;">
+        <div style="background:#F9FAFB; padding:16px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:14px;">
+            <div><span style="color:#6B7280;">Rider:</span> <strong style="color:#111827;">${Utils.escapeHtml(r.rider_name)}</strong></div>
+            <div><span style="color:#6B7280;">Amount:</span> <strong style="color:#111827;">${Utils.formatCurrency(r.amount)}</strong></div>
+            <div><span style="color:#6B7280;">Category:</span> <span style="background:#EFF6FF; color:#2563EB; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></div>
+            <div><span style="color:#6B7280;">Submitted:</span> <span style="color:#4B5563;">${Utils.formatDateTime(r.created_at)}</span></div>
+          </div>
+          <div style="margin-top:10px; font-size:13px; color:#4B5563; border-top:1px solid #E5E7EB; padding-top:10px;">
+            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(r.description || '-')}
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Admin Note (Optional)</label>
+          <textarea name="admin_note" class="expense-form-input" style="width:100%; min-height:60px; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; resize:none;" placeholder="Add details or comments for this approval..."></textarea>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; background:#F9FAFB; padding:10px 14px; border-radius:8px; border:1px solid #E5E7EB;">
+          <input type="checkbox" id="attach-receipt-toggle" style="width:18px; height:18px; cursor:pointer;">
+          <label for="attach-receipt-toggle" style="font-size:14px; font-weight:600; color:#374151; cursor:pointer; user-select:none;">Attach Receipt?</label>
+        </div>
+
+        <div id="receipt-upload-container" style="display:none; margin-bottom:20px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Receipt Upload</label>
+          <div class="expense-upload-zone" onclick="document.getElementById('approve-receipt-upload').click()" style="border:2.5px dashed #D1D5DB; padding:20px; border-radius:10px; text-align:center; cursor:pointer; background:#FFFFFF; transition:border 0.2s;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" style="margin:0 auto 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span class="upload-text" style="font-size:13px; font-weight:500; color:#4B5563;">Click or drag to attach receipt or PDF</span>
+          </div>
+          <div id="approve-receipt-preview-area" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+          <input type="file" id="approve-receipt-upload" multiple accept="image/*,.pdf" style="display:none;">
+          <div style="font-size:11px; color:#9CA3AF; margin-top:6px;">Images compressed automatically · PDFs supported</div>
+          <input type="hidden" id="approve-receipt-base64-hidden">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #E5E7EB; padding-top:16px; margin-top:16px;">
+          <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
+          <button type="submit" id="btn-submit-approve" style="width:140px; height:42px; border-radius:10px; border:none; background:#16A34A; color:white; font-weight:600; cursor:pointer;">Approve</button>
+        </div>
+      </form>
+    `;
+
+    Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#16A34A;">Approve Rider Request</div>', html, 'modal-approve');
+
+    // Toggle receipt container
+    document.getElementById('attach-receipt-toggle').addEventListener('change', (e) => {
+      const container = document.getElementById('receipt-upload-container');
+      container.style.display = e.target.checked ? 'block' : 'none';
+      if (!e.target.checked) {
+        document.getElementById('approve-receipt-base64-hidden').value = '';
+        document.getElementById('approve-receipt-preview-area').innerHTML = '';
+        document.getElementById('approve-receipt-preview-area').style.display = 'none';
+      }
+    });
+
+    // Init file upload functionality
+    this.initMultiUpload('approve-receipt-upload', 'approve-receipt-base64-hidden', 'approve-receipt-preview-area', 'approve-request-form');
+
+    // Form submit
+    document.getElementById('approve-request-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const adminNote = e.target.elements.admin_note.value.trim();
+      const attachReceipt = document.getElementById('attach-receipt-toggle').checked;
+      const receiptBase64 = attachReceipt ? document.getElementById('approve-receipt-base64-hidden').value || null : null;
+
+      try {
+        Utils.closeModal();
+        Utils.showLoading('Approving request...');
+        await API.updateRiderRequestStatus(r.id, 'approved', adminNote, receiptBase64);
+        Utils.showToast('Request approved successfully');
+        this.render();
+      } catch(err) {
+        Utils.showToast(err.message, 'error');
+      } finally {
+        Utils.hideLoading();
+      }
+    });
+  },
+
+  showRejectionModal(r) {
+    const html = `
+      <div style="padding:4px 0;">
+        <div style="background:#F9FAFB; padding:16px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:14px;">
+            <div><span style="color:#6B7280;">Rider:</span> <strong style="color:#111827;">${Utils.escapeHtml(r.rider_name)}</strong></div>
+            <div><span style="color:#6B7280;">Amount:</span> <strong style="color:#111827;">${Utils.formatCurrency(r.amount)}</strong></div>
+            <div><span style="color:#6B7280;">Category:</span> <span style="background:#EFF6FF; color:#2563EB; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></div>
+            <div><span style="color:#6B7280;">Submitted:</span> <span style="color:#4B5563;">${Utils.formatDateTime(r.created_at)}</span></div>
+          </div>
+          <div style="margin-top:10px; font-size:13px; color:#4B5563; border-top:1px solid #E5E7EB; padding-top:10px;">
+            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(r.description || '-')}
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Rejection Reason</label>
+          <textarea id="rejection-reason" class="expense-form-input" style="width:100%; min-height:80px; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; resize:none;" placeholder="Explain why this request is rejected..."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #E5E7EB; padding-top:16px;">
+          <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
+          <button id="btn-submit-reject" style="width:140px; height:42px; border-radius:10px; border:none; background:#DC2626; color:white; font-weight:600; cursor:pointer;">Reject Request</button>
+        </div>
+      </div>
+    `;
+
+    Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#DC2626;">Reject Rider Request</div>', html, 'modal-reject');
+
+    document.getElementById('btn-submit-reject').addEventListener('click', async () => {
+      const adminNote = document.getElementById('rejection-reason').value.trim();
+      if (!adminNote) {
+        return Utils.showToast('Please enter a reason for rejection', 'error');
+      }
+
+      try {
+        Utils.closeModal();
+        Utils.showLoading('Rejecting request...');
+        await API.updateRiderRequestStatus(r.id, 'rejected', adminNote);
+        Utils.showToast('Request rejected successfully');
+        this.render();
+      } catch(err) {
+        Utils.showToast(err.message, 'error');
+      } finally {
+        Utils.hideLoading();
+      }
+    });
   },
 
   renderDeductionsUI(area) {

@@ -865,13 +865,19 @@ async function createRiderRequest(requestData) {
 
 async function getRiderRequests(status = 'pending') {
   let query = supabase.from('rider_requests').select('*').order('created_at', { ascending: false });
-  if (status) query = query.eq('status', status);
+  if (status && status !== 'all') {
+    if (status === 'history') {
+      query = query.in('status', ['approved', 'rejected']);
+    } else {
+      query = query.eq('status', status);
+    }
+  }
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
 
-async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin', processedByPhoto = '') {
+async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin', processedByPhoto = '', receiptBase64 = null) {
   const { data: request, error: fetchErr } = await supabase.from('rider_requests').select('*').eq('id', id).single();
   if (fetchErr || !request) throw new Error('Request not found');
 
@@ -882,12 +888,13 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
 
   if (status === 'approved') {
     if (request.category === 'Advance') {
-      await createAdvance({ rider_id: request.rider_id, rider_name: request.rider_name, amount: request.amount, notes: `Rider Request`, source: 'rider_request', request_id: id });
+      await createAdvance({ rider_id: request.rider_id, rider_name: request.rider_name, amount: request.amount, notes: `Rider Request: ${request.description || ''}`, source: 'rider_request', request_id: id });
+      await createExpense({ expense_date: todayLocal(), category: request.category, amount: request.amount, rider_id: request.rider_id, rider_name: request.rider_name, is_deductible: false, source: 'rider_request', request_id: id, receipt_base64: receiptBase64 });
     } else {
-      await createExpense({ expense_date: todayLocal(), category: request.category, amount: request.amount, rider_id: request.rider_id, rider_name: request.rider_name, is_deductible: true, source: 'rider_request', request_id: id });
+      await createExpense({ expense_date: todayLocal(), category: request.category, amount: request.amount, rider_id: request.rider_id, rider_name: request.rider_name, is_deductible: true, source: 'rider_request', request_id: id, receipt_base64: receiptBase64 });
     }
   }
-  return { success: true };
+  return { success: true, rider_id: request.rider_id, category: request.category };
 }
 
 async function getMyRequests(riderId) {
