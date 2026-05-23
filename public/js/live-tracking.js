@@ -317,7 +317,7 @@ const LiveTracking = {
     async startSync() {
         this.stopSync();
         this.fetchFleet(true); // Initial center
-        this._refreshInterval = setInterval(() => this.fetchFleet(false), 5000);
+        this._refreshInterval = setInterval(() => this.fetchFleet(false), 15000);
     },
 
     stopSync() {
