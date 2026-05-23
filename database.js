@@ -956,9 +956,119 @@ async function updateAdminProfile(emailKey, profileData) {
 
 async function migrateFromSQLite() { return { migrated: false, total: 0, message: "Dep" }; }
 
+async function syncApprovedRequests() {
+  console.log('🔄 Checking for missing expenses/advances for approved rider requests...');
+  try {
+    // 1. Get all approved rider requests
+    const { data: approvedRequests, error: reqErr } = await supabase
+      .from('rider_requests')
+      .select('*')
+      .eq('status', 'approved');
+    
+    if (reqErr) {
+      console.error('Failed to fetch approved requests for sync:', reqErr);
+      return;
+    }
+    
+    if (!approvedRequests || approvedRequests.length === 0) {
+      console.log('✅ No approved requests found to sync.');
+      return;
+    }
+
+    // 2. Fetch all expenses with source = 'rider_request'
+    const { data: expenses, error: expErr } = await supabase
+      .from('expenses')
+      .select('request_id')
+      .eq('source', 'rider_request');
+      
+    if (expErr) {
+      console.error('Failed to fetch expenses for sync:', expErr);
+      return;
+    }
+
+    // 3. Fetch all salary advances with source = 'rider_request'
+    const { data: advs, error: advErr } = await supabase
+      .from('salary_advances')
+      .select('request_id')
+      .eq('source', 'rider_request');
+      
+    if (advErr) {
+      console.error('Failed to fetch advances for sync:', advErr);
+      return;
+    }
+
+    const expenseRequestIds = new Set((expenses || []).map(e => String(e.request_id)));
+    const advanceRequestIds = new Set((advs || []).map(a => String(a.request_id)));
+
+    let syncedCount = 0;
+
+    for (const req of approvedRequests) {
+      const reqIdStr = String(req.id);
+      const datePart = (req.updated_at || req.created_at || nowISO()).slice(0, 10);
+
+      if (req.category === 'Advance') {
+        // Check if advance record exists
+        if (!advanceRequestIds.has(reqIdStr)) {
+          console.log(`Sync: Creating missing salary advance for request #${req.id}`);
+          await createAdvance({
+            rider_id: req.rider_id,
+            rider_name: req.rider_name,
+            amount: req.amount,
+            notes: `Rider Request: ${req.description || ''}`,
+            source: 'rider_request',
+            request_id: req.id,
+            created_at: req.created_at || nowISO()
+          });
+        }
+        
+        // Check if expense record exists
+        if (!expenseRequestIds.has(reqIdStr)) {
+          console.log(`Sync: Creating missing non-deductible expense for request #${req.id}`);
+          await createExpense({
+            expense_date: datePart,
+            category: req.category,
+            amount: req.amount,
+            rider_id: req.rider_id,
+            rider_name: req.rider_name,
+            is_deductible: false,
+            source: 'rider_request',
+            request_id: req.id,
+            notes: `Sync approved advance: ${req.description || ''}`,
+            created_at: req.created_at || nowISO()
+          });
+          syncedCount++;
+        }
+      } else {
+        // Check if expense record exists
+        if (!expenseRequestIds.has(reqIdStr)) {
+          console.log(`Sync: Creating missing deductible expense for request #${req.id}`);
+          await createExpense({
+            expense_date: datePart,
+            category: req.category,
+            amount: req.amount,
+            rider_id: req.rider_id,
+            rider_name: req.rider_name,
+            is_deductible: true,
+            source: 'rider_request',
+            request_id: req.id,
+            notes: `Sync approved request: ${req.description || ''}`,
+            created_at: req.created_at || nowISO()
+          });
+          syncedCount++;
+        }
+      }
+    }
+
+    console.log(`🔄 Sync completed: ${syncedCount} missing records restored.`);
+  } catch(err) {
+    console.error('Failed to sync approved requests:', err);
+  }
+}
+
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
   archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsByRider,
+  syncApprovedRequests,
   getMissingLogs, createDailyLog, updateDailyLog, deleteDailyLog,
   getDashboardStats, calculatePayroll, getExpenseStats, getExpenses,
   createExpense, updateExpense, deleteExpense, settleExpenseDeduction,

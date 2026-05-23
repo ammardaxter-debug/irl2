@@ -1653,6 +1653,9 @@ async function initializeApp() {
     await seedAuthUsers();
     console.log('  🔐 Dashboard auth users ready');
 
+    // Sync approved requests to restore missing expenses/advances
+    await db.syncApprovedRequests();
+
     // Check if we have data
     const riders = await db.getAllRiders();
     console.log(`  📊 Database has data (${riders.length} riders)`);
