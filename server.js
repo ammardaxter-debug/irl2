@@ -212,14 +212,12 @@ app.get('/api/daily-logs', async (req, res) => {
     }
     
     if (start && end) {
-      // If no rider_id but start/end, we get all logs in range
-      const { data, error } = await db.getDb().from('daily_logs').select('*').gte('log_date', start).lte('log_date', end);
-      if (error) throw error;
+      const data = await db.getDailyLogs(start, end);
       return res.json(data || []);
     }
 
     const logDate = date || new Date().toISOString().split('T')[0];
-    const logs = await db.getDailyLogs(logDate);
+    const logs = await db.getDailyLogs(logDate, logDate);
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -452,15 +450,17 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
 // ========== BACKUP ROUTES ==========
 
-// Download database backup (Firebase JSON export)
+// Download database backup (Supabase JSON export)
 app.get('/api/backup/download', async (req, res) => {
   try {
-    const snapshot = await db.getDb().ref('/').once('value');
-    const data = snapshot.val();
+    const riders = await db.getAllRiders();
+    const expenses = await db.getExpenses();
+    const funds = await db.getFunds();
+    const data = { riders, expenses, funds };
     const jsonStr = JSON.stringify(data, null, 2);
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    res.setHeader('Content-Disposition', `attachment; filename="IRL_Firebase_Backup_${timestamp}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="IRL_Supabase_Backup_${timestamp}.json"`);
     res.setHeader('Content-Type', 'application/json');
     res.send(jsonStr);
   } catch (err) {
@@ -585,19 +585,15 @@ app.get('/api/charts/expense-breakdown', async (req, res) => {
 app.get('/api/charts/daily-orders', async (req, res) => {
   try {
     const { start, end } = req.query;
-    const snapshot = await db.getDb().ref('daily_logs').once('value');
+    const logs = await db.getDailyLogs(start, end);
     const results = {};
-    if (snapshot.exists()) {
-      snapshot.forEach(child => {
-        const log = child.val();
-        const d = log.log_date;
-        if (d && (!start || d >= start) && (!end || d <= end)) {
-          if (!results[d]) results[d] = 0;
-          results[d] += (log.total_orders || 0);
-        }
-      });
-    }
-    // Sort by date and return as array
+    logs.forEach(log => {
+      const d = log.log_date;
+      if (d) {
+        if (!results[d]) results[d] = 0;
+        results[d] += (log.primary_orders || 0) + (log.associate_orders || 0);
+      }
+    });
     const sorted = Object.entries(results).sort((a, b) => a[0].localeCompare(b[0]));
     res.json(sorted.map(([date, orders]) => ({ date, orders })));
   } catch (err) {
@@ -720,19 +716,12 @@ app.get('/api/backup/export-xlsx', async (req, res) => {
     const riders = await db.getAllRiders();
     const expenses = await db.getExpenses();
     const funds = await db.getFunds();
+    const logs = await db.getDailyLogs();
 
-    // Get all daily logs
-    const allLogsSnap = await db.getDb().ref('daily_logs').once('value');
-    const logs = [];
-    if (allLogsSnap.exists()) {
-      allLogsSnap.forEach(child => {
-        logs.push({ id: parseInt(child.key), ...child.val() });
-      });
-    }
     // Enrich logs with rider names
     const riderMap = {};
     for (const r of riders) { riderMap[r.id] = r.name; }
-    for (const l of logs) { l.rider_name = riderMap[l.rider_id] || 'Unknown'; }
+    for (const l of logs) { l.rider_name = l.rider_name || riderMap[l.rider_id] || 'Unknown'; }
     logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 
     const wb = XLSX.utils.book_new();
@@ -780,8 +769,8 @@ app.post('/api/download-pdf', (req, res) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const snapshot = await db.getDb().ref('settings').once('value');
-    res.json(snapshot.val() || {});
+    const settings = await db.getSettings('settings');
+    res.json(settings || {});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -791,9 +780,7 @@ app.post('/api/settings', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     const { key, value } = req.body;
     if (!key) return res.status(400).json({ error: 'Key is required' });
-    
-    // Replace dots with slashes for nested keys, or just use as path
-    await db.getDb().ref(`settings/${key.replace(/\./g, '/')}`).set(value);
+    await db.updateSettings(key, value);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -806,8 +793,8 @@ app.get('/api/warning-message-status', async (req, res) => {
   try {
     const { cycle_key } = req.query;
     if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
-    const snapshot = await db.getDb().ref(`warning_message_status/${cycle_key}`).once('value');
-    res.json(snapshot.val() || {});
+    const allStatuses = await db.getSettings(`warning_msg_${cycle_key}`);
+    res.json(allStatuses || {});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -817,10 +804,9 @@ app.put('/api/warning-message-status', verifyAdminToken, requireAdmin, async (re
   try {
     const { rider_id, cycle_key } = req.body;
     if (!rider_id || !cycle_key) return res.status(400).json({ error: 'rider_id and cycle_key required' });
-    await db.getDb().ref(`warning_message_status/${cycle_key}/${rider_id}`).set({
-      sent: true,
-      sent_at: new Date().toISOString()
-    });
+    const existing = await db.getSettings(`warning_msg_${cycle_key}`) || {};
+    existing[rider_id] = { sent: true, sent_at: new Date().toISOString() };
+    await db.updateSettings(`warning_msg_${cycle_key}`, existing);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1278,7 +1264,7 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
           ? `Your ${result.category} request has been approved by ${adminName}.`
           : `Your ${result.category} request was rejected by ${adminName}. Reason: ${admin_note || 'No reason provided'}`;
 
-        const { data: rider } = await db.getDb().from('riders').select('*').eq('id', result.rider_id).single();
+        const rider = await db.getRiderById(result.rider_id);
         if (rider && rider.push_token) {
           try {
             const { Expo } = await import('expo-server-sdk');
@@ -1394,6 +1380,7 @@ app.post('/api/admin/force-offline-all', verifyAdminToken, requireAdmin, async (
       }
     }
     res.json({ success: true, offlined: count });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -1628,7 +1615,7 @@ if (!process.env.VERCEL) {
     console.log(`  → Running at http://localhost:${PORT}`);
     console.log(`  → Login: http://localhost:${PORT}/login`);
     console.log(`  → Rider Portal: http://localhost:${PORT}/rider/`);
-    console.log(`  → Database: Firebase Realtime Database ☁️\n`);
+    console.log(`  → Database: Supabase Database 🐘\n`);
   });
 }
 

@@ -35,14 +35,16 @@ function todayLocal() {
 }
 
 // Helper to fetch all rows paginated to bypass 1000 row limit
-async function fetchPaginated(queryBuilder) {
+async function fetchPaginated(queryBuilderOrFactory) {
   let allData = [];
   let from = 0;
   const pageSize = 1000;
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await queryBuilder.range(from, from + pageSize - 1);
+    // Support both a query builder and a factory function
+    const qb = typeof queryBuilderOrFactory === 'function' ? queryBuilderOrFactory() : queryBuilderOrFactory;
+    const { data, error } = await qb.range(from, from + pageSize - 1);
     if (error) throw error;
     if (data && data.length > 0) {
       allData = allData.concat(data);
@@ -53,6 +55,8 @@ async function fetchPaginated(queryBuilder) {
     } else {
       hasMore = false;
     }
+    // If a raw query builder was passed (not a factory), we can't reuse it
+    if (typeof queryBuilderOrFactory !== 'function') break;
   }
   return allData;
 }
@@ -185,30 +189,11 @@ async function setAppVersion(configData) {
   if (error) throw error;
 }
 
-// ========== DAILY LOGS ==========
 
-async function getDailyLogs(date) {
-  let query = supabase.from('daily_logs').select('*');
-  if (date) {
-    query = query.like('log_date', `${date}%`);
-  }
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
-}
-
-async function getDailyLogsByRider(riderId, start, end) {
-  let query = supabase.from('daily_logs').select('*').eq('rider_id', riderId);
-  if (start) query = query.gte('log_date', start);
-  if (end) query = query.lte('log_date', end);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
-}
 
 async function getMissingLogs(date) {
   const riders = await getAllRiders('active');
-  const logs = await getDailyLogs(date);
+  const logs = await getDailyLogs(date, date);
   const loggedRiderIds = new Set(logs.map(l => String(l.rider_id)));
   return riders.filter(r => !loggedRiderIds.has(String(r.id)));
 }
@@ -269,8 +254,8 @@ async function deleteDailyLog(id) {
 async function getDashboardStats(start, end) {
   const activeRiders = await getAllRiders('active');
   const [pLogs, tLogs] = await Promise.all([
-    fetchPaginated(supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end)),
-    fetchPaginated(supabase.from('daily_logs').select('*').eq('log_date', todayLocal()))
+    fetchPaginated(() => supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end)),
+    fetchPaginated(() => supabase.from('daily_logs').select('*').eq('log_date', todayLocal()))
   ]);
 
   const now = new Date();
@@ -346,11 +331,13 @@ async function getExpenseStats() {
 }
 
 async function getExpenses(start, end) {
-  let query = supabase.from('expenses').select('*');
-  if (start && end) {
-    query = query.gte('expense_date', start).lte('expense_date', end);
-  }
-  const data = await fetchPaginated(query);
+  const data = await fetchPaginated(() => {
+    let q = supabase.from('expenses').select('*');
+    if (start && end) {
+      q = q.gte('expense_date', start).lte('expense_date', end);
+    }
+    return q;
+  });
   
   return data.map(e => ({
     ...e,
@@ -477,11 +464,13 @@ async function deleteBonus(id) {
 // ========== FUNDS ==========
 
 async function getFunds(start, end) {
-  let query = supabase.from('company_funds').select('*');
-  if (start && end) {
-    query = query.gte('receive_date', start).lte('receive_date', end);
-  }
-  const data = await fetchPaginated(query);
+  const data = await fetchPaginated(() => {
+    let q = supabase.from('company_funds').select('*');
+    if (start && end) {
+      q = q.gte('receive_date', start).lte('receive_date', end);
+    }
+    return q;
+  });
   return data.map(f => ({
     ...f,
     description: f.source || f.description
@@ -523,19 +512,19 @@ async function deleteFund(id) {
 }
 
 async function getDailyLogs(periodStart, periodEnd) {
-  let query = supabase.from('daily_logs').select('*');
-  if (periodStart && periodEnd) {
-    query = query.gte('log_date', periodStart).lte('log_date', periodEnd);
-  }
-  const data = await fetchPaginated(query);
-  
-  return data.sort((a, b) => b.log_date.localeCompare(a.log_date));
+  const data = await fetchPaginated(() => {
+    let q = supabase.from('daily_logs').select('*');
+    if (periodStart && periodEnd) {
+      q = q.gte('log_date', periodStart).lte('log_date', periodEnd);
+    }
+    return q;
+  });
+  return data.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 }
 
 async function getDailyLogsByRider(riderId, start, end) {
-  const query = supabase.from('daily_logs').select('*').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end);
-  const logs = await fetchPaginated(query);
-  return logs.sort((a, b) => b.log_date.localeCompare(a.log_date));
+  const logs = await fetchPaginated(() => supabase.from('daily_logs').select('*').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
+  return logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 }
 
 // ========== PAYROLL LOGIC ==========
@@ -559,11 +548,11 @@ async function settleRiderDeductions(riderId, settledBy) {
 async function calculatePayroll(periodStart, periodEnd) {
   const riders = await getAllRiders();
   const [bonuses, advances, expenses, payStatuses, logs] = await Promise.all([
-    fetchPaginated(supabase.from('bonuses').select('*')),
-    fetchPaginated(supabase.from('salary_advances').select('*').eq('status', 'approved').eq('deductionSettled', false)),
-    fetchPaginated(supabase.from('expenses').select('*').eq('is_deductible', true).eq('deductionSettled', false)),
-    fetchPaginated(supabase.from('payment_status').select('*')),
-    fetchPaginated(supabase.from('daily_logs').select('*').gte('log_date', periodStart).lte('log_date', periodEnd))
+    fetchPaginated(() => supabase.from('bonuses').select('*')),
+    fetchPaginated(() => supabase.from('salary_advances').select('*').eq('status', 'approved').eq('deductionSettled', false)),
+    fetchPaginated(() => supabase.from('expenses').select('*').eq('is_deductible', true).eq('deductionSettled', false)),
+    fetchPaginated(() => supabase.from('payment_status').select('*')),
+    fetchPaginated(() => supabase.from('daily_logs').select('*').gte('log_date', periodStart).lte('log_date', periodEnd))
   ]);
 
   const allPayStatuses = {};
@@ -678,7 +667,7 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
 }
 
 async function getPaymentStatuses(cycleKey) {
-  const data = await fetchPaginated(supabase.from('payment_status').select('*').eq('cycle_key', cycleKey));
+  const data = await fetchPaginated(() => supabase.from('payment_status').select('*').eq('cycle_key', cycleKey));
   const result = {};
   data.forEach(p => { result[p.rider_id] = p; });
   return result;
@@ -709,7 +698,7 @@ async function deleteRiderCycleLogs(riderId, start, end) {
 
 // ========== BIKES ==========
 async function getAllBikes() {
-  const data = await fetchPaginated(supabase.from('bikes').select('*'));
+  const data = await fetchPaginated(() => supabase.from('bikes').select('*'));
   return data;
 }
 
@@ -754,7 +743,7 @@ async function setRiderPassword(riderId, plainPassword) {
 }
 
 async function authenticateRider(phone, plainPassword) {
-  const riders = await fetchPaginated(supabase.from('riders').select('*').eq('portal_enabled', true));
+  const riders = await fetchPaginated(() => supabase.from('riders').select('*').eq('portal_enabled', true));
   const foundRider = riders.find(r => r.phone && r.phone.replace(/\s+/g, '') === phone.replace(/\s+/g, ''));
   if (!foundRider || !foundRider.portal_password) return null;
 
@@ -999,41 +988,3 @@ async function upsertAuthUser(userData) {
   return { success: true };
 }
 
-// ========== TRACKING & FLEET MGT ==========
-async function updateRiderOnlineStatus(riderId, isOnline) {
-  const { error } = await supabase.from('riders')
-    .update({ 
-      is_online: isOnline, 
-      last_location_update: nowISO() 
-    })
-    .eq('id', riderId);
-  if (error) throw error;
-  return { success: true };
-}
-
-async function updateRiderLocation(riderId, lat, lng) {
-  const { error } = await supabase.from('riders')
-    .update({ 
-      last_lat: lat, 
-      last_lng: lng, 
-      last_location_update: nowISO(),
-      gps_status: 'synced'
-    })
-    .eq('id', riderId);
-  if (error) {
-    if (error.message && error.message.includes("gps_status")) {
-      console.warn("⚠️ Column 'gps_status' not found in 'riders' table. Retrying update without 'gps_status'...");
-      const { error: retryError } = await supabase.from('riders')
-        .update({
-          last_lat: lat,
-          last_lng: lng,
-          last_location_update: nowISO()
-        })
-        .eq('id', riderId);
-      if (retryError) throw retryError;
-      return { success: true };
-    }
-    throw error;
-  }
-  return { success: true };
-}
