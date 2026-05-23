@@ -1372,6 +1372,32 @@ app.get('/api/admin/fleet-locations', async (req, res) => {
   }
 });
 
+// Force single rider offline (Admin)
+app.post('/api/admin/force-offline/:id', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    await db.updateRiderOnlineStatus(parseInt(req.params.id), false);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Force ALL riders offline at once (Admin)
+app.post('/api/admin/force-offline-all', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const riders = await db.getAllRiders();
+    let count = 0;
+    for (const r of riders) {
+      if (r.is_online) {
+        await db.updateRiderOnlineStatus(r.id, false);
+        count++;
+      }
+    }
+    res.json({ success: true, offlined: count });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Update GPS status (Rider App heartbeat)
 app.post('/api/rider/gps-status', verifyRiderToken, async (req, res) => {
   try {

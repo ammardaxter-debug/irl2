@@ -165,7 +165,10 @@ const LiveTracking = {
                         <div style="padding:16px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:12px;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <h3 style="margin:0; font-size:16px; font-weight:800; color:#0f172a;">Rider Fleet</h3>
-                                <button onclick="LiveTracking.recenter()" style="background:var(--primary-50); border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; color:var(--primary-600); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='var(--primary-100)'" onmouseout="this.style.background='var(--primary-50)'">Recenter All</button>
+                                <div style="display:flex; gap:6px;">
+                                    <button onclick="LiveTracking.forceOfflineAll()" style="background:#fef2f2; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#dc2626; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">Offline All</button>
+                                    <button onclick="LiveTracking.recenter()" style="background:var(--primary-50); border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; color:var(--primary-600); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='var(--primary-100)'" onmouseout="this.style.background='var(--primary-50)'">Recenter</button>
+                                </div>
                             </div>
                             
                             <!-- Real-time search box -->
@@ -410,6 +413,7 @@ const LiveTracking = {
                         <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${isOnline ? '#ecfdf5' : '#f1f5f9'}; color:${isOnline ? '#059669' : '#64748b'}; letter-spacing:0.02em;">
                             ${isOnline ? '● ONLINE' : '● OFFLINE'}
                         </span>
+                        ${isOnline ? `<button onclick="event.stopPropagation(); LiveTracking.forceOfflineRider(${r.id})" style="font-size:10px; font-weight:700; color:#dc2626; background:#fef2f2; border:none; padding:4px 8px; border-radius:6px; cursor:pointer;">Force Offline</button>` : ''}
                         <span style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px; background:${gpsStatus.bg}; color:${gpsStatus.color}; letter-spacing:0.02em;">
                             ${gpsStatus.text}
                         </span>

@@ -226,6 +226,12 @@ const Dashboard = {
             </div>
             <span style="font-size: 13px; font-weight: 500; color: #374151;">Download Backup</span>
           </button>
+          <button id="qa-force-offline" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="color: #dc2626; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            </div>
+            <span style="font-size: 13px; font-weight: 500; color: #374151;">Force Offline Rider</span>
+          </button>
         </div>
       </div>
 
@@ -528,6 +534,19 @@ const Dashboard = {
     document.getElementById('qa-backup')?.addEventListener('click', () => {
       API.downloadBackup();
       Utils.showToast('Backup download started', 'success');
+    });
+    document.getElementById('qa-force-offline')?.addEventListener('click', async () => {
+      const riderIdStr = prompt('Enter Rider ID to force offline:');
+      if (riderIdStr) {
+        const id = parseInt(riderIdStr, 10);
+        if (isNaN(id)) return Utils.showToast('Invalid Rider ID', 'error');
+        try {
+          await API.request(`/admin/force-offline/${id}`, { method: 'POST' });
+          Utils.showToast('Rider forced offline successfully', 'success');
+        } catch (err) {
+          Utils.showToast(err.message, 'error');
+        }
+      }
     });
 
     // Load charts asynchronously

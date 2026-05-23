@@ -34,6 +34,29 @@ function todayLocal() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Helper to fetch all rows paginated to bypass 1000 row limit
+async function fetchPaginated(queryBuilder) {
+  let allData = [];
+  let from = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await queryBuilder.range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (data && data.length > 0) {
+      allData = allData.concat(data);
+      from += pageSize;
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+  return allData;
+}
+
 // ========== RIDER OPERATIONS ==========
 
 async function getAllRiders(status = 'active') {
@@ -83,7 +106,22 @@ async function updateRiderLocation(id, lat, lng) {
       updated_at: nowISO()
     })
     .eq('id', id);
-  if (error) throw error;
+  if (error) {
+    if (error.message && error.message.includes("gps_status")) {
+      console.warn("⚠️ Column 'gps_status' not found in 'riders' table. Retrying update without 'gps_status'...");
+      const { error: retryError } = await supabase.from('riders')
+        .update({
+          last_lat: lat,
+          last_lng: lng,
+          last_location_update: nowISO(),
+          updated_at: nowISO()
+        })
+        .eq('id', id);
+      if (retryError) throw retryError;
+      return { success: true };
+    }
+    throw error;
+  }
   return { success: true };
 }
 
@@ -94,7 +132,13 @@ async function updateRiderGpsStatus(id, gpsStatus) {
       updated_at: nowISO()
     })
     .eq('id', id);
-  if (error) throw error;
+  if (error) {
+    if (error.message && error.message.includes("gps_status")) {
+      console.warn("⚠️ Column 'gps_status' not found in 'riders' table. Ignoring GPS status heartbeat update...");
+      return { success: true, warning: 'gps_status column missing' };
+    }
+    throw error;
+  }
   return { success: true };
 }
 
@@ -223,14 +267,11 @@ async function deleteDailyLog(id) {
 // ========== DASHBOARD STATS ==========
 
 async function getDashboardStats(start, end) {
-  const [activeRiders, periodLogs, todayLogs] = await Promise.all([
-    getAllRiders('active'),
-    supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end),
-    supabase.from('daily_logs').select('*').eq('log_date', todayLocal())
+  const activeRiders = await getAllRiders('active');
+  const [pLogs, tLogs] = await Promise.all([
+    fetchPaginated(supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end)),
+    fetchPaginated(supabase.from('daily_logs').select('*').eq('log_date', todayLocal()))
   ]);
-
-  const pLogs = periodLogs.data || [];
-  const tLogs = todayLogs.data || [];
 
   const now = new Date();
   const thirtyDaysLater = new Date();
@@ -309,10 +350,9 @@ async function getExpenses(start, end) {
   if (start && end) {
     query = query.gte('expense_date', start).lte('expense_date', end);
   }
-  const { data, error } = await query;
-  if (error) throw error;
+  const data = await fetchPaginated(query);
   
-  return (data || []).map(e => ({
+  return data.map(e => ({
     ...e,
     rider_name: e.rider_name,
     receipt_base64: e.receipt_url || e.receipt_base64
@@ -441,9 +481,8 @@ async function getFunds(start, end) {
   if (start && end) {
     query = query.gte('receive_date', start).lte('receive_date', end);
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data || []).map(f => ({
+  const data = await fetchPaginated(query);
+  return data.map(f => ({
     ...f,
     description: f.source || f.description
   })).sort((a, b) => {
@@ -483,6 +522,22 @@ async function deleteFund(id) {
   if (error) throw error;
 }
 
+async function getDailyLogs(periodStart, periodEnd) {
+  let query = supabase.from('daily_logs').select('*');
+  if (periodStart && periodEnd) {
+    query = query.gte('log_date', periodStart).lte('log_date', periodEnd);
+  }
+  const data = await fetchPaginated(query);
+  
+  return data.sort((a, b) => b.log_date.localeCompare(a.log_date));
+}
+
+async function getDailyLogsByRider(riderId, start, end) {
+  const query = supabase.from('daily_logs').select('*').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end);
+  const logs = await fetchPaginated(query);
+  return logs.sort((a, b) => b.log_date.localeCompare(a.log_date));
+}
+
 // ========== PAYROLL LOGIC ==========
 async function settleRiderDeductions(riderId, settledBy) {
   const settleData = {
@@ -502,24 +557,24 @@ async function settleRiderDeductions(riderId, settledBy) {
 }
 
 async function calculatePayroll(periodStart, periodEnd) {
-  const [riders, bonuses, advances, expenses, payStatuses, logs] = await Promise.all([
-    getAllRiders(),
-    supabase.from('bonuses').select('*'),
-    supabase.from('salary_advances').select('*').eq('status', 'approved').eq('deductionSettled', false),
-    supabase.from('expenses').select('*').eq('is_deductible', true).eq('deductionSettled', false),
-    supabase.from('payment_status').select('*'),
-    supabase.from('daily_logs').select('*').gte('log_date', periodStart).lte('log_date', periodEnd)
+  const riders = await getAllRiders();
+  const [bonuses, advances, expenses, payStatuses, logs] = await Promise.all([
+    fetchPaginated(supabase.from('bonuses').select('*')),
+    fetchPaginated(supabase.from('salary_advances').select('*').eq('status', 'approved').eq('deductionSettled', false)),
+    fetchPaginated(supabase.from('expenses').select('*').eq('is_deductible', true).eq('deductionSettled', false)),
+    fetchPaginated(supabase.from('payment_status').select('*')),
+    fetchPaginated(supabase.from('daily_logs').select('*').gte('log_date', periodStart).lte('log_date', periodEnd))
   ]);
 
   const allPayStatuses = {};
-  (payStatuses.data || []).forEach(p => {
+  payStatuses.forEach(p => {
     if (p.cycle_key === `${periodStart}_${periodEnd}`) {
       allPayStatuses[p.rider_id] = p;
     }
   });
 
   const logsByRider = {};
-  (logs.data || []).forEach(log => {
+  logs.forEach(log => {
     const rid = String(log.rider_id);
     if (!logsByRider[rid]) logsByRider[rid] = [];
     logsByRider[rid].push(log);
@@ -551,14 +606,14 @@ async function calculatePayroll(periodStart, periodEnd) {
 
       // Bonuses
       let totalBonuses = 0;
-      (bonuses.data || []).filter(b => String(b.rider_id) === riderId).forEach(b => { totalBonuses += b.amount || 0; });
+      bonuses.filter(b => String(b.rider_id) === riderId).forEach(b => { totalBonuses += b.amount || 0; });
 
       // Deductions
       let totalDeductions = 0;
-      (expenses.data || []).filter(e => String(e.rider_id) === riderId && !(e.category || '').toLowerCase().includes('medical')).forEach(e => { totalDeductions += e.amount || 0; });
+      expenses.filter(e => String(e.rider_id) === riderId && !(e.category || '').toLowerCase().includes('medical')).forEach(e => { totalDeductions += e.amount || 0; });
       
       let totalAdvances = 0;
-      (advances.data || []).filter(a => String(a.rider_id) === riderId).forEach(a => { totalAdvances += a.amount || 0; });
+      advances.filter(a => String(a.rider_id) === riderId).forEach(a => { totalAdvances += a.amount || 0; });
 
       const totalDedSum = totalDeductions + totalAdvances;
       const netPay = (calculatedSalary + totalBonuses) - totalDedSum;
@@ -623,9 +678,9 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
 }
 
 async function getPaymentStatuses(cycleKey) {
-  const { data, error } = await supabase.from('payment_status').select('*').eq('cycle_key', cycleKey);
+  const data = await fetchPaginated(supabase.from('payment_status').select('*').eq('cycle_key', cycleKey));
   const result = {};
-  (data || []).forEach(p => { result[p.rider_id] = p; });
+  data.forEach(p => { result[p.rider_id] = p; });
   return result;
 }
 
@@ -654,9 +709,8 @@ async function deleteRiderCycleLogs(riderId, start, end) {
 
 // ========== BIKES ==========
 async function getAllBikes() {
-  const { data, error } = await supabase.from('bikes').select('*');
-  if (error) throw error;
-  return data || [];
+  const data = await fetchPaginated(supabase.from('bikes').select('*'));
+  return data;
 }
 
 async function createBike(bikeData) {
@@ -700,8 +754,8 @@ async function setRiderPassword(riderId, plainPassword) {
 }
 
 async function authenticateRider(phone, plainPassword) {
-  const { data: riders } = await supabase.from('riders').select('*').eq('portal_enabled', true);
-  const foundRider = (riders || []).find(r => r.phone && r.phone.replace(/\s+/g, '') === phone.replace(/\s+/g, ''));
+  const riders = await fetchPaginated(supabase.from('riders').select('*').eq('portal_enabled', true));
+  const foundRider = riders.find(r => r.phone && r.phone.replace(/\s+/g, '') === phone.replace(/\s+/g, ''));
   if (!foundRider || !foundRider.portal_password) return null;
 
   const match = await bcrypt.compare(plainPassword, foundRider.portal_password);
@@ -739,10 +793,10 @@ async function getRiderMonthlyReport(riderId, start, end) {
   const rider = await getRiderById(riderId);
   if (!rider) return null;
 
-  const { data: logs } = await supabase.from('daily_logs').select('*').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end);
-  const presentLogs = (logs || []).filter(l => (l.attendance_status || '').toLowerCase().includes('present') || l.attendance_status === 'p');
-  const absentLogs = (logs || []).filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
-  const weekoffLogs = (logs || []).filter(l => ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes((l.attendance_status || '').toLowerCase().trim()));
+  const logs = await getDailyLogsByRider(riderId, start, end);
+  const presentLogs = logs.filter(l => (l.attendance_status || '').toLowerCase().includes('present') || l.attendance_status === 'p');
+  const absentLogs = logs.filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
+  const weekoffLogs = logs.filter(l => ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes((l.attendance_status || '').toLowerCase().trim()));
 
   const totalOrders = presentLogs.reduce((sum, l) => sum + (l.primary_orders || 0) + (l.associate_orders || 0), 0);
   const avgCheckinMin = presentLogs.length > 0 ? presentLogs.reduce((sum, l) => sum + ((l.checkin_hours || 0) * 60 + (l.checkin_minutes || 0)), 0) / presentLogs.length : 0;
@@ -966,6 +1020,20 @@ async function updateRiderLocation(riderId, lat, lng) {
       gps_status: 'synced'
     })
     .eq('id', riderId);
-  if (error) throw error;
+  if (error) {
+    if (error.message && error.message.includes("gps_status")) {
+      console.warn("⚠️ Column 'gps_status' not found in 'riders' table. Retrying update without 'gps_status'...");
+      const { error: retryError } = await supabase.from('riders')
+        .update({
+          last_lat: lat,
+          last_lng: lng,
+          last_location_update: nowISO()
+        })
+        .eq('id', riderId);
+      if (retryError) throw retryError;
+      return { success: true };
+    }
+    throw error;
+  }
   return { success: true };
 }
