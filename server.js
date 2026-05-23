@@ -908,6 +908,40 @@ app.delete('/api/daily-logs/:id', verifyAdminToken, requireAdmin, async (req, re
   }
 });
 
+// Delete own daily log (within 24 hours)
+app.delete('/api/rider/my-logs/:id', verifyRiderToken, async (req, res) => {
+  try {
+    const supabase = db.getDb();
+    const { data: log, error: fetchError } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !log) {
+      return res.status(404).json({ error: 'Daily log not found' });
+    }
+
+    if (log.rider_id !== parseInt(req.riderId)) {
+      return res.status(403).json({ error: 'You can only delete your own daily logs.' });
+    }
+
+    const createdDate = new Date(log.created_at || new Date().toISOString());
+    const now = new Date();
+    const diffHours = (now - createdDate) / (1000 * 60 * 60);
+
+    if (diffHours > 24) {
+      return res.status(403).json({ error: 'You can only delete logs within 24 hours of submission.' });
+    }
+
+    await db.deleteDailyLog(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Get own daily logs
 app.get('/api/rider/my-logs', verifyRiderToken, async (req, res) => {
   try {
