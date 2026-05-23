@@ -49,7 +49,7 @@ const Riders = {
     `;
 
     try {
-      const riders = await API.getRiders('active');
+      const riders = await API.getRiders('all');
       container.innerHTML = this.buildHTML(riders);
       this.attachEvents(riders);
     } catch (err) {
@@ -65,6 +65,8 @@ const Riders = {
         <div style="display:flex; gap:16px; align-items:center;">
           <div style="display:flex; gap:8px;">
             <button class="filter-tab ${this.currentFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+            <button class="filter-tab ${this.currentFilter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
+            <button class="filter-tab ${this.currentFilter === 'inactive' ? 'active' : ''}" data-filter="inactive">Inactive</button>
             <button class="filter-tab ${this.currentFilter === 'company' ? 'active' : ''}" data-filter="company">Company</button>
             <button class="filter-tab ${this.currentFilter === 'freelancer' ? 'active' : ''}" data-filter="freelancer">Freelancer</button>
           </div>
@@ -135,7 +137,10 @@ const Riders = {
 
   buildRiderCards(riders) {
     const filtered = riders.filter(r => {
-      const matchType = this.currentFilter === 'all' || r.rider_type === this.currentFilter;
+      const matchType = this.currentFilter === 'all' || 
+                        (this.currentFilter === 'active' && r.status === 'active') ||
+                        (this.currentFilter === 'inactive' && r.status === 'inactive') ||
+                        r.rider_type === this.currentFilter;
       const q = this.searchQuery.toLowerCase();
       const matchSearch = !q ||
         (r.name && r.name.toLowerCase().includes(q)) ||

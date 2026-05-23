@@ -65,7 +65,7 @@ async function fetchPaginated(queryBuilderOrFactory) {
 
 async function getAllRiders(status = 'active') {
   let query = supabase.from('riders').select('*').order('name');
-  if (status) {
+  if (status && status !== 'all') {
     query = query.eq('status', status.toLowerCase());
   }
   const { data, error } = await query;
@@ -549,7 +549,7 @@ async function settleRiderDeductions(riderId, settledBy) {
 }
 
 async function calculatePayroll(periodStart, periodEnd) {
-  const riders = await getAllRiders();
+  const riders = await getAllRiders('all');
   
   // Run sequentially to avoid connection pool exhaustion and statement timeouts
   const bonuses = await fetchPaginated(() => 
