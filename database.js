@@ -215,8 +215,7 @@ function sanitizeDailyLog(logData) {
     'checkin_minutes',
     'notes',
     'screenshot',
-    'submitted_at',
-    'absent_reason'
+    'submitted_at'
   ];
   const sanitized = {};
   for (const key of validKeys) {
