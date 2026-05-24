@@ -1104,37 +1104,55 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
 
-    // 1. Get all active riders
     const riders = await db.getAllRiders('active');
     
-    // 2. Get all logs for the period
     const { data: allLogs, error: logErr } = await db.getDb()
       .from('daily_logs')
-      .select('rider_id, primary_orders, associate_orders')
+      .select('rider_id, primary_orders, associate_orders, log_date')
       .gte('log_date', start)
       .lte('log_date', end);
 
     if (logErr) throw logErr;
 
-    // 3. Aggregate stats
+    // We want to calculate rank changes vs yesterday
+    const todayStr = new Date(Date.now() + 3 * 3600000).toISOString().split('T')[0]; // KSA timezone
+    
     const statsMap = {};
+    const yesterdayStatsMap = {};
+
     (allLogs || []).forEach(log => {
       const rid = log.rider_id;
       const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      
       if (!statsMap[rid]) statsMap[rid] = 0;
       statsMap[rid] += orders;
+
+      if (log.log_date < todayStr) {
+        if (!yesterdayStatsMap[rid]) yesterdayStatsMap[rid] = 0;
+        yesterdayStatsMap[rid] += orders;
+      }
     });
 
-    // 4. Map to rider details
+    // Compute yesterday's ranks
+    let yesterdayLeaderboard = riders.map(r => ({
+      id: r.id,
+      orders: yesterdayStatsMap[r.id] || 0
+    })).sort((a, b) => b.orders - a.orders);
+    
+    const yesterdayRanks = {};
+    yesterdayLeaderboard.forEach((r, index) => {
+      yesterdayRanks[r.id] = index + 1;
+    });
+
     const leaderboard = riders.map(r => ({
       id: r.id,
       name: r.name,
       photo: r.profile_photo || r.photo_url || null,
       total_orders: statsMap[r.id] || 0,
-      rider_type: r.rider_type
+      rider_type: r.rider_type,
+      yesterday_rank: yesterdayRanks[r.id]
     }));
 
-    // 5. Sort by orders desc
     leaderboard.sort((a, b) => b.total_orders - a.total_orders);
 
     res.json(leaderboard);
