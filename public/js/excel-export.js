@@ -699,7 +699,7 @@ const ExcelExport = {
     const totalAllNet = payroll.reduce((s, p) => s + ((p.calculated_salary||0) + (p.total_bonuses||0) - (p.deductions||0)), 0);
 
     const cards = [
-      { label: 'GROSS PAYOUT', val: totalGross, color: this.colors.blue, col: 'B' },
+      { label: 'GROSS PAYOUT', val: totalGross, color: 'FF' + this.colors.blue, col: 'B' },
       { label: 'TOTAL BONUSES', val: totalBonus, color: 'FF10B981', col: 'G' },
       { label: 'ALL DEDUCTIONS', val: totalDed, color: 'FFEF4444', col: 'K' }
     ];
@@ -1292,7 +1292,7 @@ const ExcelExport = {
 
     const validLogs = allLogs.filter(l => riders.some(r => String(r.id) === String(l.rider_id)));
     validLogs.sort((a, b) => {
-      if (a.log_date !== b.log_date) return a.log_date.localeCompare(b.log_date);
+      if (a.log_date !== b.log_date) return (a.log_date || '').localeCompare(b.log_date || '');
       const rA = riders.find(r => String(r.id) === String(a.rider_id));
       const rB = riders.find(r => String(r.id) === String(b.rider_id));
       return (rA?.name || '').localeCompare(rB?.name || '');

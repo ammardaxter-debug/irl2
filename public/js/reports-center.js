@@ -263,12 +263,11 @@ const ReportsCenter = {
     try {
       await updateProgress(0); // Fetching rider data...
       const period = Utils.getNoonCyclePeriod(Utils.getActiveDate());
-      const [riders, payroll, allLogs, expenses] = await Promise.all([
-        API.getRiders(),
-        API.getPayroll(period.start, period.end),
-        API.request(`/daily-logs?start=${period.start}&end=${period.end}`),
-        API.getExpenses()
-      ]);
+      // Fetch sequentially to prevent Supabase statement timeouts on heavy queries
+      const riders = await API.getRiders();
+      const payroll = await API.getPayroll(period.start, period.end);
+      const allLogs = await API.request(`/daily-logs?start=${period.start}&end=${period.end}`);
+      const expenses = await API.getExpenses();
 
       await ExcelExport.generate(period, riders, payroll, allLogs, expenses, updateProgress);
 
