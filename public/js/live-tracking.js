@@ -12,6 +12,11 @@ const LiveTracking = {
     _filterStatus: 'all',
     _lastRidersData: [],
     _zonesLayers: [],
+    _currentTileLayer: null,
+    _activeMapStyle: 'street',
+
+    // Riyadh metro bounds
+    _riyadhBounds: [[24.45, 46.35], [25.05, 47.10]],
 
     zones: [
         { id: "laban", name: "Laban", color: "#3b82f6", coords: [[24.6890, 46.5340], [24.7150, 46.5520]] },
@@ -181,7 +186,20 @@ const LiveTracking = {
                     
                     <!-- Premium Map Container -->
                     <div style="background:white; border-radius:20px; overflow:hidden; border:1px solid #e2e8f0; position:relative; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
-                        <div id="tracking-map" style="height:100%; width:100%; background:#f8fafc;"></div>
+                        <div id="tracking-map" style="height:100%; width:100%; background:#0f172a;"></div>
+                        
+                        <!-- Floating Map Style Switcher -->
+                        <div id="map-style-switcher" style="position:absolute; top:14px; right:14px; z-index:1000; display:flex; background:rgba(255,255,255,0.95); backdrop-filter:blur(12px); border-radius:10px; padding:3px; box-shadow:0 4px 16px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04); gap:2px;">
+                            <button id="style-street" onclick="LiveTracking.switchMapStyle('street')" style="padding:7px 14px; border:none; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:#0f172a; color:white; letter-spacing:0.02em;">Street</button>
+                            <button id="style-satellite" onclick="LiveTracking.switchMapStyle('satellite')" style="padding:7px 14px; border:none; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:transparent; color:#64748b; letter-spacing:0.02em;">Satellite</button>
+                            <button id="style-dark" onclick="LiveTracking.switchMapStyle('dark')" style="padding:7px 14px; border:none; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; background:transparent; color:#64748b; letter-spacing:0.02em;">Dark</button>
+                        </div>
+                        
+                        <!-- Riyadh Badge -->
+                        <div style="position:absolute; bottom:14px; left:14px; z-index:1000; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); color:white; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:6px; letter-spacing:0.03em;">
+                            <span style="width:6px; height:6px; background:#10b981; border-radius:50%; display:inline-block;"></span>
+                            RIYADH METRO — LIVE FLEET
+                        </div>
                     </div>
 
                     <!-- Rider Console -->
@@ -226,6 +244,33 @@ const LiveTracking = {
                 .leaflet-control-attribution {
                     display: none !important;
                 }
+                /* Premium zoom controls */
+                .leaflet-control-zoom {
+                    border: none !important;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04) !important;
+                    border-radius: 10px !important;
+                    overflow: hidden !important;
+                    backdrop-filter: blur(12px);
+                }
+                .leaflet-control-zoom a {
+                    background: rgba(255,255,255,0.95) !important;
+                    color: #0f172a !important;
+                    width: 36px !important;
+                    height: 36px !important;
+                    line-height: 36px !important;
+                    font-size: 16px !important;
+                    font-weight: 600 !important;
+                    border: none !important;
+                    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+                    transition: all 0.15s !important;
+                }
+                .leaflet-control-zoom a:hover {
+                    background: #f1f5f9 !important;
+                    color: #2563eb !important;
+                }
+                .leaflet-control-zoom a:last-child {
+                    border-bottom: none !important;
+                }
                 @keyframes active-pulse { 
                     0% { transform: scale(0.85); opacity: 0.6; } 
                     50% { transform: scale(1.15); opacity: 0.9; } 
@@ -260,6 +305,9 @@ const LiveTracking = {
                     box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1) !important;
                 }
                 .leaflet-popup-content { margin: 0 !important; }
+                .leaflet-popup-tip {
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.08) !important;
+                }
                 .zone-tooltip {
                     background: rgba(15, 23, 42, 0.95) !important;
                     border: none !important;
@@ -277,6 +325,13 @@ const LiveTracking = {
                     0% { opacity: 0.4; transform: scale(0.9); }
                     50% { opacity: 1; transform: scale(1.1); }
                     100% { opacity: 0.4; transform: scale(0.9); }
+                }
+                /* Smooth tile loading */
+                .leaflet-tile {
+                    filter: saturate(1.05) contrast(1.02);
+                }
+                .leaflet-tile-pane {
+                    transition: opacity 0.3s;
                 }
             </style>
         `;
@@ -302,19 +357,84 @@ const LiveTracking = {
         });
     },
 
+    // Map tile definitions
+    _tileLayers: {
+        street: {
+            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png',
+            options: { subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 20 }
+        },
+        satellite: {
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            options: { maxZoom: 19, maxNativeZoom: 19 }
+        },
+        dark: {
+            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            options: { subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 20 }
+        }
+    },
+
     initMap() {
         if (this._map) this._map.remove();
-        this._map = L.map('tracking-map', { zoomControl: false, attributionControl: false }).setView(this._lastCenter, 12);
+        
+        const riyadhBounds = L.latLngBounds(this._riyadhBounds);
+        
+        this._map = L.map('tracking-map', { 
+            zoomControl: false, 
+            attributionControl: false,
+            minZoom: 10,
+            maxZoom: 19,
+            maxBounds: riyadhBounds.pad(0.3),
+            maxBoundsViscosity: 0.9
+        }).setView(this._lastCenter, 12);
+        
         L.control.zoom({ position: 'topleft' }).addTo(this._map);
         
-        // Premium Light Voyager tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CartoDB',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(this._map);
-
+        // Apply the default street layer
+        this.switchMapStyle('street');
     },
+
+    switchMapStyle(style) {
+        if (!this._map) return;
+        
+        // Remove existing tile layer
+        if (this._currentTileLayer) {
+            this._map.removeLayer(this._currentTileLayer);
+        }
+        
+        // Add new tile layer
+        const tileDef = this._tileLayers[style] || this._tileLayers.street;
+        this._currentTileLayer = L.tileLayer(tileDef.url, tileDef.options).addTo(this._map);
+        this._activeMapStyle = style;
+        
+        // If satellite, add a road labels overlay for clarity
+        if (this._satelliteLabels) {
+            this._map.removeLayer(this._satelliteLabels);
+            this._satelliteLabels = null;
+        }
+        if (style === 'satellite') {
+            this._satelliteLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 20,
+                pane: 'overlayPane',
+                opacity: 0.9
+            }).addTo(this._map);
+        }
+        
+        // Update switcher buttons
+        ['street', 'satellite', 'dark'].forEach(s => {
+            const btn = document.getElementById('style-' + s);
+            if (btn) {
+                if (s === style) {
+                    btn.style.background = '#0f172a';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#64748b';
+                }
+            }
+        });
+    },
+
 
     async startSync() {
         this.stopSync();
