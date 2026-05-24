@@ -278,6 +278,22 @@ const Riders = {
        ? `<img src="${rider.profile_photo}" style="width:72px; height:72px; border-radius:50%; object-fit:cover;">` 
        : `<div style="width:72px; height:72px; border-radius:50%; background:${avatarBg}; color:white; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:bold;">${Utils.getInitials(rider.name)}</div>`;
 
+      let vaultNotes = rider.doc_vault || '';
+      let vaultJsonHtml = '';
+      try {
+         const parsed = JSON.parse(vaultNotes);
+         if (parsed && typeof parsed === 'object' && parsed.emergency_name) {
+            vaultJsonHtml = `
+               <div style="font-size:12px; color:#374151; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; background:#EFF6FF; padding:10px; border-radius:8px; border:1px solid #BFDBFE;">
+                  <div style="font-weight:600; color:#1E3A8A; font-size:11px; text-transform:uppercase;">Emergency & License Info</div>
+                  <div><span style="color:#6B7280;">Contact:</span> <strong>${Utils.escapeHtml(parsed.emergency_name)}</strong> (${Utils.escapeHtml(parsed.emergency_relation)}) — ${Utils.escapeHtml(parsed.emergency_phone)}</div>
+                  <div><span style="color:#6B7280;">License:</span> ${Utils.escapeHtml(parsed.license_number || 'N/A')} <span style="color:#6B7280; font-size:11px;">(Exp: ${Utils.escapeHtml(parsed.license_expiry || 'N/A')})</span></div>
+               </div>
+            `;
+            vaultNotes = parsed.admin_notes || '';
+         }
+      } catch (e) {}
+
     const typePill = rider.rider_type === 'company' 
        ? `<span style="background:#EFF6FF; color:#2563EB; font-size:11px; font-weight:600; padding:4px 8px; border-radius:6px;">Company Rider</span>`
        : `<span style="background:#F5F3FF; color:#7C3AED; font-size:11px; font-weight:600; padding:4px 8px; border-radius:6px;">Freelancer</span>`;
@@ -398,9 +414,10 @@ const Riders = {
       <div style="margin-bottom:24px;">
          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px;">
             <label style="font-size:13px; font-weight:500; color:#374151;">Internal Notes</label>
-            ${App.isViewer() ? '' : `<button class="btn btn-sm" onclick="Riders.saveVaultNotes(${rider.id})" style="height:28px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#374151; font-size:12px; font-weight:500; padding:0 12px; cursor:pointer;">Save Notes</button>`}
+            ${App.isViewer() ? '' : `<button class="btn btn-sm" onclick="Riders.saveVaultNotes(${rider.id})" style="height:28px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#374151; font-size:12px; font-weight:500; padding:0 12px; cursor:pointer; align-self:flex-end;">Save Notes</button>`}
          </div>
-         <textarea id="vault-notes-${rider.id}" ${App.isViewer() ? 'readonly' : ''} placeholder="${App.isViewer() ? 'No notes added' : 'Iqama location, notes, Google Drive links...'}" style="width:100%; height:80px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:12px; font-size:13px; color:#0F0F0F; outline:none; resize:none; font-family:inherit; box-sizing:border-box;">${Utils.escapeHtml(rider.doc_vault || '')}</textarea>
+         ${vaultJsonHtml}
+         <textarea id="vault-notes-${rider.id}" ${App.isViewer() ? 'readonly' : ''} placeholder="${App.isViewer() ? 'No notes added' : 'Iqama location, notes, Google Drive links...'}" style="width:100%; height:80px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:12px; font-size:13px; color:#0F0F0F; outline:none; resize:none; font-family:inherit; box-sizing:border-box;">${Utils.escapeHtml(vaultNotes)}</textarea>
       </div>
 
       <div style="margin-bottom:24px;">
@@ -1263,14 +1280,27 @@ const Riders = {
   async saveVaultNotes(riderId) {
     const textarea = document.getElementById(`vault-notes-${riderId}`);
     if (!textarea) return;
+    const btn = textarea.previousElementSibling && textarea.previousElementSibling.tagName === 'BUTTON' ? textarea.previousElementSibling : (textarea.parentElement.querySelector('button'));
     try {
       const val = textarea.value.trim();
-      const updated = await API.updateRider(riderId, { doc_vault: val });
+      
+      const rider = this.riders.find(r => r.id === riderId);
+      let newVault = val;
+      if (rider && rider.doc_vault) {
+        try {
+          const parsed = JSON.parse(rider.doc_vault);
+          if (parsed && typeof parsed === 'object' && parsed.emergency_name) {
+             parsed.admin_notes = val;
+             newVault = JSON.stringify(parsed);
+          }
+        } catch(e) {}
+      }
+
+      const updated = await API.updateRider(riderId, { doc_vault: newVault });
       // Update local state if needed
       const idx = this.riders.findIndex(r => r.id === riderId);
       if (idx !== -1) this.riders[idx] = updated;
       
-      const btn = textarea.nextElementSibling.querySelector('button');
       const originalText = btn.innerHTML;
       btn.innerHTML = 'Saved ✓';
       btn.style.background = 'var(--success-500)';
@@ -1281,9 +1311,9 @@ const Riders = {
         btn.style.background = '';
         btn.style.color = '';
       }, 2000);
-      Utils.showToast('Document Vault updated', 'success');
+      Utils.showToast('Notes updated', 'success');
     } catch (e) {
-      Utils.showToast('Failed to save vault notes', 'error');
+      Utils.showToast('Failed to save notes', 'error');
     }
   }
 };
