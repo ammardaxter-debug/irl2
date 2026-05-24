@@ -898,60 +898,6 @@ app.put('/api/rider/me', verifyRiderToken, async (req, res) => {
   }
 });
 
-// Debug endpoint - temporary diagnostic
-app.get('/api/debug/rider-logs/:name', async (req, res) => {
-  try {
-    const name = decodeURIComponent(req.params.name);
-    const { start, end } = req.query;
-    const riders = await db.getAllRiders('all');
-    const rider = riders.find(r => r.name.toLowerCase().includes(name.toLowerCase()));
-    if (!rider) return res.status(404).json({ error: 'Rider not found', searched: name });
-    
-    // Get ALL raw logs for this rider in the period
-    const { data: rawLogs, error } = await require('./database.js').supabase
-      ? { data: null, error: 'no direct access' }
-      : { data: null, error: 'no direct access' };
-    
-    // Use the existing function
-    const periodStart = start || '2026-04-21';
-    const periodEnd = end || '2026-05-20';
-    const logs = await db.getDailyLogsByRider(rider.id, periodStart, periodEnd);
-    
-    // Also get payroll for comparison
-    const payroll = await db.calculatePayroll(periodStart, periodEnd);
-    const riderPayroll = payroll.find(p => String(p.rider_id) === String(rider.id));
-    
-    // Categorize logs
-    const presentLogs = logs.filter(l => (l.attendance_status || '').toLowerCase().includes('present') || l.attendance_status === 'p');
-    const absentLogs = logs.filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
-    const weekoffLogs = logs.filter(l => ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes((l.attendance_status || '').toLowerCase().trim()));
-    const uncategorized = logs.filter(l => {
-      const s = (l.attendance_status || '').toLowerCase().trim();
-      const isPresent = s.includes('present') || s === 'p';
-      const isAbsent = s === 'absent' || s === 'missed';
-      const isWeekoff = ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes(s);
-      return !isPresent && !isAbsent && !isWeekoff;
-    });
-    
-    res.json({
-      rider: { id: rider.id, name: rider.name, status: rider.status, rider_type: rider.rider_type },
-      period: { start: periodStart, end: periodEnd },
-      total_logs: logs.length,
-      present_count: presentLogs.length,
-      absent_count: absentLogs.length,
-      weekoff_count: weekoffLogs.length,
-      uncategorized_count: uncategorized.length,
-      uncategorized_logs: uncategorized.map(l => ({ id: l.id, date: l.log_date, status: l.attendance_status, primary: l.primary_orders, associate: l.associate_orders })),
-      all_logs: logs.map(l => ({ id: l.id, date: l.log_date, status: l.attendance_status, primary: l.primary_orders, associate: l.associate_orders })),
-      payroll_result: riderPayroll || 'NOT FOUND IN PAYROLL',
-      total_primary_from_present: presentLogs.reduce((s, l) => s + (l.primary_orders || 0), 0),
-      total_associate_from_present: presentLogs.reduce((s, l) => s + (l.associate_orders || 0), 0),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Delete daily log
 app.delete('/api/daily-logs/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {

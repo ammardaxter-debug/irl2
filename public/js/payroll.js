@@ -1069,8 +1069,9 @@ const Payroll = {
                 </thead>
                 <tbody>
                   ${[...logs].sort((a, b) => a.log_date.localeCompare(b.log_date)).map(l => {
-                    const isPresent = l.attendance_status === 'Present';
-                    const isAbsent = l.attendance_status === 'Absent';
+                    const statusLower = (l.attendance_status || '').toLowerCase().trim();
+                    const isPresent = statusLower.includes('present') || statusLower === 'p';
+                    const isAbsent = statusLower === 'absent' || statusLower === 'missed';
                     const totalOrd = (l.primary_orders || 0) + (l.associate_orders || 0);
                     const checkinStr = isPresent ? `${l.checkin_hours || 0}:${String(l.checkin_minutes || 0).padStart(2, '0')}` : '&mdash;';
                     const checkinH = l.checkin_hours || 0;
