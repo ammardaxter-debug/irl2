@@ -491,7 +491,7 @@ const ExcelExport = {
 
     unsettled.forEach(e => {
       const rider = riders.find(rid => String(rid.id) === String(e.rider_id));
-      const rName = rider ? rider.name : 'Unknown';
+      const rName = rider ? (rider.status === 'inactive' ? `${rider.name} (Inactive)` : rider.name) : 'Unknown';
       const warehouse = rider ? this.getBranchName(rider.client_company, rider) : 'Other';
       const amount = parseFloat(e.amount || 0);
       totalPending += amount;
@@ -629,7 +629,7 @@ const ExcelExport = {
 
     unsettled.forEach(e => {
       const rider = riders.find(rid => String(rid.id) === String(e.rider_id)) || {};
-      const rName = rider.name || 'Unknown';
+      const rName = rider.name ? (rider.status === 'inactive' ? `${rider.name} (Inactive)` : rider.name) : 'Unknown';
       const warehouse = this.getBranchName(rider.client_company, rider);
       const dObj = new Date(e.expense_date || e.created_at);
       const daysOut = Math.floor((new Date() - dObj) / (1000 * 60 * 60 * 24));

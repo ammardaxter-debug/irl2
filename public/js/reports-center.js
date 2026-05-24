@@ -264,7 +264,7 @@ const ReportsCenter = {
       await updateProgress(0); // Fetching rider data...
       const period = Utils.getNoonCyclePeriod(Utils.getActiveDate());
       // Fetch sequentially to prevent Supabase statement timeouts on heavy queries
-      const riders = await API.getRiders();
+      const riders = await API.getRiders('all');
       const payroll = await API.getPayroll(period.start, period.end);
       const allLogs = await API.request(`/daily-logs?start=${period.start}&end=${period.end}`);
       const expenses = await API.getExpenses();
