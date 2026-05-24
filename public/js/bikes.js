@@ -139,49 +139,46 @@ const Bikes = {
          expiryText = `Expiring (${bike.worstExpiry} days)`;
       }
 
-      const statusBadge = bike.status === 'active' ? '<span class="badge badge-success">● Active</span>' :
-                          bike.status === 'maintenance' ? '<span class="badge badge-warning">⚙ Maintenance</span>' :
-                          '<span class="badge badge-slate">○ Retired</span>';
+      const statusBadge = bike.status === 'active' 
+          ? `<span style="background:#F0FDF4; color:#16A34A; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Active</span>`
+          : bike.status === 'maintenance' 
+          ? `<span style="background:#FFFBEB; color:#D97706; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Maintenance</span>`
+          : `<span style="background:#F3F4F6; color:#6B7280; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Retired</span>`;
 
       const authAlert = bike.daysUntilAuthExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
       const insAlert = bike.daysUntilExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
 
       return `
-        <div class="card section-card bike-card" style="cursor: pointer; animation: slideUp 300ms ease both; animation-delay: ${index * 40}ms;" data-id="${bike.id}">
-          <div class="section-header" style="margin-bottom: 16px;">
-            <div style="display:flex; align-items:center; gap: 12px;">
-              <div style="width: 48px; height: 48px; background: var(--slate-100); border-radius: 8px; display:flex; align-items:center; justify-content:center; color: var(--slate-500);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/></svg>
+        <div class="rider-card-new bike-card" style="cursor: pointer; animation: slideUp 300ms ease both; animation-delay: ${index * 30}ms;" data-id="${bike.id}">
+          <div style="display:flex; align-items:center; gap: 12px; margin-bottom: 16px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:#F3F4F6; display:flex; align-items:center; justify-content:center; color:#6B7280;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:15px; font-weight:600; color:#0F0F0F; margin-bottom:4px;">${Utils.escapeHtml(bike.plate_number)}</div>
+              <div style="display:flex; gap:6px;">
+                ${statusBadge}
+                ${bike.model ? `<span style="background:#F3F4F6; color:#6B7280; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">${Utils.escapeHtml(bike.model)}</span>` : ''}
               </div>
-              <div>
-                <h3 style="margin:0; font-size: 18px;">${Utils.escapeHtml(bike.plate_number)}</h3>
-                <div style="font-size: 13px; color: var(--slate-500); margin-top:4px;">${Utils.escapeHtml(bike.model) || 'Unknown Model'}</div>
-              </div>
-            </div>
-            ${statusBadge}
-          </div>
-          
-          <div style="display:flex; flex-direction: column; gap: 8px; font-size: 14px; padding: 12px; background: var(--slate-50); border-radius: 8px;">
-            <div style="display:flex; justify-content: space-between; align-items:center;">
-              <span style="color: var(--slate-500)">Health Status:</span>
-              <span style="${expiryClass} display:flex; align-items:center;">${healthDot} ${expiryText}</span>
-            </div>
-            <div style="display:flex; justify-content: space-between;">
-              <span style="color: var(--slate-500)">Authorization:</span>
-              <span style="${authAlert}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : '—'}</span>
-            </div>
-            <div style="display:flex; justify-content: space-between;">
-              <span style="color: var(--slate-500)">Insurance Expiry:</span>
-              <span style="${insAlert}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</span>
             </div>
           </div>
           
-          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--slate-200); display:flex; align-items:center; gap:8px;">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--slate-100); display:flex; align-items:center; justify-content:center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:2px;">Health Status</div>
+              <div style="font-size:13px; font-weight:500; ${expiryClass}">${healthDot} ${expiryText}</div>
             </div>
-            <div style="font-size: 13px; font-weight: 500; color: var(--slate-700);">
-               ${bike.assigned_rider_name || 'No rider assigned'}
+            <div>
+              <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:2px;">Assigned Rider</div>
+              <div style="font-size:13px; font-weight:500; color:#374151;">${bike.assigned_rider_name || 'Unassigned'}</div>
+            </div>
+            <div>
+              <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:2px;">Authorization</div>
+              <div style="font-size:13px; font-weight:500; ${authAlert ? authAlert : 'color:#374151;'}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : '—'}</div>
+            </div>
+            <div>
+              <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:2px;">Insurance</div>
+              <div style="font-size:13px; font-weight:500; ${insAlert ? insAlert : 'color:#374151;'}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</div>
             </div>
           </div>
         </div>

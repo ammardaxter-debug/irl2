@@ -792,20 +792,46 @@ async function authenticateRider(phone, plainPassword) {
 }
 
 async function updateRiderSelfService(riderId, riderData) {
-  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry', 'noon_id', 'doc_vault'];
+  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry', 'noon_id', 'doc_vault', 'client_company', 'store_warehouse'];
   const updates = { updated_at: nowISO() };
   for (const key of allowed) {
     if (riderData[key] !== undefined) updates[key] = riderData[key];
   }
+
+  let assignedBikeId = riderData.bike_id;
+
+  if (riderData.new_bike) {
+    const newBike = await createBike({
+      plate_number: riderData.new_bike.plate_number,
+      model: riderData.new_bike.model || ''
+    });
+    assignedBikeId = newBike.id;
+  }
+
+  if (assignedBikeId !== undefined) {
+    if (assignedBikeId) {
+      const { data: existingRider } = await supabase
+        .from('riders')
+        .select('id')
+        .eq('bike_id', assignedBikeId)
+        .neq('id', riderId)
+        .maybeSingle();
+        
+      if (existingRider) {
+        throw new Error('This bike is already assigned to another rider.');
+      }
+    }
+    updates.bike_id = assignedBikeId; // can also be null if they unassign
+  }
+
   const { data, error } = await supabase.from('riders').update(updates).eq('id', riderId).select().single();
   if (error) throw error;
 
-  // Intercept vehicle authorization and insurance expiry dates to update the assigned bike
-  if (riderData.authorization_expiry !== undefined || riderData.insurance_expiry !== undefined) {
+  // Intercept vehicle istimara expiry to update the assigned bike
+  if (riderData.istimara_expiry !== undefined) {
     if (data.bike_id) {
       const bikeUpdates = {};
-      if (riderData.authorization_expiry !== undefined) bikeUpdates.authorization_expiry = riderData.authorization_expiry;
-      if (riderData.insurance_expiry !== undefined) bikeUpdates.insurance_expiry = riderData.insurance_expiry;
+      if (riderData.istimara_expiry !== undefined) bikeUpdates.istimara_expiry = riderData.istimara_expiry;
       await updateBike(data.bike_id, bikeUpdates);
     }
   }

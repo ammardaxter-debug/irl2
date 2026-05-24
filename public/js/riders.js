@@ -319,6 +319,24 @@ const Riders = {
             </div>
          </div>
       </div>
+
+      <div id="rider-details-container" style="margin-top:16px;">
+         <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.05em;">Assignment & Details</div>
+         <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:12px; padding:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div>
+               <div style="font-size:11px; color:#6B7280;">Client Company</div>
+               <div style="font-size:13px; font-weight:500; color:#0F0F0F;">${Utils.escapeHtml(rider.client_company || '—')}</div>
+            </div>
+            <div>
+               <div style="font-size:11px; color:#6B7280;">Store / Warehouse</div>
+               <div style="font-size:13px; font-weight:500; color:#0F0F0F;">${Utils.escapeHtml(rider.store_warehouse || '—')}</div>
+            </div>
+            <div>
+               <div style="font-size:11px; color:#6B7280;">Date of Birth</div>
+               <div style="font-size:13px; font-weight:500; color:#0F0F0F;">${Utils.escapeHtml(rider.date_of_birth || '—')}</div>
+            </div>
+         </div>
+      </div>
       
       <div style="height:1px; background:#F3F4F6; margin:20px 0;"></div>
 
