@@ -1172,10 +1172,35 @@ app.get('/api/admin/riders-compliance', verifyAdminToken, async (req, res) => {
   try {
     const targetDate = req.query.date || new Date(Date.now() + 3 * 3600000).toISOString().split('T')[0];
     const riders = await db.getAllRiders('active');
-    const logs = await db.getDailyLogs(targetDate);
     
-    const loggedRiderIds = new Set(logs.map(l => String(l.rider_id)));
+    // Cycle logic
+    const tD = new Date(targetDate + 'T00:00:00');
+    const day = tD.getDate();
+    const month = tD.getMonth();
+    const year = tD.getFullYear();
+    let cycleStart;
+    if (day >= 21) {
+      cycleStart = new Date(year, month, 21);
+    } else {
+      cycleStart = new Date(year, month - 1, 21);
+    }
+    const cycleStartStr = cycleStart.toISOString().split('T')[0];
     
+    const cycleLogs = await db.getDailyLogs(cycleStartStr, targetDate);
+    const logsByRider = {};
+    cycleLogs.forEach(l => {
+      const rid = String(l.rider_id);
+      if (!logsByRider[rid]) logsByRider[rid] = [];
+      logsByRider[rid].push(l.log_date);
+    });
+
+    const elapsedDays = Math.floor((tD - cycleStart) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // Bike insurance expiry tracking
+    const bikes = await db.getAllBikes();
+    const bikeInsuranceMap = {};
+    bikes.forEach(b => { if (b.insurance_expiry) bikeInsuranceMap[b.id] = b.insurance_expiry; });
+
     const compliance = riders.map(r => {
       const missing = [];
       if (!r.noon_id) missing.push('noon_id');
@@ -1185,6 +1210,7 @@ app.get('/api/admin/riders-compliance', verifyAdminToken, async (req, res) => {
       
       let emergencyMissing = true;
       let licenseMissing = true;
+      let licenseExpiry = null;
       if (r.doc_vault) {
         try {
           const vault = typeof r.doc_vault === 'string' ? JSON.parse(r.doc_vault) : r.doc_vault;
@@ -1193,25 +1219,32 @@ app.get('/api/admin/riders-compliance', verifyAdminToken, async (req, res) => {
           }
           if (vault.license_number && vault.license_expiry) {
             licenseMissing = false;
+            licenseExpiry = vault.license_expiry;
           }
         } catch(e) {}
       }
       if (emergencyMissing) missing.push('emergency_contact');
       if (licenseMissing) missing.push('drivers_license');
 
-      const logMissing = !loggedRiderIds.has(String(r.id));
+      const rLogs = logsByRider[String(r.id)] || [];
+      const logMissingToday = !rLogs.includes(targetDate);
+      const cycleMissingDays = elapsedDays - rLogs.length;
       
       return {
         id: r.id,
         name: r.name,
         phone: r.phone,
         missing_fields: missing,
-        missing_log: logMissing,
+        missing_log: logMissingToday,
+        cycle_missing_days: cycleMissingDays > 0 ? cycleMissingDays : 0,
+        iqama_expiry: r.iqama_expiry,
+        license_expiry: licenseExpiry,
+        insurance_expiry: r.bike_id ? bikeInsuranceMap[r.bike_id] : null,
         push_token: r.push_token
       };
     });
 
-    res.json({ date: targetDate, compliance });
+    res.json({ date: targetDate, elapsed_cycle_days: elapsedDays, compliance });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

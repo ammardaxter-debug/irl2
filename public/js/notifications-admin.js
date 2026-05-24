@@ -48,7 +48,26 @@ const NotificationsAdmin = {
     const totalCount = this.riders.length;
     const compliantCount = this.riders.filter(r => r.missing_fields.length === 0 && !r.missing_log).length;
     const missingFieldsCount = this.riders.filter(r => r.missing_fields.length > 0).length;
-    const missingLogsCount = this.riders.filter(r => r.missing_log).length;
+    
+    // Cycle missing logic
+    const cycleMissingCount = this.riders.filter(r => r.cycle_missing_days && r.cycle_missing_days > 0).length;
+    
+    // Expiry logic
+    const today = new Date(this.date);
+    let expiringCount = 0;
+    this.riders.forEach(r => {
+      let isExpiring = false;
+      ['iqama_expiry', 'license_expiry', 'insurance_expiry'].forEach(field => {
+        if (r[field]) {
+          const exp = new Date(r[field]);
+          const diffDays = Math.floor((exp - today) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 15 && diffDays >= 0) isExpiring = true;
+          if (diffDays < 0) isExpiring = true; // Expired!
+        }
+      });
+      if (isExpiring) expiringCount++;
+      r.isExpiring = isExpiring;
+    });
 
     const filteredRiders = this.getFilteredRiders();
 
@@ -103,8 +122,19 @@ const NotificationsAdmin = {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
           </div>
-          <div class="stat-card-value" style="color: var(--danger-600);">${missingLogsCount}</div>
-          <div class="stat-card-sub">Without logs on date</div>
+          <div class="stat-card-value" style="color: var(--danger-600);">${cycleMissingCount}</div>
+          <div class="stat-card-sub">Cycle missing logs detected</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Expiring Docs (<15 days)</span>
+            <div class="stat-card-icon" style="color: var(--warning-500)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value" style="color: var(--warning-600);">${expiringCount}</div>
+          <div class="stat-card-sub">Iqama, License, or Insurance</div>
         </div>
       </div>
 
@@ -123,11 +153,11 @@ const NotificationsAdmin = {
             </div>
           </div>
 
-          <!-- Category filter tabs -->
-          <div style="display: flex; gap: 4px; background: var(--gray-100); padding: 4px; border-radius: var(--radius-md);">
+          <div style="display: flex; gap: 4px; background: var(--gray-100); padding: 4px; border-radius: var(--radius-md); overflow-x: auto;">
             <button class="btn btn-sm ${this.filterCategory === 'all' ? 'btn-primary' : 'btn-ghost'}" id="filter-all-btn">All</button>
             <button class="btn btn-sm ${this.filterCategory === 'missing_log' ? 'btn-primary' : 'btn-ghost'}" id="filter-log-btn">Missing Logs</button>
             <button class="btn btn-sm ${this.filterCategory === 'missing_profile' ? 'btn-primary' : 'btn-ghost'}" id="filter-profile-btn">Missing Profile</button>
+            <button class="btn btn-sm ${this.filterCategory === 'expiring' ? 'btn-primary' : 'btn-ghost'}" id="filter-expiring-btn">Expiring Docs</button>
             <button class="btn btn-sm ${this.filterCategory === 'compliant' ? 'btn-primary' : 'btn-ghost'}" id="filter-compliant-btn">Compliant</button>
           </div>
         </div>
@@ -180,9 +210,11 @@ const NotificationsAdmin = {
               <label class="form-label" for="composer-preset">Select Template Preset</label>
               <select id="composer-preset" class="form-select">
                 <option value="custom">-- Custom Message --</option>
-                <option value="log_missing">Missing Daily Log</option>
+                <option value="log_missing">Missing Cycle Logs Warning</option>
                 <option value="profile_missing">Missing Profile Fields (IBAN/Noon ID)</option>
                 <option value="extra_missing">Missing Emergency / License details</option>
+                <option value="expiring_docs">Expiring Documents Warning</option>
+                <option value="runaway">No Activity (Runaway) Suspension Warning</option>
               </select>
             </div>
 
@@ -291,6 +323,20 @@ const NotificationsAdmin = {
               </span>
             `}
 
+            <!-- Cycle Missing Logs -->
+            ${rider.cycle_missing_days > 0 ? `
+              <span class="badge" style="background: var(--danger-600); color: white; border: 1px solid var(--danger-700); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+                Missed ${rider.cycle_missing_days} cycle days
+              </span>
+            ` : ''}
+
+            <!-- Expiring Documents -->
+            ${rider.isExpiring ? `
+              <span class="badge" style="background: var(--warning-500); color: white; border: 1px solid var(--warning-600); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+                Expiring Docs!
+              </span>
+            ` : ''}
+
             <!-- Missing fields badges -->
             ${rider.missing_fields.map(field => `
               <span class="badge" style="background: var(--warning-50); color: var(--warning-600); border: 1px solid var(--warning-100); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
@@ -327,9 +373,10 @@ const NotificationsAdmin = {
         if (!nameMatch && !phoneMatch && !noonIdMatch) return false;
       }
 
-      if (this.filterCategory === 'missing_log') return r.missing_log;
+      if (this.filterCategory === 'missing_log') return r.cycle_missing_days > 0 || r.missing_log;
       if (this.filterCategory === 'missing_profile') return r.missing_fields.length > 0;
-      if (this.filterCategory === 'compliant') return r.missing_fields.length === 0 && !r.missing_log;
+      if (this.filterCategory === 'expiring') return r.isExpiring;
+      if (this.filterCategory === 'compliant') return r.missing_fields.length === 0 && (!r.cycle_missing_days || r.cycle_missing_days === 0);
 
       return true;
     });
@@ -381,7 +428,7 @@ const NotificationsAdmin = {
     const setupTabFilter = (btnId, cat) => {
       document.getElementById(btnId)?.addEventListener('click', () => {
         this.filterCategory = cat;
-        ['filter-all-btn', 'filter-log-btn', 'filter-profile-btn', 'filter-compliant-btn'].forEach(id => {
+        ['filter-all-btn', 'filter-log-btn', 'filter-profile-btn', 'filter-expiring-btn', 'filter-compliant-btn'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) {
             btn.classList.toggle('btn-primary', id === btnId);
@@ -394,6 +441,7 @@ const NotificationsAdmin = {
     setupTabFilter('filter-all-btn', 'all');
     setupTabFilter('filter-log-btn', 'missing_log');
     setupTabFilter('filter-profile-btn', 'missing_profile');
+    setupTabFilter('filter-expiring-btn', 'expiring');
     setupTabFilter('filter-compliant-btn', 'compliant');
 
     // 5. Select All Checkbox
@@ -566,8 +614,22 @@ const NotificationsAdmin = {
       }
 
       if (preset === 'log_missing') {
-        titleInput.value = 'Action Required: Missing Daily Delivery Log';
-        messageTextarea.value = `Hi ${greeting},\n\nYou haven't submitted your daily delivery log for ${this.date}. Please open the Rider App, navigate to the portal, and submit your log as soon as possible to ensure accurate payroll calculation.`;
+        titleInput.value = 'Action Required: Missing Daily Logs';
+        
+        // Find maximum cycle missing days across selected riders if multiple
+        let maxDays = 1;
+        if (this.selectedRiders.size === 1) {
+          const targetId = Array.from(this.selectedRiders)[0];
+          const r = this.riders.find(x => String(x.id) === String(targetId));
+          if (r && r.cycle_missing_days) maxDays = r.cycle_missing_days;
+        } else {
+          Array.from(this.selectedRiders).forEach(id => {
+            const r = this.riders.find(x => String(x.id) === String(id));
+            if (r && r.cycle_missing_days && r.cycle_missing_days > maxDays) maxDays = r.cycle_missing_days;
+          });
+        }
+        
+        messageTextarea.value = `Hi ${greeting},\n\nYou have missed submitting ${maxDays} daily delivery log(s) this cycle. Please open the Rider App, navigate to the portal, and submit your logs immediately to avoid any salary deductions!`;
       } 
       else if (preset === 'profile_missing') {
         titleInput.value = 'Incomplete Profile Information';
@@ -576,6 +638,14 @@ const NotificationsAdmin = {
       else if (preset === 'extra_missing') {
         titleInput.value = 'Emergency Contact & Driver\'s License Required';
         messageTextarea.value = `Hi ${greeting},\n\nWe require emergency contact details and driver's license tracking for safety and compliance audit purposes. \n\nPlease open the Rider App, click the Profile tab, and fill in the "Emergency Contact & License" section. Thank you!`;
+      }
+      else if (preset === 'expiring_docs') {
+        titleInput.value = 'URGENT: Document Expiring Soon!';
+        messageTextarea.value = `Hi ${greeting},\n\nOur system detected that one of your essential documents (Iqama, Driver's License, or Bike Insurance) is expiring within the next 15 days!\n\nPlease renew your documents and update your profile in the Rider App immediately to avoid suspension.`;
+      }
+      else if (preset === 'runaway') {
+        titleInput.value = 'FINAL WARNING: No Activity Detected';
+        messageTextarea.value = `Hi ${greeting},\n\nYou have not submitted logs or shown activity for multiple consecutive days. This is a severe violation of company policy.\n\nPlease contact your supervisor immediately or your account will be suspended and legal action may be taken.`;
       }
     }
 
