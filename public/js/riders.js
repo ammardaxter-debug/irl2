@@ -680,8 +680,8 @@ const Riders = {
     Utils.hideLoading();
 
     const nationalities = ['Saudi', 'Pakistani', 'Indian', 'Bangladeshi', 'Egyptian', 'Yemeni', 'Filipino', 'Other'];
-    const companies = ['Inspiring Roads', 'Noon', 'HungerStation', 'Jahez', 'Ninja', 'Other'];
-    const warehouses = ['North Node', 'South Node', 'East Node', 'West Node', 'Central Node'];
+    const companies = ['Noon Minutes'];
+    const warehouses = ['Dhahrat Laban', 'Mahdiyah', 'Muhammadiyah', 'Laban 2', 'Laban 3', 'Irqah 2', 'Hittin'];
     const banks = ['Al Rajhi Bank', 'SNB (AlAhli)', 'Riyad Bank', 'Alinma Bank', 'SABB', 'Banque Saudi Fransi', 'ANB', 'STC Pay', 'Urpay', 'Other'];
 
     const html = `
