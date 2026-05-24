@@ -306,7 +306,7 @@ const ExcelExport = {
         warehouse,
         p.total_orders,
         p.present_days,
-        (p.payment_status || 'pending').toUpperCase(),
+        (typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')).toUpperCase(),
         0
       ];
       
@@ -362,7 +362,7 @@ const ExcelExport = {
     } else {
       freelancers.forEach(p => {
         const fr = ws.getRow(rowNum);
-        fr.values = [p.rider_name, p.present_days, p.total_orders, (p.payment_status || 'pending').toUpperCase(), '', 0];
+        fr.values = [p.rider_name, p.present_days, p.total_orders, (typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')).toUpperCase(), '', 0];
         for (let i = 1; i <= 6; i++) {
           const c = fr.getCell(i);
           c.font = { name: 'Calibri', size: 10, color: { argb: 'FF000000' } };
@@ -756,7 +756,7 @@ const ExcelExport = {
           p.present_days, p.absent_days, p.weekoff_days || 0, attRate,
           p.total_primary_orders, p.total_associate_orders, p.total_orders,
           p.base_salary || 0, p.total_bonuses || 0, p.deductions || 0, netPay,
-          p.avg_checkin || '-', (p.payment_status || 'pending').toUpperCase(),
+          p.avg_checkin || '-', (typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')).toUpperCase(),
           warningsStr
         ];
         rRow.height = 22;
@@ -769,8 +769,8 @@ const ExcelExport = {
         });
 
         let statusColor = 'FF16A34A'; // PAID
-        if (p.payment_status === 'pending') statusColor = 'FFD97706';
-        else if (p.payment_status === 'partial') statusColor = 'FF7C3AED';
+        if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'pending') statusColor = 'FFD97706';
+        else if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'partial') statusColor = 'FF7C3AED';
         rRow.getCell(1).border = { left: { style: 'medium', color: { argb: statusColor } }, bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
 
         if (p.present_days < 26 && p.present_days > 0) rRow.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
@@ -800,8 +800,8 @@ const ExcelExport = {
 
         const stCell = rRow.getCell(17);
         stCell.font = { name: 'Calibri', bold: true, size: 9 };
-        if (p.payment_status === 'paid') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; stCell.font.color = { argb: 'FF16A34A' }; }
-        else if (p.payment_status === 'pending') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; stCell.font.color = { argb: 'FFD97706' }; }
+        if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'paid') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; stCell.font.color = { argb: 'FF16A34A' }; }
+        else if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'pending') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; stCell.font.color = { argb: 'FFD97706' }; }
         else { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; stCell.font.color = { argb: 'FFDC2626' }; }
 
         const warnCell = rRow.getCell(18);
@@ -857,7 +857,7 @@ const ExcelExport = {
         i + 1, p.rider_name, branch, rider.phone || '',
         p.present_days, p.absent_days, p.weekoff_days || 0,
         p.total_orders, 6.8, p.total_bonuses || 0, p.deductions || 0, flNetPay,
-        p.avg_checkin || '-', (p.payment_status || 'pending').toUpperCase(),
+        p.avg_checkin || '-', (typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')).toUpperCase(),
         warningsStr
       ];
       rRow.height = 22;
@@ -879,8 +879,8 @@ const ExcelExport = {
 
       const stCell = rRow.getCell(14);
       stCell.font = { name: 'Calibri', bold: true, size: 9 };
-      if (p.payment_status === 'paid') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; stCell.font.color = { argb: 'FF16A34A' }; }
-      else if (p.payment_status === 'pending') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; stCell.font.color = { argb: 'FFD97706' }; }
+      if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'paid') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; stCell.font.color = { argb: 'FF16A34A' }; }
+      else if ((typeof p.payment_status === 'string' ? p.payment_status : (p.payment_status && p.payment_status.status ? p.payment_status.status : 'pending')) === 'pending') { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; stCell.font.color = { argb: 'FFD97706' }; }
       else { stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; stCell.font.color = { argb: 'FFDC2626' }; }
 
       const warnCell = rRow.getCell(15);
