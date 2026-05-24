@@ -867,7 +867,11 @@ app.get('/api/rider/me', verifyRiderToken, async (req, res) => {
       try {
         const bikes = await db.getAllBikes();
         const bike = bikes.find(b => String(b.id) === String(safeRider.bike_id));
-        if (bike) safeRider.bike = bike;
+        if (bike) {
+          bike.authorization_expiry = bike.istimara_expiry;
+          bike.auth_expiry = bike.istimara_expiry;
+          safeRider.bike = bike;
+        }
       } catch (err) {
         console.error('Error fetching bike for rider', err);
       }
@@ -887,7 +891,11 @@ app.put('/api/rider/me', verifyRiderToken, async (req, res) => {
       try {
         const bikes = await db.getAllBikes();
         const bike = bikes.find(b => String(b.id) === String(updated.bike_id));
-        if (bike) updated.bike = bike;
+        if (bike) {
+           bike.authorization_expiry = bike.istimara_expiry;
+           bike.auth_expiry = bike.istimara_expiry;
+           updated.bike = bike;
+        }
       } catch (err) {
         console.error('Error fetching bike for rider on update', err);
       }

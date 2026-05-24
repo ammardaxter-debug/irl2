@@ -842,11 +842,18 @@ async function updateRiderSelfService(riderId, riderData) {
     }
   }
 
-  // Intercept vehicle istimara expiry to update the assigned bike
-  if (riderData.istimara_expiry !== undefined) {
+  // Intercept vehicle istimara/auth expiry to update the assigned bike
+  if (riderData.istimara_expiry !== undefined || riderData.authorization_expiry !== undefined || riderData.auth_expiry !== undefined || riderData.insurance_expiry !== undefined) {
     if (data.bike_id) {
       const bikeUpdates = {};
+      
+      // Map istimara_expiry / authorization_expiry / auth_expiry to istimara_expiry
       if (riderData.istimara_expiry !== undefined) bikeUpdates.istimara_expiry = riderData.istimara_expiry;
+      if (riderData.authorization_expiry !== undefined) bikeUpdates.istimara_expiry = riderData.authorization_expiry;
+      if (riderData.auth_expiry !== undefined) bikeUpdates.istimara_expiry = riderData.auth_expiry;
+      
+      // Update insurance expiry
+      if (riderData.insurance_expiry !== undefined) bikeUpdates.insurance_expiry = riderData.insurance_expiry;
       
       // We also update assigned_rider_name here just in case it was missed
       bikeUpdates.assigned_rider_id = String(riderId);
