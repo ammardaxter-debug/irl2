@@ -798,6 +798,7 @@ async function updateRiderSelfService(riderId, riderData) {
     if (riderData[key] !== undefined) updates[key] = riderData[key];
   }
 
+  const oldRider = await getRiderById(riderId);
   let assignedBikeId = riderData.bike_id;
 
   if (riderData.new_bike) {
@@ -827,11 +828,30 @@ async function updateRiderSelfService(riderId, riderData) {
   const { data, error } = await supabase.from('riders').update(updates).eq('id', riderId).select().single();
   if (error) throw error;
 
+  // Sync bike assignment if bike_id changed
+  if (assignedBikeId !== undefined && String(oldRider?.bike_id) !== String(assignedBikeId)) {
+    try {
+      if (oldRider?.bike_id) {
+        await updateBike(oldRider.bike_id, { assigned_rider_id: null, assigned_rider_name: null });
+      }
+      if (assignedBikeId) {
+        await updateBike(assignedBikeId, { assigned_rider_id: String(riderId), assigned_rider_name: data.name });
+      }
+    } catch (err) {
+      console.error('Failed to sync bike assignment:', err);
+    }
+  }
+
   // Intercept vehicle istimara expiry to update the assigned bike
   if (riderData.istimara_expiry !== undefined) {
     if (data.bike_id) {
       const bikeUpdates = {};
       if (riderData.istimara_expiry !== undefined) bikeUpdates.istimara_expiry = riderData.istimara_expiry;
+      
+      // We also update assigned_rider_name here just in case it was missed
+      bikeUpdates.assigned_rider_id = String(riderId);
+      bikeUpdates.assigned_rider_name = data.name;
+      
       await updateBike(data.bike_id, bikeUpdates);
     }
   }

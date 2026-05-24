@@ -174,7 +174,7 @@ const Riders = {
          ? `<img src="${r.profile_photo}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`
          : `<div style="width:40px;height:40px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;">${Utils.getInitials(r.name)}</div>`;
 
-      const missingCritical = (!r.phone || !r.bank_name || !r.bank_account);
+      const missingCritical = (!r.phone || !r.bank_name || (!r.bank_account && !r.iban));
       const dotHtml = missingCritical ? `<div style="position:absolute; top:16px; right:16px; width:8px; height:8px; background:#F59E0B; border-radius:50%;" title="Missing critical data"></div>` : '';
 
       const phoneDisplay = r.phone || '—';
@@ -933,8 +933,13 @@ const Riders = {
         </div>
 
         <div class="rider-form-group">
-          <label class="rider-form-label">Account / IBAN Number</label>
-          <input type="text" class="rider-form-input" name="bank_account" value="${isEdit ? Utils.escapeHtml(rider.bank_account || '') : ''}" placeholder="Enter IBAN or account number">
+          <label class="rider-form-label">Account Number</label>
+          <input type="text" class="rider-form-input" name="bank_account" value="${isEdit ? Utils.escapeHtml(rider.bank_account || '') : ''}" placeholder="Enter account number (Optional)">
+        </div>
+
+        <div class="rider-form-group">
+          <label class="rider-form-label">IBAN Number</label>
+          <input type="text" class="rider-form-input" name="iban" value="${isEdit ? Utils.escapeHtml(rider.iban || '') : ''}" placeholder="Enter IBAN">
         </div>
 
         <div class="rider-form-section">UNIFORM & SAFETY KIT</div>
@@ -1123,6 +1128,7 @@ const Riders = {
         store_warehouse: formData.get('store_warehouse'),
         bank_name: formData.get('bank_name'),
         bank_account: formData.get('bank_account'),
+        iban: formData.get('iban'),
         base_salary: riderType === 'company' ? (salaryValue || 1950) : 0,
         per_order_rate: riderType === 'freelancer' ? (salaryValue || 8) : 0,
         profile_photo: formData.get('profile_photo') || null,

@@ -57,7 +57,7 @@ const ExcelExport = {
       else await new Promise(r => setTimeout(r, 10)); // Yield
 
       this.buildOverview(workbook.addWorksheet('Overview', { properties: { tabColor: { argb: 'FF1E3A5F' } } }), period, activeRiders, payroll, allLogs, expenses);
-      this.buildUnsettledDeductions(workbook.addWorksheet('Unsettled Deductions', { properties: { tabColor: { argb: 'FFDC2626' } } }), activeRiders, expenses);
+      this.buildUnsettledDeductions(workbook.addWorksheet('Unsettled Deductions', { properties: { tabColor: { argb: 'FFDC2626' } } }), riders, expenses);
       this.buildPayrollSummary(workbook.addWorksheet('Payroll Summary', { properties: { tabColor: { argb: 'FF16A34A' } } }), period, activeRiders, payroll);
       
       if (updateProgress) await updateProgress(2); // Generating attendance grid
