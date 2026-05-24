@@ -1264,6 +1264,8 @@ app.post('/api/admin/send-notification', verifyAdminToken, requireAdmin, async (
             sound: 'default',
             title: title,
             body: message,
+            channelId: 'default',
+            priority: 'high',
             data: { type: 'admin_broadcast' }
           }]);
           pushSent = true;
