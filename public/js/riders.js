@@ -335,6 +335,14 @@ const Riders = {
                <div style="font-size:11px; color:#6B7280;">Date of Birth</div>
                <div style="font-size:13px; font-weight:500; color:#0F0F0F;">${Utils.escapeHtml(rider.date_of_birth || '—')}</div>
             </div>
+            <div>
+               <div style="font-size:11px; color:#6B7280;">Email</div>
+               <div style="font-size:13px; font-weight:500; color:#0F0F0F; word-break:break-all;">${Utils.escapeHtml(rider.email || '—')}</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+               <div style="font-size:11px; color:#6B7280;">Bank Account</div>
+               <div style="font-size:13px; font-weight:500; color:#0F0F0F;">${rider.bank_name ? Utils.escapeHtml(rider.bank_name) + ' — ' : ''}${rider.iban ? Utils.escapeHtml(rider.iban) : (rider.bank_account ? Utils.escapeHtml(rider.bank_account) : '—')}</div>
+            </div>
          </div>
       </div>
       
