@@ -635,7 +635,12 @@ async function getDailyLogsPaginated(date, limit, offset, search = '') {
 }
 
 async function getDailyLogsByRider(riderId, start, end) {
-  const logs = await fetchPaginated(() => supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, submitted_at, created_at, updated_at').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
+  const isSingleDay = start === end;
+  const selectFields = isSingleDay 
+    ? 'id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, screenshot, submitted_at, created_at, updated_at'
+    : 'id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, submitted_at, created_at, updated_at';
+
+  const logs = await fetchPaginated(() => supabase.from('daily_logs').select(selectFields).eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
   return logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 }
 
