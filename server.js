@@ -68,6 +68,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+const sessionCache = new Map();
 
 // JWT middleware for rider portal routes
 function verifyRiderToken(req, res, next) {
@@ -90,7 +91,26 @@ function verifyRiderToken(req, res, next) {
     
     // Validate session token against database for single-device enforcement
     if (req.sessionToken) {
+      const cacheKey = `${decoded.riderId}`;
+      const now = Date.now();
+      
+      if (sessionCache.has(cacheKey)) {
+        const cached = sessionCache.get(cacheKey);
+        if (now - cached.time < 60000) { // 60 seconds cache
+          if (cached.token && cached.token !== req.sessionToken) {
+            return res.status(401).json({ 
+              error: 'Your account has been logged in on another device. Please log in again.',
+              code: 'SESSION_INVALIDATED'
+            });
+          }
+          return next();
+        }
+      }
+
       db.getRiderById(decoded.riderId).then(rider => {
+        if (rider) {
+          sessionCache.set(cacheKey, { token: rider.session_token, time: now });
+        }
         if (rider && rider.session_token && rider.session_token !== req.sessionToken) {
           return res.status(401).json({ 
             error: 'Your account has been logged in on another device. Please log in again.',
@@ -98,7 +118,10 @@ function verifyRiderToken(req, res, next) {
           });
         }
         next();
-      }).catch(() => next()); // On DB error, allow through
+      }).catch(err => {
+        console.error('Session validation error:', err);
+        res.status(500).json({ error: 'Session validation failed' });
+      });
     } else {
       // Legacy tokens without session_token — allow through
       next();
@@ -1110,10 +1133,21 @@ app.get('/api/admin/rider-requests', async (req, res) => {
 });
 
 // ========== LEADERBOARD API ==========
+const leaderboardCacheMap = new Map();
+
 app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
+
+    const cacheKey = `${start}_${end}`;
+    const now = Date.now();
+    if (leaderboardCacheMap.has(cacheKey)) {
+      const cached = leaderboardCacheMap.get(cacheKey);
+      if (now - cached.time < 30000) {
+        return res.json(cached.data);
+      }
+    }
 
     const riders = await db.getAllRiders('active');
     
@@ -1166,6 +1200,7 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
 
     leaderboard.sort((a, b) => b.total_orders - a.total_orders);
 
+    leaderboardCacheMap.set(cacheKey, { data: leaderboard, time: now });
     res.json(leaderboard);
   } catch (err) {
     res.status(500).json({ error: err.message });

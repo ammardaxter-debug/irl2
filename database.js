@@ -1257,12 +1257,24 @@ async function updateSettings(key, value) {
   return { success: true };
 }
 
+let trackingShutdownCache = null;
+let trackingShutdownCacheTime = 0;
+
 async function isTrackingShutdown() {
+  const now = Date.now();
+  if (trackingShutdownCache !== null && now - trackingShutdownCacheTime < 30000) {
+    return trackingShutdownCache;
+  }
   const status = await getSettings('tracking_status');
-  return status ? status.shutdown === true : false;
+  const val = status ? status.shutdown === true : false;
+  trackingShutdownCache = val;
+  trackingShutdownCacheTime = now;
+  return val;
 }
 
 async function setTrackingShutdown(shutdown) {
+  trackingShutdownCache = shutdown;
+  trackingShutdownCacheTime = Date.now();
   await updateSettings('tracking_status', { shutdown, updated_at: nowISO() });
   return { success: true };
 }
