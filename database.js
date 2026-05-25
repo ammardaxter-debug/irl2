@@ -61,6 +61,63 @@ async function fetchPaginated(queryBuilderOrFactory) {
   return allData;
 }
 
+// Helper to upload base64 images to Supabase Storage and return public URL
+async function uploadBase64ToStorage(base64Str, bucketName, filenamePrefix) {
+  if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image')) {
+    return base64Str; // Return as is if already a URL or not base64
+  }
+
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let mimeType = 'image/jpeg';
+    let bufferData;
+
+    if (matches && matches.length === 3) {
+      mimeType = matches[1];
+      bufferData = Buffer.from(matches[2], 'base64');
+    } else {
+      bufferData = Buffer.from(base64Str, 'base64');
+    }
+
+    const extension = mimeType.split('/')[1] || 'jpg';
+    const filename = `${filenamePrefix}_${Date.now()}.${extension}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(filename, bufferData, {
+        contentType: mimeType,
+        upsert: true
+      });
+
+    if (error) {
+      if (error.message && error.message.includes('bucket not found')) {
+        // Create bucket if it doesn't exist
+        await supabase.storage.createBucket(bucketName, { public: true });
+        // Retry
+        const { data: retryData, error: retryError } = await supabase.storage
+          .from(bucketName)
+          .upload(filename, bufferData, {
+            contentType: mimeType,
+            upsert: true
+          });
+        if (retryError) throw retryError;
+      } else {
+        throw error;
+      }
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filename);
+
+    return urlData.publicUrl;
+  } catch (err) {
+    console.error('Error uploading to storage:', err);
+    return base64Str; // Fallback to raw base64 if upload fails
+  }
+}
+
 // ========== RIDER OPERATIONS ==========
 
 async function getAllRiders(status = 'active') {
@@ -228,6 +285,9 @@ function sanitizeDailyLog(logData) {
 
 async function createDailyLog(logData) {
   const sanitized = sanitizeDailyLog(logData);
+  if (sanitized.screenshot && sanitized.screenshot.startsWith('data:image')) {
+    sanitized.screenshot = await uploadBase64ToStorage(sanitized.screenshot, 'rider-proofs', `screenshot_rider_${sanitized.rider_id || 'unknown'}`);
+  }
   const { data, error } = await supabase.from('daily_logs').insert([{
     ...sanitized,
     created_at: nowISO(),
@@ -239,6 +299,9 @@ async function createDailyLog(logData) {
 
 async function updateDailyLog(id, logData) {
   const sanitized = sanitizeDailyLog(logData);
+  if (sanitized.screenshot && sanitized.screenshot.startsWith('data:image')) {
+    sanitized.screenshot = await uploadBase64ToStorage(sanitized.screenshot, 'rider-proofs', `screenshot_rider_${sanitized.rider_id || 'unknown'}`);
+  }
   const { data, error } = await supabase.from('daily_logs')
     .update({ ...sanitized, updated_at: nowISO() })
     .eq('id', id)
@@ -367,7 +430,13 @@ async function createExpense(expData) {
     "deductionSettled": false,
     created_at: nowISO()
   };
-  if (receipt_base64 !== undefined) insertData.receipt_url = receipt_base64;
+  if (receipt_base64 !== undefined) {
+    let receiptUrl = receipt_base64;
+    if (receipt_base64 && receipt_base64.startsWith('data:image')) {
+      receiptUrl = await uploadBase64ToStorage(receipt_base64, 'rider-proofs', `receipt_expense_rider_${expData.rider_id || 'admin'}`);
+    }
+    insertData.receipt_url = receiptUrl;
+  }
   
   const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
   if (error) throw error;
@@ -382,7 +451,13 @@ async function updateExpense(id, expData) {
   }
   const { receipt_base64, ...rest } = expData;
   const updateData = { ...rest, updated_at: nowISO() };
-  if (receipt_base64 !== undefined) updateData.receipt_url = receipt_base64;
+  if (receipt_base64 !== undefined) {
+    let receiptUrl = receipt_base64;
+    if (receipt_base64 && receipt_base64.startsWith('data:image')) {
+      receiptUrl = await uploadBase64ToStorage(receipt_base64, 'rider-proofs', `receipt_expense_rider_${expData.rider_id || 'admin'}`);
+    }
+    updateData.receipt_url = receiptUrl;
+  }
   
   const { error } = await supabase.from('expenses').update(updateData).eq('id', id);
   if (error) throw error;
