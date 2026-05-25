@@ -215,6 +215,12 @@ const NotificationsAdmin = {
                 <option value="extra_missing">Missing Emergency / License details</option>
                 <option value="expiring_docs">Expiring Documents Warning</option>
                 <option value="runaway">No Activity (Runaway) Suspension Warning</option>
+                <option value="disabled" disabled>──────────────────────────</option>
+                <option value="urdu_log_missing">Urdu - Daily Log Missing Warning ⚠️</option>
+                <option value="urdu_cycle_missing">Urdu - Multiple Cycle Logs Missing 🚨</option>
+                <option value="urdu_profile_missing">Urdu - Profile Incomplete Action 🔒</option>
+                <option value="urdu_docs_expiring">Urdu - Document Expiring Notice 📅</option>
+                <option value="urdu_inactive_warning">Urdu - Inactive Warning (Final) ⛔</option>
               </select>
             </div>
 
@@ -646,6 +652,37 @@ const NotificationsAdmin = {
       else if (preset === 'runaway') {
         titleInput.value = 'FINAL WARNING: No Activity Detected';
         messageTextarea.value = `Hi ${greeting},\n\nYou have not submitted logs or shown activity for multiple consecutive days. This is a severe violation of company policy.\n\nPlease contact your supervisor immediately or your account will be suspended and legal action may be taken.`;
+      }
+      else if (preset === 'urdu_log_missing') {
+        titleInput.value = '⚠️ URGENT: Aaj Ka Delivery Log Missing Hai!';
+        messageTextarea.value = `Assalam-o-Alaikum ${greeting},\n\nAap ne aaj ka daily delivery log abhi tak submit nahi kiya hai. 📝\n\nAap se guzarish hai ke fauran Rider App open karein aur aaj ki total deliveries aur screenshot upload kar ke apna log submit karein. 📲\n\nYad rahe, agar log time par submit nahi hoga to attendance lagne me masla ho sakta hai aur salary deduction ho sakti hai. 💸\n\nShukriya! 🤝`;
+      }
+      else if (preset === 'urdu_cycle_missing') {
+        titleInput.value = '🚨 WARNING: Pichle Dino Ke Logs Missing Hain!';
+        let maxDays = 1;
+        if (this.selectedRiders.size === 1) {
+          const targetId = Array.from(this.selectedRiders)[0];
+          const r = this.riders.find(x => String(x.id) === String(targetId));
+          if (r && r.cycle_missing_days) maxDays = r.cycle_missing_days;
+        } else {
+          Array.from(this.selectedRiders).forEach(id => {
+            const r = this.riders.find(x => String(x.id) === String(id));
+            if (r && r.cycle_missing_days && r.cycle_missing_days > maxDays) maxDays = r.cycle_missing_days;
+          });
+        }
+        messageTextarea.value = `Hi ${greeting},\n\nHamare system ke mutabik aap ke is cycle ke pichle ${maxDays} dino ke delivery logs abhi tak received nahi hue hain. 📉\n\nLogs missing hone ki wajah se aap ki performance report incomplete hai. Fauran Rider App open kar ke "Daily Log" section me jaaen aur tamam unlogged days ka data clear karein. 📅\n\nAgar koi masla ho to LA ya supervisor se rabta karein. Ise jald az jald poora karein taake salary delay na ho! ⏳\n\nJazakAllah! 🙏`;
+      }
+      else if (preset === 'urdu_profile_missing') {
+        titleInput.value = '🔒 ACTION REQUIRED: Profile Details Mukammal Karein';
+        messageTextarea.value = `Assalam-o-Alaikum ${greeting},\n\nAap ki profile details abhi tak system me mukammal nahi hain. 👤\n\nSalary transfer aur compliance ke liye in details ka hona lazmi hai. Meharbani kar ke fauran Rider App ke Profile tab me jaaen aur missing fields [${missingFieldsStr || 'Noon ID, Bank Account, ya Iqama Info'}] ko update karein. 💳\n\nApp par details enter karna asaan aur safe hai. Please ise aaj hi mukammal karein! 🚀\n\nBest regards,\nIRL Team`;
+      }
+      else if (preset === 'urdu_docs_expiring') {
+        titleInput.value = '📅 Document Expire Hone Wala Hai — Renew Karein!';
+        messageTextarea.value = `Hi ${greeting},\n\nAap ka Iqama, Driver's License, ya Bike Insurance aglay 15 dinon ke andar expire hone wala hai. ⚠️\n\nKaam jari rakhne ke liye documents ka valid hona zaroori hai. Fauran apne documents renew karwaen aur new copies Rider App me update karein. 📝\n\nExpiry ke baad system aap ki profile ko auto-suspend kar dega jis se aap duty nahi kar sakenge. Kisi bhi pareshani se bachne ke liye aaj hi renew karein! ⏱️\n\nShukriya!`;
+      }
+      else if (preset === 'urdu_inactive_warning') {
+        titleInput.value = '⛔ FINAL WARNING: System Me Activity Nahi Hai!';
+        messageTextarea.value = `Hi ${greeting},\n\nAap pichle kuch dino se duty par active nahi hain aur na hi koi log submit kiya hai. 🚫\n\nYe company policy ki khilaf-warzi hai. Agar aap kisi wajah se chutti par hain to apne supervisor ko fauran inform karein. 📞\n\nAgar aglay 24 ghante me aap ka koi response ya log nahi mila, to aap ki ID block (suspend) kar di jayegi aur legal action liya ja sakta hai. 🔒\n\nFauran supervisor se rabta karein!`;
       }
     }
 
