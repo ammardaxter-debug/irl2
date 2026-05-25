@@ -137,8 +137,14 @@ async function getRiderById(id) {
 }
 
 async function createRider(riderData) {
+  let profilePhoto = riderData.profile_photo;
+  if (profilePhoto && profilePhoto.startsWith('data:image')) {
+    profilePhoto = await uploadBase64ToStorage(profilePhoto, 'rider-proofs', `profile_rider`);
+  }
+
   const { data, error } = await supabase.from('riders').insert([{
     ...riderData,
+    profile_photo: profilePhoto,
     rider_type: riderData.rider_type || 'company',
     status: 'active',
     created_at: nowISO(),
@@ -149,8 +155,18 @@ async function createRider(riderData) {
 }
 
 async function updateRider(id, riderData) {
+  let profilePhoto = riderData.profile_photo;
+  if (profilePhoto && profilePhoto.startsWith('data:image')) {
+    profilePhoto = await uploadBase64ToStorage(profilePhoto, 'rider-proofs', `profile_rider_${id}`);
+  }
+
+  const updates = { ...riderData, updated_at: nowISO() };
+  if (profilePhoto !== undefined) {
+    updates.profile_photo = profilePhoto;
+  }
+
   const { data, error } = await supabase.from('riders')
-    .update({ ...riderData, updated_at: nowISO() })
+    .update(updates)
     .eq('id', id)
     .select().single();
   if (error) throw error;
