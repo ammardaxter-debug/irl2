@@ -616,6 +616,24 @@ async function getDailyLogs(periodStart, periodEnd) {
   return data.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
 }
 
+async function getDailyLogsPaginated(date, limit, offset, search = '') {
+  let query = supabase
+    .from('daily_logs')
+    .select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, submitted_at, created_at, updated_at', { count: 'exact' })
+    .eq('log_date', date);
+
+  if (search) {
+    query = query.ilike('rider_name', `%${search}%`);
+  }
+
+  const { data, count, error } = await query
+    .order('rider_name', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+  return { logs: data || [], total: count || 0 };
+}
+
 async function getDailyLogsByRider(riderId, start, end) {
   const logs = await fetchPaginated(() => supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes').eq('rider_id', riderId).gte('log_date', start).lte('log_date', end));
   return logs.sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''));
@@ -1191,7 +1209,7 @@ async function syncApprovedRequests() {
 
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
-  archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsByRider,
+  archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsPaginated, getDailyLogsByRider,
   syncApprovedRequests,
   getMissingLogs, createDailyLog, updateDailyLog, deleteDailyLog,
   getDashboardStats, calculatePayroll, getExpenseStats, getExpenses,

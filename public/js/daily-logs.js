@@ -4,47 +4,29 @@
 
 const DailyLogs = {
   currentDate: null,
+  currentPage: 1,
+  limit: 20,
+  searchQuery: '',
 
   async render() {
     if (!this.currentDate) this.currentDate = Utils.today();
     const container = document.getElementById('page-daily-logs');
-    container.innerHTML = `
-      <div style="display:flex; justify-content:space-between; margin-bottom:24px;">
-         <div class="skeleton skeleton-row" style="width:300px; height:40px;"></div>
-         <div class="skeleton skeleton-row" style="width:140px; height:40px;"></div>
-      </div>
-      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
-         <div class="skeleton skeleton-card" style="height:80px;"></div>
-         <div class="skeleton skeleton-card" style="height:80px;"></div>
-         <div class="skeleton skeleton-card" style="height:80px;"></div>
-      </div>
-      <div style="margin-top:24px;">
-         <div class="skeleton skeleton-row" style="width:200px; height:24px;"></div>
-         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
-            <div class="skeleton skeleton-card" style="height:80px;"></div>
-            <div class="skeleton skeleton-card" style="height:80px;"></div>
-         </div>
-      </div>
-    `;
+    
+    // Reset search and page on fresh render (tab navigate)
+    this.currentPage = 1;
+    this.searchQuery = '';
 
-    try {
-      const [logged, missing] = await Promise.all([
-        API.getDailyLogs(this.currentDate),
-        API.getMissingLogs(this.currentDate)
-      ]);
-      container.innerHTML = this.buildHTML(logged, missing);
-      this.attachEvents(logged, missing);
-    } catch (err) {
-      container.innerHTML = `<div class="empty-state"><p>Failed to load logs: ${err.message}</p></div>`;
-    }
+    container.innerHTML = this.buildShellHTML();
+    this.attachShellEvents();
+    await this.loadGridData();
   },
 
-  buildHTML(logged, missing) {
+  buildShellHTML() {
     return `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
         <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Daily Logs</h1>
         <div style="display:flex; align-items:center; gap:12px;">
-          <span style="background:#FEF3C7; color:#D97706; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">${Utils.formatDate(this.currentDate)}</span>
+          <span id="date-label" style="background:#FEF3C7; color:#D97706; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">${Utils.formatDate(this.currentDate)}</span>
           <button id="bulk-lodge-btn" style="background:#FFFFFF; color:#2563EB; border:1px solid #2563EB; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             Bulk Lodge Data
@@ -97,17 +79,9 @@ const DailyLogs = {
         <div style="display:flex; align-items:center; gap:8px; padding:16px; border-bottom:1px solid #E5E7EB; background:#F9FAFB;">
           <div style="width:8px; height:8px; border-radius:50%; background:#F59E0B;"></div>
           <h2 style="font-size:16px; font-weight:600; color:#0F0F0F; margin:0;">Not Yet Logged</h2>
-          <span style="background:#FEF3C7; color:#D97706; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">${missing.length} pending</span>
+          <span id="missing-count" style="background:#FEF3C7; color:#D97706; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">0 pending</span>
         </div>
-        <div id="missing-grid" style="display:flex; flex-direction:column;">
-          ${missing.length === 0
-            ? `<div style="padding:40px 20px; text-align:center;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                <div style="font-size:15px; font-weight:500; color:#0F0F0F;">All riders logged for this date! 🎉</div>
-              </div>`
-            : missing.map(r => this.buildMissingCard(r)).join('')
-          }
-        </div>
+        <div id="missing-grid" style="display:flex; flex-direction:column;"></div>
       </div>
 
       <!-- Already Logged Section -->
@@ -115,120 +89,171 @@ const DailyLogs = {
         <div style="display:flex; align-items:center; gap:8px; padding:16px; border-bottom:1px solid #E5E7EB; background:#F9FAFB;">
           <div style="width:8px; height:8px; border-radius:50%; background:#10B981;"></div>
           <h2 style="font-size:16px; font-weight:600; color:#0F0F0F; margin:0;">Logged Today</h2>
-          <span style="background:#D1FAE5; color:#059669; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">${logged.length} done</span>
+          <span id="logged-count" style="background:#D1FAE5; color:#059669; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">0 done</span>
         </div>
-        <div id="logged-grid" style="display:flex; flex-direction:column;">
-          ${logged.length === 0
-            ? `<div style="padding:40px 20px; text-align:center;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <div style="font-size:15px; font-weight:500; color:#0F0F0F;">No data logged yet for this date</div>
-              </div>`
-            : logged.map(l => this.buildLoggedCard(l)).join('')
-          }
-        </div>
+        <div id="logged-grid" style="display:flex; flex-direction:column;"></div>
+        <div id="logged-pagination"></div>
       </div>
     `;
   },
 
-  buildMissingCard(rider) {
-    const avatarBg = rider.rider_type === 'company' ? '#2563EB' : '#7C3AED';
-    const typeBadge = rider.rider_type === 'company' 
-         ? `<span style="background:#EFF6FF; color:#2563EB; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Company</span>`
-         : `<span style="background:#F5F3FF; color:#7C3AED; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Freelancer</span>`;
-    const branchBadge = rider.store_warehouse ? `<span style="color:#9CA3AF; font-size:12px;">• ${Utils.escapeHtml(rider.store_warehouse)}</span>` : '';
-
-    return `
-      <div class="log-row-item pending-log log-entry-card" data-rider-id="${rider.id}" data-action="log" data-name="${Utils.escapeHtml(rider.name).toLowerCase()}">
-        <div style="display:flex; align-items:center; gap:12px; flex:1;">
-          <div style="width:32px;height:32px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">${Utils.getInitials(rider.name)}</div>
-          <div style="font-size:14px; font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(rider.name)}</div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            ${typeBadge}
-            ${branchBadge}
-          </div>
-        </div>
-        <div>
-          ${App.isViewer() ? '' : `
-          <button class="log-now-btn" data-rider-id="${rider.id}" data-rider-name="${Utils.escapeHtml(rider.name)}" style="background:#2563EB; color:white; border:none; height:28px; padding:0 12px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:4px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Log
-          </button>
-          `}
-        </div>
-      </div>
-    `;
-  },
-
-  buildLoggedCard(log) {
-    const totalMinutes = Utils.toMinutes(log.checkin_hours, log.checkin_minutes);
-    const isLowCheckin = totalMinutes < 660; // < 11 hours
-    const totalOrders = log.primary_orders + log.associate_orders;
+  async loadGridData() {
+    const missingGrid = document.getElementById('missing-grid');
+    const loggedGrid = document.getElementById('logged-grid');
+    const loggedPagination = document.getElementById('logged-pagination');
     
-    // Order Chip Logic (Example minimum: 20 orders is good, 15 borderline, <15 low)
-    let orderBg = '#DCFCE7', orderColor = '#16A34A';
-    if (totalOrders < 15) { orderBg = '#FEE2E2'; orderColor = '#DC2626'; }
-    else if (totalOrders < 20) { orderBg = '#FEF3C7'; orderColor = '#D97706'; }
+    if (!missingGrid || !loggedGrid) return;
 
-    // Checkin Chip Logic
-    const checkinBg = isLowCheckin ? '#FEE2E2' : '#DCFCE7';
-    const checkinColor = isLowCheckin ? '#DC2626' : '#16A34A';
-
-    const avatarBg = log.rider_type === 'company' ? '#2563EB' : '#7C3AED';
-
-    return `
-      <div class="log-row-item logged log-entry-card" data-log-id="${log.id}" data-action="edit" data-name="${Utils.escapeHtml(log.rider_name).toLowerCase()}">
-        <div style="display:flex; align-items:center; gap:12px; flex:1;">
-          <div style="width:32px;height:32px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">${Utils.getInitials(log.rider_name)}</div>
-          <div style="font-size:14px; font-weight:600; color:#0F0F0F; ${log.attendance_status !== 'Present' ? 'opacity:0.5;' : ''}">${Utils.escapeHtml(log.rider_name)}</div>
-          ${log.attendance_status !== 'Present' ? `<span style="background:#FEF3C7; color:#D97706; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">${log.attendance_status}</span>` : ''}
-          ${log.absent_reason ? `<span style="color:#9CA3AF; font-size:12px; font-style:italic;">• ${Utils.escapeHtml(log.absent_reason)}</span>` : ''}
-        </div>
-        
-        <div style="display:flex; align-items:center; gap:8px; ${log.attendance_status !== 'Present' ? 'opacity:0.5;' : ''}">
-          <div style="background:${orderBg}; color:${orderColor}; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px;">
-            📦 ${totalOrders} Orders
-          </div>
-          <div style="background:${checkinBg}; color:${checkinColor}; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px;">
-            🕒 ${log.checkin_hours}:${String(log.checkin_minutes).padStart(2, '0')} Hrs
-          </div>
-          ${log.screenshot ? `
-          <button class="view-proof-btn" data-log-id="${log.id}" style="background:transparent; border:none; color:#2563EB; cursor:pointer; padding:4px;" title="View Screenshot">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          </button>` : ''}
-          ${App.isViewer() ? '' : `
-          <button class="delete-log-btn" data-log-id="${log.id}" data-rider-name="${Utils.escapeHtml(log.rider_name)}" style="background:transparent; border:none; color:#DC2626; cursor:pointer; padding:4px;" title="Delete Log">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
-          <button style="background:transparent; border:none; color:#9CA3AF; cursor:pointer; padding:4px;" title="Edit Log">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          `}
-        </div>
+    missingGrid.innerHTML = `
+      <div style="padding:20px; text-align:center;">
+        <span class="spinner" style="width:24px; height:24px;"></span>
       </div>
     `;
+    loggedGrid.innerHTML = `
+      <div style="padding:20px; text-align:center;">
+        <span class="spinner" style="width:24px; height:24px;"></span>
+      </div>
+    `;
+    if (loggedPagination) loggedPagination.innerHTML = '';
+
+    try {
+      const [res, missing] = await Promise.all([
+        API.getDailyLogs(this.currentDate, this.currentPage, this.limit, this.searchQuery),
+        API.getMissingLogs(this.currentDate)
+      ]);
+
+      const logged = res.logs || [];
+      const total = res.total || 0;
+
+      // Filter missing list client-side based on search query
+      const filteredMissing = missing.filter(r => {
+        const q = this.searchQuery.toLowerCase().trim();
+        return !q || (r.name && r.name.toLowerCase().includes(q));
+      });
+
+      // Update counters
+      const missingCountEl = document.getElementById('missing-count');
+      if (missingCountEl) missingCountEl.innerText = `${filteredMissing.length} pending`;
+
+      const loggedCountEl = document.getElementById('logged-count');
+      if (loggedCountEl) loggedCountEl.innerText = `${total} done`;
+
+      // Render missing
+      if (filteredMissing.length === 0) {
+        missingGrid.innerHTML = `
+          <div style="padding:40px 20px; text-align:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div style="font-size:15px; font-weight:500; color:#0F0F0F;">All riders logged for this date! 🎉</div>
+          </div>
+        `;
+      } else {
+        missingGrid.innerHTML = filteredMissing.map(r => this.buildMissingCard(r)).join('');
+      }
+
+      // Render logged
+      if (logged.length === 0) {
+        loggedGrid.innerHTML = `
+          <div style="padding:40px 20px; text-align:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div style="font-size:15px; font-weight:500; color:#0F0F0F;">No data logged yet for this date</div>
+          </div>
+        `;
+      } else {
+        loggedGrid.innerHTML = logged.map(l => this.buildLoggedCard(l)).join('');
+      }
+
+      // Render pagination controls
+      const totalPages = Math.ceil(total / this.limit) || 1;
+      if (totalPages > 1 && loggedPagination) {
+        loggedPagination.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid #E5E7EB; background:#F9FAFB;">
+            <div style="font-size:13px; color:#6B7280;">
+              Showing <span style="font-weight:600; color:#111827;">${(this.currentPage - 1) * this.limit + 1}</span> to <span style="font-weight:600; color:#111827;">${Math.min(this.currentPage * this.limit, total)}</span> of <span style="font-weight:600; color:#111827;">${total}</span> logs
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button id="page-prev" ${this.currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:500; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+                Previous
+              </button>
+              <span style="font-size:13px; color:#374151;">Page <span style="font-weight:600;">${this.currentPage}</span> of ${totalPages}</span>
+              <button id="page-next" ${this.currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:500; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      this.attachGridEvents(logged, missing, total);
+    } catch (err) {
+      loggedGrid.innerHTML = `<div class="empty-state"><p>Failed to load logs: ${err.message}</p></div>`;
+      missingGrid.innerHTML = '';
+    }
   },
 
-  attachEvents(logged, missing) {
+  attachShellEvents() {
     // Date navigation
     document.getElementById('date-prev')?.addEventListener('click', () => {
       this.currentDate = Utils.shiftDate(this.currentDate, -1);
-      this.render();
+      this.currentPage = 1;
+      const label = document.getElementById('date-label');
+      if (label) label.innerText = Utils.formatDate(this.currentDate);
+      const picker = document.getElementById('date-picker');
+      if (picker) picker.value = this.currentDate;
+      this.loadGridData();
     });
 
     document.getElementById('date-next')?.addEventListener('click', () => {
       if (this.currentDate >= Utils.today()) return;
       this.currentDate = Utils.shiftDate(this.currentDate, 1);
-      this.render();
+      this.currentPage = 1;
+      const label = document.getElementById('date-label');
+      if (label) label.innerText = Utils.formatDate(this.currentDate);
+      const picker = document.getElementById('date-picker');
+      if (picker) picker.value = this.currentDate;
+      this.loadGridData();
     });
 
     document.getElementById('date-picker')?.addEventListener('change', (e) => {
       const selected = e.target.value;
-      if (selected > Utils.today()) {
-        this.currentDate = Utils.today();
-      } else {
-        this.currentDate = selected;
+      this.currentDate = selected > Utils.today() ? Utils.today() : selected;
+      this.currentPage = 1;
+      const label = document.getElementById('date-label');
+      if (label) label.innerText = Utils.formatDate(this.currentDate);
+      const picker = document.getElementById('date-picker');
+      if (picker) picker.value = this.currentDate;
+      this.loadGridData();
+    });
+
+    // Search input (Debounced server-side + client-side filter)
+    const searchInput = document.getElementById('logs-search');
+    searchInput?.addEventListener('input', Utils.debounce((e) => {
+      this.searchQuery = e.target.value;
+      this.currentPage = 1; // reset page when search changes
+      this.loadGridData();
+    }, 200));
+
+    // Bulk lodge button
+    document.getElementById('bulk-lodge-btn')?.addEventListener('click', () => {
+      this.openBulkLodgeModal();
+    });
+  },
+
+  attachGridEvents(logged, missing, total) {
+    const totalPages = Math.ceil(total / this.limit) || 1;
+    
+    // Pagination button clicks
+    document.getElementById('page-prev')?.addEventListener('click', () => {
+      if (this.currentPage > 1) {
+        this.currentPage--;
+        this.loadGridData();
       }
-      this.render();
+    });
+
+    document.getElementById('page-next')?.addEventListener('click', () => {
+      if (this.currentPage < totalPages) {
+        this.currentPage++;
+        this.loadGridData();
+      }
     });
 
     // Log buttons for missing riders
@@ -241,11 +266,21 @@ const DailyLogs = {
       });
     });
 
+    // Clicking missing card also opens log form
+    document.querySelectorAll('[data-action="log"]').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (App.isViewer()) return;
+        if (e.target.closest('.log-now-btn')) return;
+        const riderId = parseInt(card.dataset.riderId);
+        const rider = missing.find(r => r.id === riderId);
+        if (rider) this.openLogForm(riderId, rider.name);
+      });
+    });
+
     // Edit logged entries
     document.querySelectorAll('[data-action="edit"]').forEach(card => {
       card.addEventListener('click', (e) => {
         if (App.isViewer()) return;
-        // Ignore if they clicked the view proof or delete button
         if (e.target.closest('.view-proof-btn') || e.target.closest('.delete-log-btn')) return;
         const logId = card.dataset.logId;
         const log = logged.find(l => String(l.id) === logId);
@@ -277,7 +312,7 @@ const DailyLogs = {
             Utils.showLoading('Deleting log');
             await API.deleteDailyLog(logId);
             Utils.showToast('Log deleted successfully', 'success');
-            this.render();
+            this.loadGridData();
           } catch (err) {
             Utils.showToast(err.message, 'error');
           } finally {
@@ -285,31 +320,6 @@ const DailyLogs = {
           }
         }
       });
-    });
-
-    // Clicking missing card also opens log form
-    document.querySelectorAll('[data-action="log"]').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (App.isViewer()) return;
-        if (e.target.closest('.log-now-btn')) return; // already handled by button
-        const riderId = parseInt(card.dataset.riderId);
-        const rider = missing.find(r => r.id === riderId);
-        if (rider) this.openLogForm(riderId, rider.name);
-      });
-    });
-
-    // Search filter
-    document.getElementById('logs-search')?.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      document.querySelectorAll('.log-entry-card').forEach(card => {
-        const name = card.getAttribute('data-name') || '';
-        card.style.display = name.includes(query) ? '' : 'none';
-      });
-    });
-
-    // Bulk lodge button
-    document.getElementById('bulk-lodge-btn')?.addEventListener('click', () => {
-      this.openBulkLodgeModal(missing);
     });
   },
 

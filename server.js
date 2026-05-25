@@ -226,7 +226,7 @@ app.delete('/api/riders/:id/hard-delete', verifyAdminToken, requireAdmin, async 
 
 app.get('/api/daily-logs', async (req, res) => {
   try {
-    const { date, rider_id, start, end } = req.query;
+    const { date, rider_id, start, end, page, limit, search } = req.query;
     
     if (rider_id) {
       const logs = await db.getDailyLogsByRider(parseInt(rider_id), start, end);
@@ -239,6 +239,17 @@ app.get('/api/daily-logs', async (req, res) => {
     }
 
     const logDate = date || new Date().toISOString().split('T')[0];
+
+    if (page || limit) {
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 20;
+      const offset = (pageNum - 1) * limitNum;
+      const searchQuery = search || '';
+
+      const { logs, total } = await db.getDailyLogsPaginated(logDate, limitNum, offset, searchQuery);
+      return res.json({ logs, total, page: pageNum, limit: limitNum });
+    }
+
     const logs = await db.getDailyLogs(logDate, logDate);
     res.json(logs);
   } catch (err) {

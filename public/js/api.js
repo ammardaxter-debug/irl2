@@ -93,8 +93,8 @@ const API = {
   },
 
   // ── Daily Logs ──
-  getDailyLogs(date) {
-    return this.request(`/daily-logs?date=${date}`);
+  getDailyLogs(date, page = 1, limit = 20, search = '') {
+    return this.request(`/daily-logs?date=${date}&page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
   },
 
   getMissingLogs(date) {
