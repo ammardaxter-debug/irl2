@@ -1777,16 +1777,19 @@ async function initializeApp() {
     await db.initDb();
     console.log('  🐘 Database initialized (Supabase)');
 
-    // Seed dashboard auth users
-    await seedAuthUsers();
-    console.log('  🔐 Dashboard auth users ready');
+    // Only run heavy sync tasks if we are running locally as a persistent server
+    if (!process.env.VERCEL) {
+      // Seed dashboard auth users
+      await seedAuthUsers();
+      console.log('  🔐 Dashboard auth users ready');
 
-    // Sync approved requests to restore missing expenses/advances
-    await db.syncApprovedRequests();
+      // Sync approved requests to restore missing expenses/advances
+      await db.syncApprovedRequests();
 
-    // Check if we have data
-    const riders = await db.getAllRiders();
-    console.log(`  📊 Database has data (${riders.length} riders)`);
+      // Check if we have data
+      const riders = await db.getAllRiders();
+      console.log(`  📊 Database has data (${riders.length} riders)`);
+    }
   } catch (err) {
     console.error('Failed to initialize:', err);
   }
