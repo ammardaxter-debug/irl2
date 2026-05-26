@@ -2790,141 +2790,124 @@ const Expenses = {
       h3.alignment = { vertical: 'middle', horizontal: 'center' };
       ws.getRow(3).height = 20;
 
-      // ══════════════════════════════════════════════════════
-      // ── SECTION: Global Balance Highlight Box ──
-      // ══════════════════════════════════════════════════════
+      // "?"? BIG HIGHLIGHT BOXES "?"?
       let r = 5;
-      const isOutOfPocket = gStats.from_my_pocket > 0;
-      const globalBalVal = isOutOfPocket ? gStats.from_my_pocket : gStats.remaining_irl;
-      const balBgColor = isOutOfPocket ? 'FFFEF2F2' : 'FFF0FDF4';
-      const balBorderColor = isOutOfPocket ? 'FFFCA5A5' : 'FF86EFAC';
-      const balTextColor = isOutOfPocket ? C.red : C.green;
-      const balLabel = isOutOfPocket ? '⚠ GLOBAL OUT OF POCKET (All-Time)' : '✓ GLOBAL REMAINING FUNDS (All-Time)';
 
+      // --- PERIOD METRICS (BIG NUMBERS) ---
       ws.mergeCells(r, 1, r, 7);
-      const balLabelCell = ws.getCell(`A${r}`);
-      balLabelCell.value = balLabel;
-      balLabelCell.font = { name: 'Calibri', bold: true, size: 12, color: { argb: isOutOfPocket ? C.red : 'FF166534' } };
-      balLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: balBgColor } };
-      balLabelCell.alignment = { vertical: 'middle', horizontal: 'center' };
-      balLabelCell.border = { top: { style: 'medium', color: { argb: balBorderColor } }, left: { style: 'medium', color: { argb: balBorderColor } }, right: { style: 'medium', color: { argb: balBorderColor } } };
-      ws.getRow(r).height = 28;
-
-      r++;
-      ws.mergeCells(r, 1, r, 7);
-      const balValCell = ws.getCell(`A${r}`);
-      balValCell.value = globalBalVal;
-      balValCell.numFmt = '#,##0.00 "SAR"';
-      balValCell.font = { name: 'Calibri', bold: true, size: 22, color: { argb: balTextColor } };
-      balValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: balBgColor } };
-      balValCell.alignment = { vertical: 'middle', horizontal: 'center' };
-      balValCell.border = { bottom: { style: 'medium', color: { argb: balBorderColor } }, left: { style: 'medium', color: { argb: balBorderColor } }, right: { style: 'medium', color: { argb: balBorderColor } } };
-      ws.getRow(r).height = 40;
-
-      // ══════════════════════════════════════════════════════
-      // ── SECTION: Financial Overview Grid ──
-      // ══════════════════════════════════════════════════════
-      r += 2;
-      ws.mergeCells(r, 1, r, 7);
-      const secTitle = ws.getCell(`A${r}`);
-      secTitle.value = '  FINANCIAL OVERVIEW';
-      secTitle.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.white } };
-      secTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue } };
+      const pTitle = ws.getCell(`A${r}`);
+      pTitle.value = ' PERIOD SUMMARY (Selected Dates)';
+      pTitle.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.white } };
+      pTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue } };
+      pTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+      pTitle.border = thinBorder;
       ws.getRow(r).height = 26;
 
       r++;
-      // Period sub-header
-      ws.mergeCells(r, 1, r, 4);
-      ws.getCell(`A${r}`).value = 'PERIOD METRICS';
-      ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.muted } };
-      ws.getCell(`A${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
-      ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
-
-      ws.mergeCells(r, 5, r, 7);
-      ws.getCell(`E${r}`).value = 'GLOBAL METRICS (ALL-TIME)';
-      ws.getCell(`E${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.muted } };
-      ws.getCell(`E${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
-      ws.getCell(`E${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
-      ws.getRow(r).height = 20;
-      applyRowBorder(r, 1, 7);
-
-      const kpiRow = (rowNum, pLabel, pVal, pColor, gLabel, gVal, gColor) => {
-        const row = ws.getRow(rowNum);
-        row.height = 26;
-
-        // Period Part
-        ws.mergeCells(rowNum, 1, rowNum, 3);
-        const pl = row.getCell(1);
-        pl.value = '  ' + pLabel;
-        pl.font = { name: 'Calibri', size: 10, bold: true };
-        pl.border = thinBorder;
-        pl.alignment = { vertical: 'middle' };
-
-        const pv = row.getCell(4);
-        pv.value = pVal;
-        pv.numFmt = '#,##0.00 "SAR"';
-        pv.font = { name: 'Calibri', size: 12, bold: true, color: { argb: pColor } };
-        pv.border = thinBorder;
-        pv.alignment = { vertical: 'middle', horizontal: 'right' };
-
-        // Global Part
-        ws.mergeCells(rowNum, 5, rowNum, 6);
-        const gl = row.getCell(5);
-        gl.value = '  ' + gLabel;
-        gl.font = { name: 'Calibri', size: 10, bold: true };
-        gl.border = thinBorder;
-        gl.alignment = { vertical: 'middle' };
-
-        const gv = row.getCell(7);
-        gv.value = gVal;
-        gv.numFmt = '#,##0.00 "SAR"';
-        gv.font = { name: 'Calibri', size: 12, bold: true, color: { argb: gColor } };
-        gv.border = thinBorder;
-        gv.alignment = { vertical: 'middle', horizontal: 'right' };
-      };
-
-      r++;
-      kpiRow(r, 'Total Received', totalFundsPeriod, C.green, 'Global Received', parseFloat(gStats.total_received) || 0, C.green);
-      r++;
-      kpiRow(r, 'Total Expenses', totalExpensesPeriod, C.red, 'Global Expenses', parseFloat(gStats.total_expenses) || 0, C.red);
-      r++;
-
-      const pNetColor = netPeriod >= 0 ? C.green : C.red;
-      const pNetLabel = netPeriod >= 0 ? 'Net Surplus' : 'Net Deficit';
-      const gBalLabel = isOutOfPocket ? 'Out of Pocket' : 'Remaining Funds';
-      const gBalColor = isOutOfPocket ? C.red : C.green;
-      kpiRow(r, pNetLabel, netPeriod, pNetColor, gBalLabel, globalBalVal, gBalColor);
-
-      // ── Deductible vs Company Paid quick row ──
-      r++;
-      ws.getRow(r).height = 22;
       ws.mergeCells(r, 1, r, 3);
-      ws.getCell(`A${r}`).value = '  Rider-Deductible Expenses';
-      ws.getCell(`A${r}`).font = { name: 'Calibri', size: 9, italic: true, color: { argb: C.amber } };
-      ws.getCell(`A${r}`).alignment = { vertical: 'middle' };
-      ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightAmber } };
-      ws.getCell(`A${r}`).border = thinBorder;
-      const dedValCell = ws.getCell(`D${r}`);
-      dedValCell.value = totalDeductible;
-      dedValCell.numFmt = '#,##0.00 "SAR"';
-      dedValCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.amber } };
-      dedValCell.alignment = { vertical: 'middle', horizontal: 'right' };
-      dedValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightAmber } };
-      dedValCell.border = thinBorder;
+      const pRecLbl = ws.getCell(`A${r}`);
+      pRecLbl.value = 'FUNDS RECEIVED';
+      pRecLbl.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF064E3B' } };
+      pRecLbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      pRecLbl.alignment = { vertical: 'middle', horizontal: 'center' };
+      pRecLbl.border = thinBorder;
 
-      ws.mergeCells(r, 5, r, 6);
-      ws.getCell(`E${r}`).value = '  Company-Paid Expenses';
-      ws.getCell(`E${r}`).font = { name: 'Calibri', size: 9, italic: true, color: { argb: C.muted } };
-      ws.getCell(`E${r}`).alignment = { vertical: 'middle' };
-      ws.getCell(`E${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightBlue } };
-      ws.getCell(`E${r}`).border = thinBorder;
-      const compValCell = ws.getCell(`G${r}`);
-      compValCell.value = totalCompanyPaid;
-      compValCell.numFmt = '#,##0.00 "SAR"';
-      compValCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.blue } };
-      compValCell.alignment = { vertical: 'middle', horizontal: 'right' };
-      compValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightBlue } };
-      compValCell.border = thinBorder;
+      ws.mergeCells(r, 4, r, 7);
+      const pExpLbl = ws.getCell(`D${r}`);
+      pExpLbl.value = 'EXPENSES';
+      pExpLbl.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF7F1D1D' } };
+      pExpLbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+      pExpLbl.alignment = { vertical: 'middle', horizontal: 'center' };
+      pExpLbl.border = thinBorder;
+      ws.getRow(r).height = 22;
+
+      r++;
+      ws.mergeCells(r, 1, r, 3);
+      const pRecVal = ws.getCell(`A${r}`);
+      pRecVal.value = totalFundsPeriod;
+      pRecVal.numFmt = '#,##0.00 "SAR"';
+      pRecVal.font = { name: 'Calibri', bold: true, size: 22, color: { argb: C.green } };
+      pRecVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      pRecVal.alignment = { vertical: 'middle', horizontal: 'center' };
+      pRecVal.border = thinBorder;
+
+      ws.mergeCells(r, 4, r, 7);
+      const pExpVal = ws.getCell(`D${r}`);
+      pExpVal.value = totalExpensesPeriod;
+      pExpVal.numFmt = '#,##0.00 "SAR"';
+      pExpVal.font = { name: 'Calibri', bold: true, size: 22, color: { argb: C.red } };
+      pExpVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+      pExpVal.alignment = { vertical: 'middle', horizontal: 'center' };
+      pExpVal.border = thinBorder;
+      ws.getRow(r).height = 40;
+
+      // --- GLOBAL METRICS (BIG NUMBERS) ---
+      r += 2;
+      ws.mergeCells(r, 1, r, 7);
+      const gTitle = ws.getCell(`A${r}`);
+      gTitle.value = ' GLOBAL SUMMARY (All-Time)';
+      gTitle.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.white } };
+      gTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.darkBlue } };
+      gTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+      gTitle.border = thinBorder;
+      ws.getRow(r).height = 26;
+
+      r++;
+      ws.mergeCells(r, 1, r, 3);
+      const gRecLbl = ws.getCell(`A${r}`);
+      gRecLbl.value = 'GLOBAL RECEIVED';
+      gRecLbl.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF064E3B' } };
+      gRecLbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      gRecLbl.alignment = { vertical: 'middle', horizontal: 'center' };
+      gRecLbl.border = thinBorder;
+
+      ws.mergeCells(r, 4, r, 7);
+      const gExpLbl = ws.getCell(`D${r}`);
+      gExpLbl.value = 'GLOBAL EXPENSES';
+      gExpLbl.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF7F1D1D' } };
+      gExpLbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      gExpLbl.alignment = { vertical: 'middle', horizontal: 'center' };
+      gExpLbl.border = thinBorder;
+      ws.getRow(r).height = 22;
+
+      r++;
+      ws.mergeCells(r, 1, r, 3);
+      const gRecVal = ws.getCell(`A${r}`);
+      gRecVal.value = parseFloat(gStats.total_received) || 0;
+      gRecVal.numFmt = '#,##0.00 "SAR"';
+      gRecVal.font = { name: 'Calibri', bold: true, size: 22, color: { argb: C.green } };
+      gRecVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      gRecVal.alignment = { vertical: 'middle', horizontal: 'center' };
+      gRecVal.border = thinBorder;
+
+      ws.mergeCells(r, 4, r, 7);
+      const gExpVal = ws.getCell(`D${r}`);
+      gExpVal.value = parseFloat(gStats.total_expenses) || 0;
+      gExpVal.numFmt = '#,##0.00 "SAR"';
+      gExpVal.font = { name: 'Calibri', bold: true, size: 22, color: { argb: C.red } };
+      gExpVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      gExpVal.alignment = { vertical: 'middle', horizontal: 'center' };
+      gExpVal.border = thinBorder;
+      ws.getRow(r).height = 40;
+
+      // EXTRA ROWS FOR REMAINING FUNDS AND DEDUCTIBLES
+      r++;
+      ws.mergeCells(r, 1, r, 3);
+      const isOutOfPocket = gStats.from_my_pocket > 0;
+      const globalBalVal = isOutOfPocket ? gStats.from_my_pocket : gStats.remaining_irl;
+      const balLabel = isOutOfPocket ? 'Out of Pocket' : 'Remaining Funds';
+      const balColor = isOutOfPocket ? C.red : C.green;
+      ws.getCell(`A${r}`).value = `  ${balLabel}: ${globalBalVal.toFixed(2)} SAR`;
+      ws.getCell(`A${r}`).font = { name: 'Calibri', size: 11, bold: true, color: { argb: balColor } };
+      ws.getCell(`A${r}`).alignment = { vertical: 'middle' };
+      ws.getCell(`A${r}`).border = thinBorder;
+
+      ws.mergeCells(r, 4, r, 7);
+      ws.getCell(`D${r}`).value = `  Rider-Deductible (Period): ${totalDeductible.toFixed(2)} SAR`;
+      ws.getCell(`D${r}`).font = { name: 'Calibri', size: 10, italic: true, color: { argb: C.amber } };
+      ws.getCell(`D${r}`).alignment = { vertical: 'middle' };
+      ws.getCell(`D${r}`).border = thinBorder;
+      ws.getRow(r).height = 24;
 
       // ══════════════════════════════════════════════════════
       // ── SECTION 1: Funds Received ──
