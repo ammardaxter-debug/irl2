@@ -84,7 +84,7 @@ function verifyRiderToken(req, res, next) {
     req.sessionToken = decoded.sessionToken || null;
     
     // Skip session validation for high-frequency endpoints (location updates)
-    const skipPaths = ['/api/rider/location', '/api/rider/gps-status'];
+    const skipPaths = ['/api/rider/location', '/api/rider/gps-status', '/api/rider/location/batch', '/api/rider/heartbeat'];
     if (skipPaths.includes(req.path)) {
       return next();
     }
@@ -1494,6 +1494,20 @@ app.post('/api/rider/location', verifyRiderToken, async (req, res) => {
     }
 
     await db.updateRiderLocation(req.riderId, latitude, longitude);
+
+    // Also insert into location_history for time-series tracking
+    try {
+      await db.insertLocationBatch(req.riderId, [{
+        lat: latitude,
+        lng: longitude,
+        timestamp: new Date().toISOString(),
+        source: 'legacy_endpoint'
+      }], null);
+    } catch (histErr) {
+      console.error('Failed to insert into location_history:', histErr);
+      // Don't fail the request if history insert fails
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1524,18 +1538,42 @@ app.post('/api/rider/online-status', verifyRiderToken, async (req, res) => {
 app.get('/api/admin/fleet-locations', async (req, res) => {
   try {
     const riders = await db.getAllRiders();
-    const activeRiders = riders.map(r => ({
-      id: r.id,
-      name: r.name,
-      lat: r.last_lat,
-      lng: r.last_lng,
-      lastUpdate: r.last_location_update,
-      isOnline: r.is_online,
-      status: r.status,
-      photo: r.profile_photo || r.photo_url,
-      phone: r.phone,
-      gpsStatus: r.gps_status || null
-    }));
+
+    // Fetch last heartbeats for online riders in parallel
+    const onlineRiders = riders.filter(r => r.is_online);
+    const heartbeatMap = {};
+    if (onlineRiders.length > 0) {
+      try {
+        const heartbeatPromises = onlineRiders.map(async (r) => {
+          try {
+            const hb = await db.getLastHeartbeat(r.id);
+            if (hb) heartbeatMap[r.id] = hb;
+          } catch (e) { /* ignore individual failures */ }
+        });
+        await Promise.all(heartbeatPromises);
+      } catch (e) {
+        console.error('Error fetching heartbeats for fleet-locations:', e);
+      }
+    }
+
+    const activeRiders = riders.map(r => {
+      const hb = heartbeatMap[r.id];
+      return {
+        id: r.id,
+        name: r.name,
+        lat: r.last_lat,
+        lng: r.last_lng,
+        lastUpdate: r.last_location_update,
+        isOnline: r.is_online,
+        status: r.status,
+        photo: r.profile_photo || r.photo_url,
+        phone: r.phone,
+        gpsStatus: r.gps_status || null,
+        battery_level: hb ? hb.battery_level : null,
+        app_state: hb ? hb.app_state : null,
+        last_heartbeat_at: hb ? hb.received_at : null
+      };
+    });
     res.json(activeRiders);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1619,6 +1657,75 @@ app.post('/api/rider/gps-status', verifyRiderToken, async (req, res) => {
 
     await db.updateRiderGpsStatus(req.riderId, gps_status);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== LOCATION BATCH & HEARTBEAT ROUTES ==========
+
+// Batch location upload (high-frequency, behind verifyRiderToken with skip session)
+app.post('/api/rider/location/batch', verifyRiderToken, async (req, res) => {
+  try {
+    const { locations, session_id } = req.body;
+    if (!locations || !Array.isArray(locations) || locations.length === 0) {
+      return res.status(400).json({ error: 'locations array required' });
+    }
+
+    // Drop updates if tracking is shutdown
+    const isShutdown = await db.isTrackingShutdown();
+    if (isShutdown) {
+      return res.json({ success: true, accepted: 0, warning: 'Tracking system is currently shut down' });
+    }
+
+    await db.insertLocationBatch(req.riderId, locations, session_id);
+    res.json({ success: true, accepted: locations.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rider heartbeat (app-alive signal)
+app.post('/api/rider/heartbeat', verifyRiderToken, async (req, res) => {
+  try {
+    const { battery, is_location_active, app_state } = req.body;
+    await db.insertHeartbeat(req.riderId, battery, is_location_active, app_state);
+
+    // If location tracking is not active but rider is online, send silent push to wake the app
+    if (is_location_active === false) {
+      try {
+        const rider = await db.getRiderById(req.riderId);
+        if (rider && rider.is_online && rider.push_token) {
+          const { Expo } = await import('expo-server-sdk');
+          const expo = new Expo();
+          if (Expo.isExpoPushToken(rider.push_token)) {
+            await expo.sendPushNotificationsAsync([{
+              to: rider.push_token,
+              data: { type: 'silent_wake', silent: true },
+              priority: 'high',
+              channelId: 'silent_wake',
+              _contentAvailable: true
+            }]);
+          }
+        }
+      } catch (pushErr) {
+        console.error('Failed to send wake push for heartbeat:', pushErr.message);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Get rider location history
+app.get('/api/admin/rider-location-history/:id', async (req, res) => {
+  try {
+    const riderId = parseInt(req.params.id);
+    const { start, end } = req.query;
+    const history = await db.getLocationHistory(riderId, start, end);
+    res.json(history);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1849,6 +1956,79 @@ if (!process.env.VERCEL) {
     console.log(`  → Login: http://localhost:${PORT}/login`);
     console.log(`  → Rider Portal: http://localhost:${PORT}/rider/`);
     console.log(`  → Database: Supabase Database 🐘\n`);
+
+    // ========== LOCATION WATCHDOG (every 2 minutes) ==========
+    setInterval(async () => {
+      try {
+        const riders = await db.getAllRiders();
+        const onlineRiders = riders.filter(r => r.is_online);
+        let staleCount = 0;
+        let disconnectedCount = 0;
+
+        for (const rider of onlineRiders) {
+          try {
+            if (!rider.last_location_update) continue;
+            const lastUpdate = new Date(rider.last_location_update).getTime();
+            const minutesAgo = (Date.now() - lastUpdate) / (1000 * 60);
+
+            if (minutesAgo > 30) {
+              // > 30 minutes: app_killed
+              await db.updateRiderOnlineStatus(rider.id, false);
+              const supabase = db.getDb();
+              await supabase.from('riders').update({ gps_status: 'app_killed' }).eq('id', rider.id);
+              disconnectedCount++;
+            } else if (minutesAgo > 10) {
+              // > 10 minutes: disconnected
+              await db.updateRiderGpsStatus(rider.id, 'disconnected');
+              disconnectedCount++;
+            } else if (minutesAgo > 5) {
+              // > 5 minutes: send silent push to wake app
+              await db.updateRiderGpsStatus(rider.id, 'stale');
+              staleCount++;
+              if (rider.push_token) {
+                try {
+                  const { Expo } = await import('expo-server-sdk');
+                  const expo = new Expo();
+                  if (Expo.isExpoPushToken(rider.push_token)) {
+                    await expo.sendPushNotificationsAsync([{
+                      to: rider.push_token,
+                      data: { type: 'silent_wake', silent: true },
+                      priority: 'high',
+                      channelId: 'silent_wake',
+                      _contentAvailable: true
+                    }]);
+                  }
+                } catch (pushErr) {
+                  console.error(`[Watchdog] Push failed for rider ${rider.id}:`, pushErr.message);
+                }
+              }
+            } else if (minutesAgo > 3) {
+              // > 3 minutes: stale
+              await db.updateRiderGpsStatus(rider.id, 'stale');
+              staleCount++;
+            }
+          } catch (riderErr) {
+            console.error(`[Watchdog] Error processing rider ${rider.id}:`, riderErr.message);
+          }
+        }
+
+        console.log(`[Watchdog] Checked ${onlineRiders.length} online riders, ${staleCount} stale, ${disconnectedCount} disconnected`);
+      } catch (err) {
+        console.error('[Watchdog] Error:', err.message);
+      }
+    }, 120000); // Every 2 minutes
+
+    // ========== DAILY CLEANUP JOB (every 24 hours) ==========
+    setInterval(async () => {
+      try {
+        console.log('[Cleanup] Running daily cleanup...');
+        await db.cleanupOldLocationHistory(30);
+        await db.cleanupOldHeartbeats(7);
+        console.log('[Cleanup] Daily cleanup completed.');
+      } catch (err) {
+        console.error('[Cleanup] Error:', err.message);
+      }
+    }, 86400000); // Every 24 hours
   });
 }
 

@@ -1326,6 +1326,109 @@ async function syncApprovedRequests() {
   }
 }
 
+// ========== LOCATION HISTORY & HEARTBEATS ==========
+
+async function insertLocationBatch(riderId, locations, sessionId) {
+  if (!locations || locations.length === 0) return { inserted: 0 };
+
+  const rows = locations.map(loc => ({
+    rider_id: riderId,
+    latitude: loc.lat,
+    longitude: loc.lng,
+    accuracy: loc.accuracy || null,
+    speed: loc.speed || null,
+    battery_level: loc.battery || null,
+    source: loc.source || null,
+    recorded_at: loc.timestamp ? new Date(loc.timestamp).toISOString() : nowISO(),
+    received_at: nowISO(),
+    session_id: sessionId || null
+  }));
+
+  const { error } = await supabase.from('location_history').insert(rows);
+  if (error) throw error;
+
+  // Update riders table with the most recent location point
+  const sorted = [...locations].sort((a, b) => {
+    const tA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tB - tA;
+  });
+  const latest = sorted[0];
+  if (latest) {
+    await updateRiderLocation(riderId, latest.lat, latest.lng);
+  }
+
+  return { inserted: rows.length };
+}
+
+async function insertHeartbeat(riderId, battery, isLocationActive, appState) {
+  const { error } = await supabase.from('rider_heartbeats').insert([{
+    rider_id: riderId,
+    battery_level: battery || null,
+    is_location_active: isLocationActive !== undefined ? isLocationActive : true,
+    app_state: appState || null,
+    received_at: nowISO()
+  }]);
+  if (error) throw error;
+  return { success: true };
+}
+
+async function getLocationHistory(riderId, start, end, limit = 1000) {
+  let query = supabase.from('location_history')
+    .select('*')
+    .eq('rider_id', riderId)
+    .order('recorded_at', { ascending: true })
+    .limit(limit);
+
+  if (start) query = query.gte('recorded_at', new Date(start).toISOString());
+  if (end) query = query.lte('recorded_at', new Date(end).toISOString());
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function getLastHeartbeat(riderId) {
+  const { data, error } = await supabase.from('rider_heartbeats')
+    .select('*')
+    .eq('rider_id', riderId)
+    .order('received_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function getOnlineRidersWithStaleLocations(staleMinutes) {
+  const cutoff = new Date(Date.now() - staleMinutes * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from('riders')
+    .select('*')
+    .eq('is_online', true)
+    .lt('last_location_update', cutoff);
+  if (error) throw error;
+  return data || [];
+}
+
+async function cleanupOldLocationHistory(retentionDays = 30) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const { error, count } = await supabase.from('location_history')
+    .delete()
+    .lt('recorded_at', cutoff);
+  if (error) throw error;
+  console.log(`[Cleanup] Deleted location_history older than ${retentionDays} days (cutoff: ${cutoff})`);
+  return { deleted: count || 0 };
+}
+
+async function cleanupOldHeartbeats(retentionDays = 7) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const { error, count } = await supabase.from('rider_heartbeats')
+    .delete()
+    .lt('received_at', cutoff);
+  if (error) throw error;
+  console.log(`[Cleanup] Deleted rider_heartbeats older than ${retentionDays} days (cutoff: ${cutoff})`);
+  return { deleted: count || 0 };
+}
+
 module.exports = {
   initDb, getDb, getAllRiders, getRiderById, createRider, updateRider,
   archiveRider, deleteRiderPermanently, getDailyLogs, getDailyLogsPaginated, getDailyLogsByRider,
@@ -1339,12 +1442,14 @@ module.exports = {
   getPaymentStatuses, deleteRiderCycleLogs, getAllBikes, createBike, updateBike, deleteBike,
   getAuditLogs, logAudit, migrateFromSQLite,
   // Rider Portal
-  // Rider Portal
   setRiderPassword, authenticateRider, updateRiderSelfService, getRiderMonthlyReport,
   getUnsettledPaymentsForRider, createRiderRequest, getRiderRequests, updateRiderRequestStatus,
   getMyRequests, deleteRiderRequest,
   // Tracking
   updateRiderOnlineStatus, updateRiderLocation, updateRiderGpsStatus,
+  // Location History & Heartbeats
+  insertLocationBatch, insertHeartbeat, getLocationHistory, getLastHeartbeat,
+  getOnlineRidersWithStaleLocations, cleanupOldLocationHistory, cleanupOldHeartbeats,
   // Notifications
   saveRiderPushToken, createNotification, getNotificationsForRider, markNotificationRead,
   // Admin Profiles

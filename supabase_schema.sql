@@ -239,6 +239,31 @@ CREATE TABLE IF NOT EXISTS auth_users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 16. LOCATION HISTORY (time-series rider positions)
+CREATE TABLE IF NOT EXISTS location_history (
+  id BIGSERIAL PRIMARY KEY,
+  rider_id INTEGER REFERENCES riders(id) ON DELETE CASCADE,
+  latitude NUMERIC NOT NULL,
+  longitude NUMERIC NOT NULL,
+  accuracy NUMERIC,
+  speed NUMERIC,
+  battery_level NUMERIC,
+  source TEXT,
+  recorded_at TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ DEFAULT NOW(),
+  session_id TEXT
+);
+
+-- 17. RIDER HEARTBEATS (app-alive signals)
+CREATE TABLE IF NOT EXISTS rider_heartbeats (
+  id BIGSERIAL PRIMARY KEY,
+  rider_id INTEGER REFERENCES riders(id) ON DELETE CASCADE,
+  battery_level NUMERIC,
+  is_location_active BOOLEAN DEFAULT true,
+  app_state TEXT,
+  received_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =============================================
 -- INDEXES for performance
 -- =============================================
@@ -251,6 +276,15 @@ CREATE INDEX IF NOT EXISTS idx_notifications_rider ON notifications(rider_id);
 CREATE INDEX IF NOT EXISTS idx_rider_requests_rider ON rider_requests(rider_id);
 CREATE INDEX IF NOT EXISTS idx_riders_status ON riders(status);
 CREATE INDEX IF NOT EXISTS idx_riders_phone ON riders(phone);
+
+-- =============================================
+-- INDEXES for location tracking tables
+-- =============================================
+CREATE INDEX IF NOT EXISTS idx_location_history_rider ON location_history(rider_id);
+CREATE INDEX IF NOT EXISTS idx_location_history_time ON location_history(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_location_history_session ON location_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_rider ON rider_heartbeats(rider_id);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON rider_heartbeats(received_at);
 
 -- =============================================
 -- Row Level Security (RLS) — disabled for server-side access
@@ -270,6 +304,8 @@ ALTER TABLE admin_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE location_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rider_heartbeats ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses RLS, so permissive policies for safety:
 CREATE POLICY "Service role full access" ON riders FOR ALL USING (true) WITH CHECK (true);
@@ -287,6 +323,8 @@ CREATE POLICY "Service role full access" ON admin_profiles FOR ALL USING (true) 
 CREATE POLICY "Service role full access" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON app_config FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON auth_users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access" ON location_history FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access" ON rider_heartbeats FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
 -- RESET SEQUENCES (run after data import)
@@ -303,3 +341,5 @@ CREATE POLICY "Service role full access" ON auth_users FOR ALL USING (true) WITH
 -- SELECT setval('payment_status_id_seq', COALESCE((SELECT MAX(id) FROM payment_status), 0) + 1, false);
 -- SELECT setval('audit_logs_id_seq', COALESCE((SELECT MAX(id) FROM audit_logs), 0) + 1, false);
 -- SELECT setval('auth_users_id_seq', COALESCE((SELECT MAX(id) FROM auth_users), 0) + 1, false);
+-- SELECT setval('location_history_id_seq', COALESCE((SELECT MAX(id) FROM location_history), 0) + 1, false);
+-- SELECT setval('rider_heartbeats_id_seq', COALESCE((SELECT MAX(id) FROM rider_heartbeats), 0) + 1, false);
