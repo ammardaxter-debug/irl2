@@ -1446,13 +1446,16 @@ const Expenses = {
       const riderMap = {};
       
       for (const e of riderExpenses) {
-        const rName = e.rider_name || `Rider #${e.rider_id}`;
+        let rName = e.rider_name || e.vendor_name;
+        if (!rName || rName === 'Rider') {
+            const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+            rName = foundRider ? foundRider.name : (e.rider_id ? 'Rider #' + e.rider_id : (e.vendor_name || 'Non-Rider Deductible'));
+        }
+        
         if (!riderMap[rName]) riderMap[rName] = { pending: [], settled: [] };
+        
         if (e.deductionSettled) {
-          const sDate = new Date(e.settledDate || e.expense_date || e.created_at);
-          if (sDate >= activeStart && sDate <= activeEnd) {
-             riderMap[rName].settled.push(e);
-          }
+          riderMap[rName].settled.push(e);
         } else {
           riderMap[rName].pending.push(e);
         }
