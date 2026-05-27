@@ -2053,5 +2053,8 @@ app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
   }
 });
 
+// Initialize background cron jobs
+require('./cron.js');
+
 // Export for Vercel
 module.exports = app;
