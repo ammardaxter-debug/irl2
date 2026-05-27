@@ -7,6 +7,12 @@
       "use": "@vercel/node"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cron/weekly-sprint",
+      "schedule": "0 20 * * *"
+    }
+  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "server.js" },
     { "src": "/rider/(.*)", "dest": "server.js" },
