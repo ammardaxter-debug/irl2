@@ -586,10 +586,10 @@ const Expenses = {
           
           const riderMap = {};
           for (const e of riderExpenses) {
-            const mapKey = e.rider_id || e.rider_name || 'Supervisor';
+            const mapKey = e.rider_id || e.rider_name || e.vendor_name || 'Supervisor';
             if (!riderMap[mapKey]) {
               const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
-              let rName = e.rider_name;
+              let rName = e.rider_name || e.vendor_name;
               if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : (e.rider_id ? `Rider #${e.rider_id}` : mapKey);
               riderMap[mapKey] = { 
                 rider_name: rName, 
@@ -1903,8 +1903,8 @@ const Expenses = {
         </div>
         
         <div id="vendor-group" style="display:none; transition: all 150ms;">
-          <label class="expense-form-label">Vendor or Item Name</label>
-          <input type="text" class="expense-form-input" name="vendor_name" id="vendor-input" placeholder="e.g. AC Installer, Petrol, Spare Part">
+          <label class="expense-form-label">Vendor or Person Name</label>
+          <input type="text" class="expense-form-input" name="vendor_name" id="vendor-input" placeholder="e.g. AC Installer, Petrol, Syed Shahzad">
         </div>
         
         <div>
@@ -2231,8 +2231,8 @@ const Expenses = {
           </div>
           
           <div id="edit-vendor-group" style="display:none; transition: all 150ms;">
-            <label class="expense-form-label">Vendor or Item Name</label>
-            <input type="text" class="expense-form-input" name="vendor_name" id="edit-vendor-input" value="${Utils.escapeHtml(exp.vendor_name || '')}" placeholder="e.g. AC Installer, Petrol, Spare Part">
+            <label class="expense-form-label">Vendor or Person Name</label>
+            <input type="text" class="expense-form-input" name="vendor_name" id="edit-vendor-input" value="${Utils.escapeHtml(exp.vendor_name || '')}" placeholder="e.g. AC Installer, Petrol, Syed Shahzad">
           </div>
           
           <div>
