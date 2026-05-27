@@ -589,8 +589,8 @@ const Expenses = {
             const mapKey = e.rider_id || e.rider_name || e.vendor_name || 'Supervisor';
             if (!riderMap[mapKey]) {
               const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
-              let rName = e.rider_name || e.vendor_name;
-              if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : (e.rider_id ? `Rider #${e.rider_id}` : mapKey);
+              let rName = foundRider ? foundRider.name : (e.rider_name || e.vendor_name || (e.rider_id ? `Rider #${e.rider_id}` : mapKey));
+
               riderMap[mapKey] = { 
                 rider_name: rName, 
                 rider_id: e.rider_id, 
@@ -1428,7 +1428,7 @@ const Expenses = {
 
       const riderExpenses = expenses.filter(e => {
         const isMedical = (e.category || '').toLowerCase().includes('medical');
-        return !isMedical && (e.is_deductible === 1 || e.is_deductible === true) && e.rider_id;
+        return !isMedical && (e.is_deductible === 1 || e.is_deductible === true);
       });
 
       const getCycleString = (dateStr) => {
@@ -1446,11 +1446,11 @@ const Expenses = {
       const riderMap = {};
       
       for (const e of riderExpenses) {
-        let rName = e.rider_name || e.vendor_name;
-        if (!rName || rName === 'Rider') {
-            const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
-            rName = foundRider ? foundRider.name : (e.rider_id ? 'Rider #' + e.rider_id : (e.vendor_name || 'Non-Rider Deductible'));
-        }
+        const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+        let rName = foundRider ? foundRider.name : (e.rider_name || e.vendor_name || (e.rider_id ? 'Rider #' + e.rider_id : 'Non-Rider Deductible'));
+
+
+
         
         if (!riderMap[rName]) riderMap[rName] = { pending: [], settled: [] };
         
