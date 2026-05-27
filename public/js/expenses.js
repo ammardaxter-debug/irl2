@@ -346,7 +346,7 @@ const Expenses = {
             if (e.rider_id) {
               deductBadge = `<span style="background:#FEF3C7; color:#D97706; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Rider Deductible</span>`;
             } else {
-              deductBadge = `<span style="background:#FFEDD5; color:#C2410C; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Supervisor Deductible</span>`;
+              deductBadge = `<span style="background:#FFEDD5; color:#C2410C; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Non-Rider Deductible</span>`;
             }
           } else {
             deductBadge = `<span style="background:#DCFCE7; color:#16A34A; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Company Paid</span>`;
@@ -1879,7 +1879,7 @@ const Expenses = {
           <select class="expense-form-input" name="deduct_type" id="expense-deductible">
             <option value="company">Company Paid</option>
             <option value="deductible">Rider Deductible (rider will repay)</option>
-            <option value="supervisor">Supervisor Deductible (supervisor will repay)</option>
+            <option value="supervisor">Non-Rider Deductible (person will repay)</option>
           </select>
           <div id="medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
         </div>
@@ -2207,7 +2207,7 @@ const Expenses = {
             <select class="expense-form-input" name="deduct_type" id="edit-expense-deductible">
               <option value="company" ${initialDeductType === 'company' ? 'selected' : ''}>Company Paid</option>
               <option value="deductible" ${initialDeductType === 'deductible' ? 'selected' : ''}>Rider Deductible (rider will repay)</option>
-              <option value="supervisor" ${initialDeductType === 'supervisor' ? 'selected' : ''}>Supervisor Deductible (supervisor will repay)</option>
+              <option value="supervisor" ${initialDeductType === 'supervisor' ? 'selected' : ''}>Non-Rider Deductible (person will repay)</option>
             </select>
             <div id="edit-medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
           </div>
