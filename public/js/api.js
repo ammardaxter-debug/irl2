@@ -205,10 +205,10 @@ const API = {
     return this.request(`/expenses/${id}`, { method: 'DELETE' });
   },
 
-  settleExpenseDeduction(id, settledBy) {
+  settleExpenseDeduction(id, settledBy, amountPaid = null) {
     return this.request(`/expenses/${id}/settle`, {
       method: 'PUT',
-      body: JSON.stringify({ settledBy })
+      body: JSON.stringify({ settledBy, amountPaid })
     });
   },
 

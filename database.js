@@ -485,7 +485,44 @@ async function deleteExpense(id) {
   if (error) throw error;
 }
 
-async function settleExpenseDeduction(id, settledBy) {
+async function settleExpenseDeduction(id, settledBy, amountPaid = null) {
+  if (amountPaid !== null) {
+    const { data: expense } = await supabase.from('expenses').select('*').eq('id', id).single();
+    if (!expense) throw new Error('Expense not found');
+    
+    amountPaid = parseFloat(amountPaid);
+    const originalAmount = parseFloat(expense.amount);
+
+    if (amountPaid < originalAmount) {
+      const remaining = originalAmount - amountPaid;
+      
+      await supabase.from('expenses').update({
+        amount: amountPaid,
+        "deductionSettled": true,
+        settled_by: settledBy,
+        "settledBy": settledBy,
+        settled_at: nowISO(),
+        "settledDate": nowISO(),
+        notes: (expense.notes ? expense.notes + ' ' : '') + '(Partially Settled)'
+      }).eq('id', id);
+
+      const newExpense = { ...expense };
+      delete newExpense.id;
+      delete newExpense.created_at;
+      delete newExpense.updated_at;
+      newExpense.amount = remaining;
+      newExpense.deductionSettled = false;
+      newExpense.settled_by = null;
+      newExpense.settledBy = null;
+      newExpense.settled_at = null;
+      newExpense.settledDate = null;
+      newExpense.notes = (expense.notes ? expense.notes.replace(' (Remaining Balance)', '').replace(' (Partially Settled)', '') + ' ' : '') + '(Remaining Balance)';
+      
+      await supabase.from('expenses').insert(newExpense);
+      return;
+    }
+  }
+
   const { error } = await supabase.from('expenses').update({
     "deductionSettled": true,
     settled_by: settledBy,

@@ -560,9 +560,9 @@ app.put('/api/expenses/:id', verifyAdminToken, requireAdmin, async (req, res) =>
 
 app.put('/api/expenses/:id/settle', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
-    const { settledBy } = req.body;
+    const { settledBy, amountPaid } = req.body;
     if (!settledBy) return res.status(400).json({ error: 'settledBy required' });
-    await db.settleExpenseDeduction(parseInt(req.params.id), settledBy);
+    await db.settleExpenseDeduction(parseInt(req.params.id), settledBy, amountPaid || null);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

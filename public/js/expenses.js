@@ -581,24 +581,25 @@ const Expenses = {
           const expenses = await API.getExpenses();
           const riderExpenses = expenses.filter(e => {
             const isMedical = (e.category || '').toLowerCase().includes('medical');
-            return !isMedical && (e.is_deductible === 1 || e.is_deductible === true) && e.rider_id;
+            return !isMedical && (e.is_deductible === 1 || e.is_deductible === true);
           });
           
           const riderMap = {};
           for (const e of riderExpenses) {
-            if (!riderMap[e.rider_id]) {
-              const foundRider = this.riders.find(r => r.id == e.rider_id);
+            const mapKey = e.rider_id || e.rider_name || 'Supervisor';
+            if (!riderMap[mapKey]) {
+              const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
               let rName = e.rider_name;
-              if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : `Rider #${e.rider_id}`;
-              riderMap[e.rider_id] = { 
+              if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : (e.rider_id ? `Rider #${e.rider_id}` : mapKey);
+              riderMap[mapKey] = { 
                 rider_name: rName, 
                 rider_id: e.rider_id, 
                 pending: [], 
                 settled: [] 
               };
             }
-            if (e.deductionSettled) { riderMap[e.rider_id].settled.push(e); }
-            else { riderMap[e.rider_id].pending.push(e); }
+            if (e.deductionSettled) { riderMap[mapKey].settled.push(e); }
+            else { riderMap[mapKey].pending.push(e); }
           }
           
           this.deductionsData = {
@@ -1714,7 +1715,18 @@ const Expenses = {
     if (App.isViewer()) return;
     const html = `
       <div style="padding:8px 0;">
-        <p style="margin-bottom:20px; font-size:15px; color:#4B5563; line-height:1.5;">Confirm settlement of <b>SAR ${amount}</b> for <b>${Utils.escapeHtml(riderName)}</b>?</p>
+        <p style="margin-bottom:20px; font-size:15px; color:#4B5563; line-height:1.5;">Settling deduction of <b>SAR ${amount}</b> for <b>${Utils.escapeHtml(riderName)}</b>.</p>
+        <div class="form-group">
+          <label class="form-label">Settlement Type</label>
+          <select id="settle-single-type" class="form-input" onchange="document.getElementById('settle-single-amount-group').style.display = this.value === 'partial' ? 'block' : 'none'">
+            <option value="full">Full Settlement (SAR ${amount})</option>
+            <option value="partial">Partial Settlement</option>
+          </select>
+        </div>
+        <div class="form-group" id="settle-single-amount-group" style="display:none;">
+          <label class="form-label">Amount Paid (SAR)</label>
+          <input type="number" id="settle-single-amount" class="form-input" step="0.01" min="0.01" max="${amount}" placeholder="Enter amount paid">
+        </div>
         <div class="form-group">
           <label class="form-label">Settled By</label>
           <select id="settle-single-by-select" class="form-input">
@@ -1725,21 +1737,33 @@ const Expenses = {
         </div>
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:32px;">
           <button class="btn btn-outline" style="border-radius:8px;" onclick="Utils.closeModal()">Cancel</button>
-          <button class="btn btn-primary" style="background:#16A34A; border-color:#16A34A; border-radius:8px;" onclick="Expenses.confirmSettleSingle(${expenseId})">Confirm Settlement</button>
+          <button class="btn btn-primary" style="background:#16A34A; border-color:#16A34A; border-radius:8px;" onclick="Expenses.confirmSettleSingle(${expenseId}, ${amount})">Confirm Settlement</button>
         </div>
       </div>
     `;
     Utils.openModal('Confirm Settlement', html);
   },
 
-  async confirmSettleSingle(expenseId) {
+  async confirmSettleSingle(expenseId, maxAmount) {
     if (App.isViewer()) return;
+    const type = document.getElementById('settle-single-type').value;
     const settledBy = document.getElementById('settle-single-by-select').value;
+    let amountPaid = null;
+    
+    if (type === 'partial') {
+      amountPaid = parseFloat(document.getElementById('settle-single-amount').value);
+      if (!amountPaid || amountPaid <= 0 || amountPaid >= maxAmount) {
+        Utils.showToast('Please enter a valid partial amount less than the total.', 'error');
+        return;
+      }
+    }
+    
     Utils.closeModal();
     try {
       Utils.showToast('Settling deduction...', 'info');
-      await API.settleExpenseDeduction(expenseId, settledBy);
+      await API.settleExpenseDeduction(expenseId, settledBy, amountPaid);
       Utils.showToast('Deduction settled successfully.', 'success');
+      this.deductionsData = null;
       this.renderTabContent();
     } catch (err) {
       Utils.showToast(err.message, 'error');
