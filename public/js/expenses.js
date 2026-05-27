@@ -1399,32 +1399,6 @@ const Expenses = {
       
       const formatReadableDate = (dStr) => dStr ? new Date(dStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
       
-      const sortedExpenses = [...expenses].sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
-      const sortedFunds = [...funds].sort((a, b) => new Date(a.receive_date || a.created_at) - new Date(b.receive_date || b.created_at));
-      let currentCompanyBalance = 0;
-      let fundIndex = 0;
-      const paidByMap = {};
-      
-      for (const e of sortedExpenses) {
-        const eDate = new Date(e.expense_date || e.created_at);
-        while (fundIndex < sortedFunds.length) {
-          const fDate = new Date(sortedFunds[fundIndex].receive_date || sortedFunds[fundIndex].created_at);
-          if (fDate <= eDate) {
-            currentCompanyBalance += parseFloat(sortedFunds[fundIndex].amount) || 0;
-            fundIndex++;
-          } else {
-            break;
-          }
-        }
-        const amt = parseFloat(e.amount) || 0;
-        if (currentCompanyBalance >= amt) {
-          paidByMap[e.id] = 'Company';
-          currentCompanyBalance -= amt;
-        } else {
-          paidByMap[e.id] = 'Out of Pocket';
-          currentCompanyBalance -= amt;
-        }
-      }
 
       const riderExpenses = expenses.filter(e => {
         const isMedical = (e.category || '').toLowerCase().includes('medical');
@@ -1529,7 +1503,7 @@ const Expenses = {
           row.getCell(4).value = getCycleString(e.expense_date || e.created_at); row.getCell(4).font = {name:'Calibri',size:11};
           row.getCell(5).value = a; row.getCell(5).numFmt='#,##0.00'; row.getCell(5).alignment={horizontal:'right'};
           row.getCell(5).font = a>500 ? {name:'Calibri',size:11,bold:true,color:{argb:RD}} : {name:'Calibri',size:11};
-          row.getCell(6).value = paidByMap[e.id] || 'Company'; row.getCell(6).font = {name:'Calibri',size:11};
+          row.getCell(6).value = 'Company'; row.getCell(6).font = {name:'Calibri',size:11};
           row.getCell(7).value = 'PENDING';
           row.getCell(7).font = {name:'Calibri',size:11,bold:true,color:{argb:PTX}};
           row.getCell(7).fill = {type:'pattern',pattern:'solid',fgColor:{argb:PBG}};
@@ -1580,7 +1554,7 @@ const Expenses = {
           row.getCell(3).value = formatReadableDate(e.expense_date); row.getCell(3).font = {name:'Calibri',size:11};
           row.getCell(4).value = a; row.getCell(4).numFmt='#,##0.00'; row.getCell(4).alignment={horizontal:'right'};
           row.getCell(4).font = a>500 ? {name:'Calibri',size:11,bold:true,color:{argb:RD}} : {name:'Calibri',size:11};
-          row.getCell(5).value = paidByMap[e.id] || 'Company'; row.getCell(5).font = {name:'Calibri',size:11};
+          row.getCell(5).value = 'Company'; row.getCell(5).font = {name:'Calibri',size:11};
           row.getCell(6).value = 'SETTLED';
           row.getCell(6).font = {name:'Calibri',size:11,bold:true,color:{argb:STX}};
           row.getCell(6).fill = {type:'pattern',pattern:'solid',fgColor:{argb:SBG}};
