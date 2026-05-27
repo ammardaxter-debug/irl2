@@ -757,6 +757,14 @@ const Expenses = {
         requests.forEach(r => {
           const dateStr = Utils.formatDateTime(r.created_at || r.updated_at);
           
+          let descText = r.description || '-';
+          let installmentText = '';
+          const match = descText.match(/\[INSTALLMENT_PLAN:(\d+)\]/);
+          if (match) {
+            installmentText = `<br><span style="background:#F5F3FF; color:#7C3AED; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600; margin-top:4px; display:inline-block;">Requested Installments: ${match[1]} Months</span>`;
+            descText = descText.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim() || '-';
+          }
+          
           let actionOrInfo = '';
           if (isPending) {
             actionOrInfo = `
@@ -768,39 +776,33 @@ const Expenses = {
               </td>
             `;
           } else {
-            const isApproved = r.status === 'approved';
-            const badgeColor = isApproved ? '#16A34A' : '#DC2626';
-            const badgeBg = isApproved ? '#F0FDF4' : '#FEF2F2';
+            let sBadge = `<span style="color:#D97706; font-weight:600;">Pending</span>`;
+            if (r.status === 'approved') sBadge = `<span style="color:#16A34A; font-weight:600;">Approved</span>`;
+            else if (r.status === 'rejected') sBadge = `<span style="color:#DC2626; font-weight:600;">Rejected</span>`;
             
-            // Check if there is an expense matching this request_id
-            const matchedExp = expenses.find(e => String(e.request_id) === String(r.id));
-            let receiptCell = '<span style="color:#9CA3AF; font-size:12px;">No receipt</span>';
-            if (matchedExp && matchedExp.receipt_base64) {
-              receiptCell = `
-                <button class="btn btn-sm" style="background:#EBF5FF; color:#1E40AF; border:1px solid #BFDBFE; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="Expenses.viewReceipt(${matchedExp.id})">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  View
-                </button>
-              `;
+            let matchedExp = '-';
+            if (r.status === 'approved' && expenses.length > 0) {
+              const eMatch = expenses.find(e => String(e.request_id) === String(r.id) && e.receipt_url);
+              if (eMatch) {
+                matchedExp = `<a href="${eMatch.receipt_url}" target="_blank" style="color:#2563EB; font-size:12px; font-weight:500; text-decoration:none;">View Receipt</a>`;
+              }
             }
-            
+
             actionOrInfo = `
-              <td>
-                <span style="background:${badgeBg}; color:${badgeColor}; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; text-transform:capitalize;">${r.status}</span>
-              </td>
-              <td style="color:#4B5563; font-size:13px;">${Utils.escapeHtml(r.processed_by || 'Admin')}</td>
-              <td style="color:#4B5563; font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${Utils.escapeHtml(r.admin_note || '-')}">${Utils.escapeHtml(r.admin_note || '-')}</td>
-              <td>${receiptCell}</td>
+              <td>${sBadge}</td>
+              <td style="font-size:12px; color:#4B5563;">${Utils.escapeHtml(r.processed_by || '-')}</td>
+              <td style="font-size:12px; color:#4B5563; max-width:200px;">${Utils.escapeHtml(r.admin_note || '-')}</td>
+              <td>${matchedExp}</td>
             `;
           }
 
           html += `
-            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+            <tr style="border-bottom:1px solid #F3F4F6;">
               <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
               <td><div style="font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div></td>
               <td><span style="background:#EFF6FF; color:#2563EB; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></td>
-              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(r.description || '-')}</div></td>
-              <td style="font-weight:700; color:#0F0F0F; text-align:right; white-space:nowrap;">${Utils.formatCurrency(r.amount)}</td>
+              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(descText)}${installmentText}</div></td>
+              <td style="font-weight:700; color:#0F0F0F; text-align:right; white-space:nowrap;">${Utils.formatCurrency(r.amount)}</td></td>
               ${actionOrInfo}
             </tr>
           `;
@@ -836,6 +838,14 @@ const Expenses = {
   },
 
   showApprovalModal(r) {
+    let descText = r.description || '-';
+    let requestedPlan = 1;
+    const match = descText.match(/\[INSTALLMENT_PLAN:(\d+)\]/);
+    if (match) {
+        requestedPlan = parseInt(match[1]) || 1;
+        descText = descText.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim() || '-';
+    }
+
     const html = `
       <form id="approve-request-form" style="padding:4px 0;">
         <div style="background:#F9FAFB; padding:16px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:20px;">
@@ -846,9 +856,22 @@ const Expenses = {
             <div><span style="color:#6B7280;">Submitted:</span> <span style="color:#4B5563;">${Utils.formatDateTime(r.created_at)}</span></div>
           </div>
           <div style="margin-top:10px; font-size:13px; color:#4B5563; border-top:1px solid #E5E7EB; padding-top:10px;">
-            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(r.description || '-')}
+            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(descText)}
           </div>
         </div>
+
+        ${r.category === 'Advance' ? `
+        <div style="margin-bottom:16px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Approved Installment Plan</label>
+          <select id="approve-installment-plan" class="expense-form-input" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; font-size:14px; font-weight:500; cursor:pointer; background:#fff;">
+            <option value="1" ${requestedPlan === 1 ? 'selected' : ''}>Direct Deduction (1 Month)</option>
+            <option value="2" ${requestedPlan === 2 ? 'selected' : ''}>2 Months Installment</option>
+            <option value="3" ${requestedPlan === 3 ? 'selected' : ''}>3 Months Installment</option>
+            <option value="4" ${requestedPlan === 4 ? 'selected' : ''}>4 Months Installment</option>
+          </select>
+          <p style="margin:6px 0 0 0; font-size:12px; color:#6B7280;">Deductions will be split evenly across selected months starting from current cycle.</p>
+        </div>
+        ` : ''}
 
         <div style="margin-bottom:16px;">
           <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Admin Note (Optional)</label>
@@ -899,7 +922,16 @@ const Expenses = {
     document.getElementById('approve-request-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const adminNote = e.target.elements.admin_note.value.trim();
+      let adminNote = e.target.elements.admin_note.value.trim();
+      
+      if (r.category === 'Advance') {
+        const planEl = document.getElementById('approve-installment-plan');
+        if (planEl) {
+          const approvedPlan = parseInt(planEl.value) || 1;
+          adminNote += (adminNote ? '\\n' : '') + `[OVERRIDE_PLAN:${approvedPlan}]`;
+        }
+      }
+
       const attachReceipt = document.getElementById('attach-receipt-toggle').checked;
       const receiptBase64 = attachReceipt ? document.getElementById('approve-receipt-base64-hidden').value || null : null;
 

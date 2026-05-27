@@ -1083,18 +1083,24 @@ app.get('/api/rider/unsettled-payments', verifyRiderToken, async (req, res) => {
 // Request money (Food, Advance, etc.)
 app.post('/api/rider/request-money', verifyRiderToken, async (req, res) => {
   try {
-    const { amount, category, description } = req.body;
+    const { amount, category, description, installment_plan } = req.body;
     if (!amount || !category) return res.status(400).json({ error: 'Amount and category required' });
     
     const rider = await db.getRiderById(req.riderId);
     if (!rider) return res.status(404).json({ error: 'Rider not found' });
+
+    let finalDesc = description || '';
+    const plan = parseInt(installment_plan, 10) || 1;
+    if (category === 'Advance' && plan > 1) {
+      finalDesc += `\n[INSTALLMENT_PLAN:${plan}]`;
+    }
 
     const request = await db.createRiderRequest({
       rider_id: req.riderId,
       rider_name: rider.name,
       amount: parseFloat(amount),
       category,
-      description: description || ''
+      description: finalDesc
     });
     res.status(201).json(request);
   } catch (err) {

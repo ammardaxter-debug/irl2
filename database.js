@@ -1060,20 +1060,52 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
   await createNotification({ rider_id: request.rider_id, type: status === 'approved' ? 'request_approved' : 'request_rejected', title: `Request ${status.toUpperCase()}`, message: msg, processed_by_name: processedBy, processed_by_photo: processedByPhoto });
 
   if (status === 'approved') {
-    // ALL approved requests (including advances) create a SINGLE deductible expense.
-    // No separate salary_advances record — prevents double-deduction in payroll.
-    await createExpense({
-      expense_date: todayLocal(),
-      category: request.category,
-      amount: request.amount,
-      rider_id: request.rider_id,
-      rider_name: request.rider_name,
-      is_deductible: true,
-      source: 'rider_request',
-      request_id: id,
-      receipt_base64: receiptBase64,
-      notes: request.description || ''
-    });
+    let plan = 1;
+    const desc = request.description || '';
+    const match = desc.match(/\[INSTALLMENT_PLAN:(\d+)\]/);
+    if (match) plan = parseInt(match[1], 10) || 1;
+    
+    const overrideMatch = (adminNote || '').match(/\[OVERRIDE_PLAN:(\d+)\]/);
+    if (overrideMatch) plan = parseInt(overrideMatch[1], 10) || 1;
+
+    const originalNote = desc.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim();
+
+    if (request.category === 'Advance' && plan > 1) {
+      const amountPerMonth = request.amount / plan;
+      for (let i = 0; i < plan; i++) {
+        const d = new Date();
+        d.setMonth(d.getMonth() + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        
+        await createExpense({
+          expense_date: `${yyyy}-${mm}-${dd}`,
+          category: request.category,
+          amount: amountPerMonth,
+          rider_id: request.rider_id,
+          rider_name: request.rider_name,
+          is_deductible: true,
+          source: 'rider_request',
+          request_id: id,
+          receipt_base64: receiptBase64,
+          notes: `Installment ${i + 1}/${plan}. ${originalNote}`.trim()
+        });
+      }
+    } else {
+      await createExpense({
+        expense_date: todayLocal(),
+        category: request.category,
+        amount: request.amount,
+        rider_id: request.rider_id,
+        rider_name: request.rider_name,
+        is_deductible: true,
+        source: 'rider_request',
+        request_id: id,
+        receipt_base64: receiptBase64,
+        notes: originalNote
+      });
+    }
   }
   return { success: true, rider_id: request.rider_id, category: request.category };
 }
