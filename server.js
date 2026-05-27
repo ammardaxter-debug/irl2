@@ -2055,25 +2055,70 @@ app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
 
 // ========== VERCEL CRON JOBS ==========
 
-// Daily Progress Notification
-app.get('/api/cron/monthly-sprint', async (req, res) => {
-  console.log('[CRON] Running daily progress notifications for Monthly Sprint...');
+// Helper function to calculate sprint state on backend
+function getSprintState(nowStr) {
+  const now = nowStr ? new Date(nowStr) : new Date();
+  
+  // Anchor: June 1, 2026, 00:00:00 Local Time
+  const anchor = new Date(2026, 5, 1, 0, 0, 0, 0); // Month is 0-indexed
+  
+  if (now.getTime() < anchor.getTime()) {
+    return {
+      phase: 'PRE_LAUNCH',
+      countdownMs: anchor.getTime() - now.getTime(),
+      currentSprintStart: anchor,
+      currentSprintEnd: new Date(anchor.getTime() + 7 * 24 * 60 * 60 * 1000 - 1),
+      sprintNumber: 1
+    };
+  }
+  
+  const diffMs = now.getTime() - anchor.getTime();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const CYCLE_MS = 8 * ONE_DAY_MS;
+  const COMP_MS = 7 * ONE_DAY_MS;
+  
+  const cycleIndex = Math.floor(diffMs / CYCLE_MS);
+  const timeInCycle = diffMs % CYCLE_MS;
+  
+  const currentSprintStart = new Date(anchor.getTime() + cycleIndex * CYCLE_MS);
+  const currentSprintEnd = new Date(currentSprintStart.getTime() + COMP_MS - 1);
+  const nextSprintStart = new Date(anchor.getTime() + (cycleIndex + 1) * CYCLE_MS);
+  
+  if (timeInCycle < COMP_MS) {
+    return {
+      phase: 'ACTIVE',
+      countdownMs: currentSprintEnd.getTime() - now.getTime(),
+      currentSprintStart,
+      currentSprintEnd,
+      sprintNumber: cycleIndex + 1
+    };
+  } else {
+    return {
+      phase: 'WINNER_HIGHLIGHT',
+      countdownMs: nextSprintStart.getTime() - now.getTime(),
+      currentSprintStart,
+      currentSprintEnd,
+      sprintNumber: cycleIndex + 1
+    };
+  }
+}
+
+// Single Smart Sprint Manager Endpoint
+app.get('/api/cron/sprint-manager', async (req, res) => {
+  console.log('[CRON] Running smart sprint manager...');
   try {
     const { Expo } = require('expo-server-sdk');
     const expo = new Expo();
     
-    // Monthly cycle: 1st of current month to end of current month
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    
-    const start = new Date(year, month, 1);
-    start.setHours(0,0,0,0);
-    const end = new Date(year, month + 1, 0); // Last day of month
-    end.setHours(23,59,59,999);
-    
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
+    const state = getSprintState();
+
+    // If we're before June 1st, there's nothing to calculate
+    if (state.phase === 'PRE_LAUNCH') {
+      return res.json({ success: true, message: 'Sprint has not started yet (PRE_LAUNCH). Nothing to do.' });
+    }
+
+    const startStr = state.currentSprintStart.toISOString().split('T')[0];
+    const endStr = state.currentSprintEnd.toISOString().split('T')[0];
 
     const riders = await db.getAllRiders('active');
     const companyRiders = riders.filter(r => r.rider_type === 'company' && r.push_token && Expo.isExpoPushToken(r.push_token));
@@ -2097,129 +2142,72 @@ app.get('/api/cron/monthly-sprint', async (req, res) => {
 
     const messages = [];
 
-    leaderboard.forEach((rider, index) => {
-      const rank = index + 1;
-      let title = '';
-      let body = '';
+    if (state.phase === 'ACTIVE') {
+      // Send standard daily progress
+      leaderboard.forEach((rider, index) => {
+        const rank = index + 1;
+        let title = '';
+        let body = '';
 
-      if (rank === 1) {
-        title = '👑 You are Rank #1!';
-        body = `Keep up the great work to secure the 40 SAR Monthly Sprint prize! You have ${rider.total_orders} orders.`;
-      } else if (rank === 2) {
-        const diffOrders = leaderboard[0].total_orders - rider.total_orders + 1;
-        title = '🥈 You are Rank #2!';
-        body = `You only need ${diffOrders} more orders to take 1st place and the 40 SAR prize!`;
-      } else if (rank === 3) {
-        const diffOrders = leaderboard[1].total_orders - rider.total_orders + 1;
-        title = '🥉 You are Rank #3!';
-        body = `You are in the money! Complete ${diffOrders} more orders to overtake Rank #2.`;
-      } else if (rank <= 10) {
-        const diffOrders = leaderboard[2].total_orders - rider.total_orders + 1;
-        title = `📈 You are Rank #${rank}!`;
-        body = `You need ${diffOrders} more orders to break into the Top 3 and win cash! Keep pushing!`;
-      }
+        if (rank === 1) {
+          title = `👑 Sprint #${state.sprintNumber}: You are Rank #1!`;
+          body = `Keep up the great work to secure the 40 SAR Weekly Sprint prize! You have ${rider.total_orders} orders.`;
+        } else if (rank === 2) {
+          const diffOrders = leaderboard[0].total_orders - rider.total_orders + 1;
+          title = `🥈 Sprint #${state.sprintNumber}: You are Rank #2!`;
+          body = `You only need ${diffOrders} more orders to take 1st place and the 40 SAR prize!`;
+        } else if (rank === 3) {
+          const diffOrders = leaderboard[1].total_orders - rider.total_orders + 1;
+          title = `🥉 Sprint #${state.sprintNumber}: You are Rank #3!`;
+          body = `You are in the money! Complete ${diffOrders} more orders to overtake Rank #2.`;
+        } else if (rank <= 10) {
+          const diffOrders = leaderboard[2].total_orders - rider.total_orders + 1;
+          title = `📈 You are Rank #${rank}!`;
+          body = `You need ${diffOrders} more orders to break into the Top 3 and win cash! Keep pushing!`;
+        }
 
-      if (title && body) {
+        if (title && body) {
+          messages.push({
+            to: rider.push_token,
+            sound: 'default',
+            title: title,
+            body: body,
+            data: { type: 'sprint_progress' },
+          });
+        }
+      });
+    } else if (state.phase === 'WINNER_HIGHLIGHT') {
+      // Only send if it's the exact day the winners are calculated (the highlight day)
+      // To prevent spamming the winner notification every hour if the cron misfires, we check if we already sent it,
+      // but since the cron runs once a day, it's fine to just blast it.
+      
+      const top3 = leaderboard.slice(0, 3);
+      if (top3.length === 0) return res.json({ success: true, message: 'No logs found for previous sprint' });
+
+      companyRiders.forEach((rider) => {
+        let title = `🏆 Sprint #${state.sprintNumber} Winners!`;
+        let body = `1st: ${top3[0]?.name || 'N/A'}\n2nd: ${top3[1]?.name || 'N/A'}\n3rd: ${top3[2]?.name || 'N/A'}\nTap to see full rankings!`;
+        
+        if (top3[0] && rider.id === top3[0].id) {
+          title = `👑 YOU WON 1ST PLACE!`;
+          body = `Congratulations! You won Sprint #${state.sprintNumber} and 40 SAR!`;
+        } else if (top3[1] && rider.id === top3[1].id) {
+          title = `🥈 YOU WON 2ND PLACE!`;
+          body = `Congratulations! You secured 2nd place in Sprint #${state.sprintNumber} and 20 SAR!`;
+        } else if (top3[2] && rider.id === top3[2].id) {
+          title = `🥉 YOU WON 3RD PLACE!`;
+          body = `Congratulations! You secured 3rd place in Sprint #${state.sprintNumber} and 15 SAR!`;
+        }
+
         messages.push({
           to: rider.push_token,
           sound: 'default',
           title: title,
           body: body,
-          data: { type: 'monthly_sprint_progress' },
+          data: { type: 'sprint_winners' },
         });
-      }
-    });
-
-    const chunks = expo.chunkPushNotifications(messages);
-    for (let chunk of chunks) {
-      try {
-        await expo.sendPushNotificationsAsync(chunk);
-      } catch (error) {
-        console.error('[CRON] Push error:', error);
-      }
-    }
-    res.json({ success: true, notified: messages.length });
-  } catch (err) {
-    console.error('[CRON] Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 1st of the Month Winner Announcement
-app.get('/api/cron/monthly-winners', async (req, res) => {
-  console.log('[CRON] Running Winner Announcement for previous month...');
-  try {
-    const { Expo } = require('expo-server-sdk');
-    const expo = new Expo();
-    
-    // Previous month bounds
-    const now = new Date();
-    let prevMonth = now.getMonth() - 1;
-    let prevYear = now.getFullYear();
-    if (prevMonth < 0) {
-      prevMonth += 12;
-      prevYear -= 1;
-    }
-    
-    const start = new Date(prevYear, prevMonth, 1);
-    start.setHours(0,0,0,0);
-    const end = new Date(prevYear, prevMonth + 1, 0);
-    end.setHours(23,59,59,999);
-    
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
-
-    const riders = await db.getAllRiders('active');
-    const companyRiders = riders.filter(r => r.rider_type === 'company' && r.push_token && Expo.isExpoPushToken(r.push_token));
-    
-    if (companyRiders.length === 0) return res.json({ success: true, message: 'No riders to notify' });
-
-    const logsResult = await db.getDailyLogsPaginated(startStr, endStr, 1, 99999);
-    const logs = logsResult.data || [];
-    
-    const statsMap = {};
-    for (const log of logs) {
-      if (log.rider_id) {
-        statsMap[log.rider_id] = (statsMap[log.rider_id] || 0) + (log.delivered_orders || 0);
-      }
-    }
-
-    const leaderboard = companyRiders.map(r => ({
-      ...r,
-      total_orders: statsMap[r.id] || 0
-    })).sort((a, b) => b.total_orders - a.total_orders);
-
-    const messages = [];
-    const top3 = leaderboard.slice(0, 3);
-    if (top3.length === 0) return res.json({ success: true, message: 'No logs found for previous month' });
-
-    const monthName = start.toLocaleDateString('en-US', { month: 'long' });
-
-    // Send massive announcement to ALL company riders
-    companyRiders.forEach((rider) => {
-      let title = `🏆 ${monthName} Sprint Winners!`;
-      let body = `1st: ${top3[0]?.name || 'N/A'}\n2nd: ${top3[1]?.name || 'N/A'}\n3rd: ${top3[2]?.name || 'N/A'}\nTap to see full rankings!`;
-      
-      // Personalize if they are a winner
-      if (top3[0] && rider.id === top3[0].id) {
-        title = `👑 YOU WON 1ST PLACE!`;
-        body = `Congratulations! You won the ${monthName} Sprint and 40 SAR!`;
-      } else if (top3[1] && rider.id === top3[1].id) {
-        title = `🥈 YOU WON 2ND PLACE!`;
-        body = `Congratulations! You secured 2nd place in the ${monthName} Sprint and 20 SAR!`;
-      } else if (top3[2] && rider.id === top3[2].id) {
-        title = `🥉 YOU WON 3RD PLACE!`;
-        body = `Congratulations! You secured 3rd place in the ${monthName} Sprint and 15 SAR!`;
-      }
-
-      messages.push({
-        to: rider.push_token,
-        sound: 'default',
-        title: title,
-        body: body,
-        data: { type: 'monthly_sprint_winners' },
       });
-    });
+    }
 
     const chunks = expo.chunkPushNotifications(messages);
     for (let chunk of chunks) {
@@ -2229,7 +2217,7 @@ app.get('/api/cron/monthly-winners', async (req, res) => {
         console.error('[CRON] Push error:', error);
       }
     }
-    res.json({ success: true, notified: messages.length });
+    res.json({ success: true, notified: messages.length, phase: state.phase });
   } catch (err) {
     console.error('[CRON] Error:', err);
     res.status(500).json({ error: err.message });
