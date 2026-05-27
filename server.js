@@ -2054,19 +2054,22 @@ app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
 });
 
 // ========== VERCEL CRON JOBS ==========
-app.get('/api/cron/weekly-sprint', async (req, res) => {
-  console.log('[CRON] Running daily progress notifications for Weekly Sprint...');
+
+// Daily Progress Notification
+app.get('/api/cron/monthly-sprint', async (req, res) => {
+  console.log('[CRON] Running daily progress notifications for Monthly Sprint...');
   try {
     const { Expo } = require('expo-server-sdk');
     const expo = new Expo();
     
+    // Monthly cycle: 1st of current month to end of current month
     const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const start = new Date(now.setDate(diff));
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    const start = new Date(year, month, 1);
     start.setHours(0,0,0,0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
+    const end = new Date(year, month + 1, 0); // Last day of month
     end.setHours(23,59,59,999);
     
     const startStr = start.toISOString().split('T')[0];
@@ -2101,7 +2104,7 @@ app.get('/api/cron/weekly-sprint', async (req, res) => {
 
       if (rank === 1) {
         title = '👑 You are Rank #1!';
-        body = `Keep up the great work to secure the 40 SAR Weekly Sprint prize! You have ${rider.total_orders} orders.`;
+        body = `Keep up the great work to secure the 40 SAR Monthly Sprint prize! You have ${rider.total_orders} orders.`;
       } else if (rank === 2) {
         const diffOrders = leaderboard[0].total_orders - rider.total_orders + 1;
         title = '🥈 You are Rank #2!';
@@ -2122,9 +2125,100 @@ app.get('/api/cron/weekly-sprint', async (req, res) => {
           sound: 'default',
           title: title,
           body: body,
-          data: { type: 'weekly_sprint_progress' },
+          data: { type: 'monthly_sprint_progress' },
         });
       }
+    });
+
+    const chunks = expo.chunkPushNotifications(messages);
+    for (let chunk of chunks) {
+      try {
+        await expo.sendPushNotificationsAsync(chunk);
+      } catch (error) {
+        console.error('[CRON] Push error:', error);
+      }
+    }
+    res.json({ success: true, notified: messages.length });
+  } catch (err) {
+    console.error('[CRON] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1st of the Month Winner Announcement
+app.get('/api/cron/monthly-winners', async (req, res) => {
+  console.log('[CRON] Running Winner Announcement for previous month...');
+  try {
+    const { Expo } = require('expo-server-sdk');
+    const expo = new Expo();
+    
+    // Previous month bounds
+    const now = new Date();
+    let prevMonth = now.getMonth() - 1;
+    let prevYear = now.getFullYear();
+    if (prevMonth < 0) {
+      prevMonth += 12;
+      prevYear -= 1;
+    }
+    
+    const start = new Date(prevYear, prevMonth, 1);
+    start.setHours(0,0,0,0);
+    const end = new Date(prevYear, prevMonth + 1, 0);
+    end.setHours(23,59,59,999);
+    
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    const riders = await db.getAllRiders('active');
+    const companyRiders = riders.filter(r => r.rider_type === 'company' && r.push_token && Expo.isExpoPushToken(r.push_token));
+    
+    if (companyRiders.length === 0) return res.json({ success: true, message: 'No riders to notify' });
+
+    const logsResult = await db.getDailyLogsPaginated(startStr, endStr, 1, 99999);
+    const logs = logsResult.data || [];
+    
+    const statsMap = {};
+    for (const log of logs) {
+      if (log.rider_id) {
+        statsMap[log.rider_id] = (statsMap[log.rider_id] || 0) + (log.delivered_orders || 0);
+      }
+    }
+
+    const leaderboard = companyRiders.map(r => ({
+      ...r,
+      total_orders: statsMap[r.id] || 0
+    })).sort((a, b) => b.total_orders - a.total_orders);
+
+    const messages = [];
+    const top3 = leaderboard.slice(0, 3);
+    if (top3.length === 0) return res.json({ success: true, message: 'No logs found for previous month' });
+
+    const monthName = start.toLocaleDateString('en-US', { month: 'long' });
+
+    // Send massive announcement to ALL company riders
+    companyRiders.forEach((rider) => {
+      let title = `🏆 ${monthName} Sprint Winners!`;
+      let body = `1st: ${top3[0]?.name || 'N/A'}\n2nd: ${top3[1]?.name || 'N/A'}\n3rd: ${top3[2]?.name || 'N/A'}\nTap to see full rankings!`;
+      
+      // Personalize if they are a winner
+      if (top3[0] && rider.id === top3[0].id) {
+        title = `👑 YOU WON 1ST PLACE!`;
+        body = `Congratulations! You won the ${monthName} Sprint and 40 SAR!`;
+      } else if (top3[1] && rider.id === top3[1].id) {
+        title = `🥈 YOU WON 2ND PLACE!`;
+        body = `Congratulations! You secured 2nd place in the ${monthName} Sprint and 20 SAR!`;
+      } else if (top3[2] && rider.id === top3[2].id) {
+        title = `🥉 YOU WON 3RD PLACE!`;
+        body = `Congratulations! You secured 3rd place in the ${monthName} Sprint and 15 SAR!`;
+      }
+
+      messages.push({
+        to: rider.push_token,
+        sound: 'default',
+        title: title,
+        body: body,
+        data: { type: 'monthly_sprint_winners' },
+      });
     });
 
     const chunks = expo.chunkPushNotifications(messages);

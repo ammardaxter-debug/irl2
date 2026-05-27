@@ -9,8 +9,12 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/weekly-sprint",
+      "path": "/api/cron/monthly-sprint",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-winners",
+      "schedule": "0 10 1 * *"
     }
   ],
   "routes": [
