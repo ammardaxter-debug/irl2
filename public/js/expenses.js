@@ -1,59 +1,1663 @@
-// 🔜 SHEET 3: Summary 🔜
+// ========================================
+//  EXPENSE TRACKER MODULE
+// ========================================
+
+const Expenses = {
+  currentTab: 'expenses',
+  currentDeductionTab: 'pending',
+  currentRequestTab: 'pending',
+  deductionsData: null,
+  riders: [],
+
+  async render() {
+    const root = document.getElementById('page-expenses');
+    if (!root) return;
+
+    root.innerHTML = `
+      <div class="page-header" style="margin-bottom:24px;">
+        <div class="skeleton skeleton-row" style="width:200px; height:32px;"></div>
+        <div class="header-actions" style="display:flex; gap:12px;">
+          <div class="skeleton skeleton-row" style="width:120px; height:40px;"></div>
+          <div class="skeleton skeleton-row" style="width:120px; height:40px;"></div>
+        </div>
+      </div>
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        <div class="skeleton skeleton-card" style="height:100px;"></div>
+        <div class="skeleton skeleton-card" style="height:100px;"></div>
+        <div class="skeleton skeleton-card" style="height:100px;"></div>
+      </div>
+      <div class="skeleton skeleton-card" style="height:400px; margin-top:20px;"></div>
+    `;
+    
+    try {
+      this.riders = await API.getRiders();
+      await this.renderDashboard(root);
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+      root.innerHTML = `<div class="p-8" style="color:var(--danger)">Failed to load expenses</div>`;
+    }
+  },
+
+  async renderDashboard(root) {
+    try {
+      const stats = await API.getExpenseStats();
+      const outOfPocketTotal = stats.from_my_pocket;
+      const isPocketWarn = outOfPocketTotal > 0;
+      
+      const remainingBg = stats.remaining_irl > 500 ? '#F0FDF4' : (stats.remaining_irl >= 100 ? '#FFFBEB' : '#FEF2F2');
+      const remainingTextColor = stats.remaining_irl > 500 ? '#16A34A' : (stats.remaining_irl >= 100 ? '#D97706' : '#DC2626');
+      
+      const headerHtml = `
+        <style>
+          .stat-card-new {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .stat-card-new-title {
+            font-size: 14px;
+            color: #6B7280;
+            font-weight: 500;
+          }
+          .stat-card-new-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #0F0F0F;
+          }
+          .btn-group {
+            display: flex;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #2563EB;
+          }
+          .btn-group button {
+            height: 36px;
+            padding: 0 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .btn-group-outline {
+            background: #FFFFFF;
+            color: #2563EB;
+            border-right: 1px solid #2563EB;
+          }
+          .btn-group-outline:hover {
+            background: #EFF6FF;
+          }
+          .btn-group-filled {
+            background: #2563EB;
+            color: #FFFFFF;
+          }
+          .btn-group-filled:hover {
+            background: #1D4ED8;
+          }
+          .tab-clean {
+            padding: 0 4px 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6B7280;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+          }
+          .tab-clean.active {
+            color: #0F0F0F;
+            border-bottom: 2px solid #2563EB;
+          }
+          .table-clean {
+            width: 100%;
+            border-collapse: collapse;
+            background: #FFFFFF;
+          }
+          .table-clean th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+            border-bottom: 1px solid #E5E7EB;
+            background: #FFFFFF;
+          }
+          .table-clean td {
+            padding: 16px;
+            font-size: 14px;
+            color: #0F0F0F;
+            border-bottom: 1px solid #E5E7EB;
+          }
+          .inline-add-row {
+            background: #F9FAFB;
+          }
+          .inline-add-row td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #E5E7EB;
+          }
+          .inline-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid #D1D5DB;
+            border-radius: 12px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+            background: #FFFFFF;
+          }
+          .inline-input:focus {
+            border-color: #2563EB;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+          }
+        </style>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+          <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Expense Tracker</h1>
+          ${App.isViewer() ? '' : `
+          <div class="btn-group">
+            <button class="btn-group-outline" onclick="Expenses.openAddFundsModal()">Log IRL Funds</button>
+            <button class="btn-group-filled" onclick="Expenses.openAddExpenseModal()">Add Expense</button>
+          </div>
+          `}
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:14px; font-weight:600; color:#4B5563; display:flex; align-items:center; gap:8px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Generate Report
+          </div>
+          <div style="display:flex; gap:12px;">
+            <button class="btn btn-outline" style="border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px;" onclick="Reports.generateExpenseReport('this_month')">This Month</button>
+            <button class="btn btn-outline" style="border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px;" onclick="Reports.generateExpenseReport('last_month')">Last Month</button>
+            <button class="btn btn-outline" style="border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px;" onclick="Reports.generateExpenseReport('all')">Full History</button>
+            <button class="btn btn-primary" style="background:#1E3A8A; border-color:#1E3A8A; border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px; color:#FFFFFF;" onclick="Reports.openSponsorReportModal()">Sponsor Report</button>
+            <button class="btn btn-success" style="background:#10B981; border-color:#10B981; border-radius:20px; font-weight:500; padding:6px 16px; height:auto; font-size:13px; color:#FFFFFF;" onclick="Expenses.openCustomExcelReportModal()">Excel Report</button>
+          </div>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:32px;">
+          <div class="stat-card-new" style="background:#EFF6FF; border-color:#BFDBFE;" title="Total funds received from IRL this cycle">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="stat-card-new-title" style="color:#1E3A8A;">Received from Company</span>
+              <span style="font-size:20px;">💰</span>
+            </div>
+            <div class="stat-card-new-value" style="color:#2563EB;">${Utils.formatCurrency(stats.total_received)}</div>
+          </div>
+          
+          <div class="stat-card-new" title="Total of all operational expenses and deductions">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="stat-card-new-title">Total Expenses</span>
+            </div>
+            <div class="stat-card-new-value">${Utils.formatCurrency(stats.total_expenses)}</div>
+          </div>
+          
+          <div class="stat-card-new" title="Total expenses paid using company funds">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="stat-card-new-title">Company Funds Used</span>
+            </div>
+            <div class="stat-card-new-value">${Utils.formatCurrency(stats.used_from_irl)}</div>
+          </div>
+          
+          <div class="stat-card-new" style="background:${remainingBg}; border-color:${remainingBg === '#FFFFFF' ? '#E5E7EB' : 'transparent'};" title="Unspent company funds">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="stat-card-new-title" style="color:${remainingTextColor};">Remaining Balance</span>
+            </div>
+            <div class="stat-card-new-value" style="color:${remainingTextColor};">${Utils.formatCurrency(stats.remaining_irl)}</div>
+          </div>
+          
+          <div class="stat-card-new" style="${isPocketWarn ? 'background:#FEF2F2; border-color:#FECACA;' : 'display:none;'}" title="Running Out of Pocket Balance">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="stat-card-new-title" style="color:#DC2626;">Out of Pocket</span>
+            </div>
+            <div class="stat-card-new-value" style="color:#DC2626;">-${Utils.formatCurrency(outOfPocketTotal)}</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:24px; border-bottom:1px solid #E5E7EB; margin-bottom:24px;">
+          <div class="tab-clean ${this.currentTab === 'expenses' ? 'active' : ''}" data-tab="expenses" onclick="Expenses.switchTab('expenses')">Expenses Log</div>
+          <div class="tab-clean ${this.currentTab === 'funds' ? 'active' : ''}" data-tab="funds" onclick="Expenses.switchTab('funds')">Funds Received</div>
+          <div class="tab-clean ${this.currentTab === 'deductions' ? 'active' : ''}" data-tab="deductions" onclick="Expenses.switchTab('deductions')">Rider Deductions</div>
+          <div class="tab-clean ${this.currentTab === 'rider_requests' ? 'active' : ''}" data-tab="rider_requests" onclick="Expenses.switchTab('rider_requests')">Rider Requests</div>
+        </div>
+
+        <div id="expense-content-area">
+          <div class="p-8"><div class="spinner"></div></div>
+        </div>
+
+
+      `;
+      root.innerHTML = headerHtml;
+      
+      await this.renderTabContent();
+    } catch(err) {
+      Utils.showToast(err.message, 'error');
+    }
+  },
+
+  async switchTab(tab) {
+    this.currentTab = tab;
+    
+    // Update active tab visually
+    document.querySelectorAll('#page-expenses .tab-clean').forEach(t => {
+      if (t.dataset.tab === tab) {
+        t.classList.add('active');
+      } else {
+        t.classList.remove('active');
+      }
+    });
+    
+    // Show immediate skeleton table loader to prevent stale data flash
+    const area = document.getElementById('expense-content-area');
+    if (area) area.innerHTML = `<div style="height:400px;background:white;border-radius:12px;border:1px solid var(--slate-200);animation:pulse 1.5s infinite; opacity:0.6"></div>`;
+    
+    await this.renderTabContent();
+  },
+
+  async renderTabContent() {
+    const area = document.getElementById('expense-content-area');
+    if (!area) return;
+
+    if (this.currentTab === 'expenses') {
+      this.deductionsData = null; // Clear deductions cache
+      const expenses = await API.getExpenses();
+      this.cachedExpenses = expenses; // Cache for edit modal
+      let html = `
+        <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center;">
+          <div style="position:relative; width:100%; max-width:350px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" style="width:18px;height:18px; position:absolute; left:12px; top:50%; transform:translateY(-50%); pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="expense-search-input" placeholder="Search by category, recipient, or notes..." style="width:100%; height:40px; padding:0 12px 0 36px; border:1px solid #E5E7EB; border-radius:8px; font-size:14px; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#2563EB';" onblur="this.style.borderColor='#E5E7EB';">
+          </div>
+          <select id="expense-rider-filter" style="height:40px; padding:0 12px; border:1px solid #E5E7EB; border-radius:8px; font-size:14px; outline:none; background:#FFFFFF; color:#4B5563; min-width:200px; cursor:pointer;" onfocus="this.style.borderColor='#2563EB';" onblur="this.style.borderColor='#E5E7EB';">
+            <option value="">All Expenses</option>
+            <option value="company">General / Company Only</option>
+            ${this.riders.map(r => `<option value="${r.id}">${Utils.escapeHtml(r.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
+          <table class="table-clean" id="expenses-data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Recipient / Item</th>
+                <th>Deductible</th>
+                <th style="text-align:right">Amount</th>
+                <th>Receipt</th>
+                ${App.isViewer() ? '' : '<th>Actions</th>'}
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Inline Quick Add Row -->
+              ${App.isViewer() ? '' : `
+              <tr class="inline-add-row">
+                <td>
+                  <input type="date" id="qa-date" class="inline-input" value="${Utils.today()}">
+                </td>
+                <td>
+                  <select id="qa-category" class="inline-input">
+                    <option value="" disabled selected>Category...</option>
+                    <option value="Advance">Advance</option>
+                    <option value="Food">Food</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Fuel">Fuel</option>
+                    <option value="Bike Maintenance">Bike Maintenance</option>
+                    <option value="Traffic Fine">Traffic Fine</option>
+                    <option value="Internet Package">Internet Package</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Staff Refreshments">Staff Refreshments</option>
+                    <option value="Office / Admin">Office / Admin</option>
+                    <option value="Health / Medical">Health / Medical</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </td>
+                <td>
+                  <input type="text" id="qa-desc" class="inline-input" placeholder="Who / What...">
+                </td>
+                <td>
+                  <!-- Deductibility removed for Quick Add (assumed Company Paid) -->
+                </td>
+                <td>
+                  <input type="number" step="0.01" id="qa-amount" class="inline-input" style="font-weight:600; text-align:right;" placeholder="0.00">
+                </td>
+                <td colspan="2" style="text-align:right; vertical-align:middle;">
+                  <button class="btn btn-sm" id="btn-qa-save" style="background:#2563EB; color:white; height:36px; font-size:13px; padding:0 16px; border:none; border-radius:12px; cursor:pointer; font-weight:500; transition:background 0.2s;" onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">Add</button>
+                </td>
+              </tr>
+              `}
+      `;
+      
+      const displayExpenses = expenses.filter(e => e.category !== 'Manual Deduction');
+
+      if (displayExpenses.length === 0) {
+        html += `<tr><td colspan="7" style="text-align:center; padding:64px 20px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px; margin:0 auto 16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+          <div style="font-size:16px; font-weight:500; color:#0F0F0F;">No expenses logged yet</div>
+        </td></tr>`;
+      } else {
+        displayExpenses.forEach(e => {
+          const dateStr = Utils.formatDate(e.expense_date);
+          let deductBadge = '';
+          if (e.is_deductible && (e.is_deductible === 'true' || e.is_deductible === 1 || e.is_deductible === true)) {
+            if (e.rider_id) {
+              deductBadge = `<span style="background:#FEF3C7; color:#D97706; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Rider Deductible</span>`;
+            } else {
+              deductBadge = `<span style="background:#FFEDD5; color:#C2410C; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Non-Rider Deductible</span>`;
+            }
+          } else {
+            deductBadge = `<span style="background:#DCFCE7; color:#16A34A; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;">Company Paid</span>`;
+          }
+            
+          let catColor = '#4B5563';
+          let catBg = '#F3F4F6';
+          const catLower = (e.category || '').toLowerCase();
+          if (catLower.includes('advance')) { catColor = '#7C3AED'; catBg = '#F5F3FF'; }
+          else if (catLower.includes('food') || catLower.includes('refreshment')) { catColor = '#D97706'; catBg = '#FFFBEB'; }
+          else if (catLower.includes('transport') || catLower.includes('fuel')) { catColor = '#2563EB'; catBg = '#EFF6FF'; }
+          else if (catLower.includes('health') || catLower.includes('medical')) { catColor = '#E11D48'; catBg = '#FFE4E6'; }
+          else if (catLower.includes('internet') || catLower.includes('package')) { catColor = '#0891B2'; catBg = '#ECFEFF'; }
+          
+          const catBadge = `<span style="background:${catBg}; color:${catColor}; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:500;">${Utils.escapeHtml(e.category)}</span>`;
+
+          const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+          let rName = e.rider_name;
+          if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : 'Rider';
+          const recipientStr = e.rider_id ? Utils.escapeHtml(rName) : Utils.escapeHtml(e.vendor_name || 'Other');
+          const amountColor = e.is_deductible ? '#DC2626' : '#0F0F0F';
+          
+          html += `
+            <tr class="expense-row" data-rider-id="${e.rider_id || ''}" data-search="${Utils.escapeHtml(e.category + ' ' + recipientStr + ' ' + (e.notes || '')).toLowerCase()}" style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
+              <td>${catBadge}</td>
+              <td><div style="font-weight:500; color:#0F0F0F;">${recipientStr}</div><div style="color:#6B7280; font-size:13px; margin-top:2px;">${Utils.escapeHtml(e.notes || '')}</div></td>
+              <td>${deductBadge}</td>
+              <td style="font-weight:600; color:${amountColor}; text-align:right;">${Utils.formatCurrency(e.amount)}</td>
+              <td>
+                ${this.renderThumbnail(e.receipt_base64, `Expenses.viewReceipt(${e.id})`)}
+              </td>
+              ${App.isViewer() ? '' : `
+              <td>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm" style="background:#F3F4F6; color:#4B5563; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.openEditExpenseModal(${e.id})">Edit</button>
+                  <button class="btn btn-sm" style="background:#FEF2F2; color:#DC2626; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.deleteExpense(${e.id})">Delete</button>
+                </div>
+              </td>
+              `}
+            </tr>
+          `;
+        });
+      }
+      
+      html += `</tbody></table></div>`;
+      area.innerHTML = html;
+      
+      // Bind Search & Filter Events
+      const applyFilters = () => {
+        const searchInput = document.getElementById('expense-search-input');
+        const filterInput = document.getElementById('expense-rider-filter');
+        if (!searchInput || !filterInput) return;
+        
+        const query = searchInput.value.toLowerCase().trim();
+        const riderId = filterInput.value;
+        
+        document.querySelectorAll('#expenses-data-table .expense-row').forEach(row => {
+          const matchesSearch = !query || row.dataset.search.includes(query);
+          const rowRiderId = row.dataset.riderId || '';
+          
+          let matchesRider = true;
+          if (riderId === 'company') {
+             matchesRider = (rowRiderId === '');
+          } else if (riderId !== '') {
+             matchesRider = (rowRiderId === riderId);
+          }
+          
+          if (matchesSearch && matchesRider) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      };
+
+      document.getElementById('expense-search-input')?.addEventListener('input', applyFilters);
+      document.getElementById('expense-rider-filter')?.addEventListener('change', applyFilters);
+
+      // Bind Quick Add Event
+      const handleQuickAdd = async () => {
+        const date = document.getElementById('qa-date').value;
+        const category = document.getElementById('qa-category').value;
+        const desc = document.getElementById('qa-desc').value.trim();
+        const isDeductible = false; // Quick Add is always Company Expense
+        const amount = parseFloat(document.getElementById('qa-amount').value);
+
+        if (!date || !category || isNaN(amount) || amount <= 0) {
+          Utils.showToast('Please fill Date, Category, and a valid Amount.', 'error');
+          return;
+        }
+
+        // Duplicate Detection
+        const isDuplicate = expenses.some(e => 
+          e.expense_date === date && 
+          e.category === category && 
+          e.amount === amount && 
+          (Date.now() - new Date(e.created_at || Date.now()).getTime()) < 86400000 // Added recently
+        );
+
+        if (isDuplicate) {
+          const confirmed = await Utils.confirm(
+            'An identical expense was recorded recently. Are you sure you want to add this again?',
+            'Duplicate Detected', 'Add Anyway', 'Cancel', false
+          );
+          if (!confirmed) return;
+        }
+
+        const btn = document.getElementById('btn-qa-save');
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;border-top-color:white;"></span>';
+        btn.disabled = true;
+
+        try {
+          this.showProcessingOverlay(category, amount, false);
+
+          // Send to API
+          const payload = {
+             expense_date: date,
+             category: category,
+             is_deductible: isDeductible,
+             amount: amount,
+             vendor_name: desc,
+             rider_id: null,
+             notes: desc,
+             receipt_base64: null,
+             created_at: new Date().toISOString()
+          };
+          
+          await API.createExpense(payload);
+
+          this.finishProcessingOverlay();
+
+          setTimeout(() => {
+            Utils.showToast('Expense saved inline ✓', 'success');
+            // Re-render
+            this.render();
+          }, 1200);
+          
+        } catch (err) {
+           this.hideProcessingOverlayError();
+           Utils.showToast(err.message, 'error');
+           btn.innerHTML = origText;
+           btn.disabled = false;
+        }
+      };
+
+      document.getElementById('btn-qa-save')?.addEventListener('click', handleQuickAdd);
+      document.getElementById('qa-amount')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleQuickAdd();
+      });
+    } else if (this.currentTab === 'funds') {
+      const funds = await API.getFunds();
+      let html = `
+        <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
+          <table class="table-clean">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th style="text-align:right">Amount</th>
+                <th>Receipt</th>
+                ${App.isViewer() ? '' : '<th>Actions</th>'}
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      if (funds.length === 0) {
+        html += `<tr><td colspan="5" style="text-align:center; padding:64px 20px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px; margin:0 auto 16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+          <div style="font-size:16px; font-weight:500; color:#0F0F0F;">No company funds logged yet</div>
+        </td></tr>`;
+      } else {
+        funds.forEach(f => {
+          const dateStr = Utils.formatDate(f.receive_date);
+          
+          html += `
+            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
+              <td>
+                <div style="font-weight:500; color:#0F0F0F;">${Utils.escapeHtml(f.description || 'IRL Transfer')}</div>
+                <div style="color:#6B7280; font-size:13px; margin-top:2px;">${Utils.escapeHtml(f.notes || '')}</div>
+              </td>
+              <td style="font-weight:600; color:#16A34A; text-align:right;">+${Utils.formatCurrency(f.amount)}</td>
+              <td>
+                ${this.renderThumbnail(f.receipt_base64, `Expenses.viewFundReceipt(${f.id})`)}
+              </td>
+              ${App.isViewer() ? '' : `
+              <td>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm" style="background:#F3F4F6; color:#4B5563; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.openEditFundModal(${f.id})">Edit</button>
+                  <button class="btn btn-sm" style="background:#FEF2F2; color:#DC2626; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.deleteFund(${f.id})">Delete</button>
+                </div>
+              </td>
+              `}
+            </tr>
+          `;
+        });
+      }
+      
+      html += `</tbody></table></div>`;
+      area.innerHTML = html;
+    } else if (this.currentTab === 'deductions') {
+      if (!this.deductionsData) {
+        area.innerHTML = `
+          <div style="margin-bottom:16px;">
+            <div style="width:100%; height:40px; border-radius:24px; background:#F3F4F6; animation:pulse 1.5s infinite;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            ${[1,2,3].map(() => `
+              <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden;">
+                <div style="background:#F9FAFB; padding:16px 20px; border-bottom:1px solid #E5E7EB;">
+                  <div style="width:200px; height:20px; background:#E5E7EB; border-radius:4px; animation:pulse 1.5s infinite alternate;"></div>
+                </div>
+                <div style="padding:16px 20px;">
+                  <div style="width:100%; height:16px; background:#E5E7EB; border-radius:4px; margin-bottom:12px; animation:pulse 1.5s infinite alternate;"></div>
+                  <div style="width:100%; height:16px; background:#E5E7EB; border-radius:4px; animation:pulse 1.5s infinite alternate;"></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <style>
+            @keyframes pulse {
+              0%, 100% { background-color: #e5e7eb; }
+              50% { background-color: #f3f4f6; }
+            }
+          </style>
+        `;
+
+        try {
+          const expenses = await API.getExpenses();
+          const riderExpenses = expenses.filter(e => {
+            const isMedical = (e.category || '').toLowerCase().includes('medical');
+            return !isMedical && (e.is_deductible === 1 || e.is_deductible === true);
+          });
+          
+          const riderMap = {};
+          for (const e of riderExpenses) {
+            const mapKey = e.rider_id || e.rider_name || e.vendor_name || 'Supervisor';
+            if (!riderMap[mapKey]) {
+              const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+              let rName = e.rider_name || e.vendor_name;
+              if (!rName || rName === 'Rider') rName = foundRider ? foundRider.name : (e.rider_id ? `Rider #${e.rider_id}` : mapKey);
+              riderMap[mapKey] = { 
+                rider_name: rName, 
+                rider_id: e.rider_id, 
+                pending: [], 
+                settled: [] 
+              };
+            }
+            if (e.deductionSettled) { riderMap[mapKey].settled.push(e); }
+            else { riderMap[mapKey].pending.push(e); }
+          }
+          
+          this.deductionsData = {
+            pending: Object.values(riderMap).filter(r => r.pending.length > 0),
+            settled: Object.values(riderMap).filter(r => r.settled.length > 0)
+          };
+        } catch(err) {
+          area.innerHTML = `<div style="color:red">Failed to load: ${err.message}</div>`;
+          return;
+        }
+      }
+      
+      this.renderDeductionsUI(area);
+    } else if (this.currentTab === 'rider_requests') {
+      await this.renderRiderRequests(area);
+    }
+  },
+
+  async renderRiderRequests(area) {
+    const isPendingTab = this.currentRequestTab === 'pending';
+    
+    let html = `
+      <style>
+        .request-tab-btn {
+          border: none;
+          background: transparent;
+          color: #6B7280;
+          padding: 8px 24px;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: background-color 200ms ease, color 200ms ease;
+          position: relative;
+          z-index: 2;
+          flex: 1;
+        }
+        .request-tab-btn:hover:not(.active) {
+          background: #EFF6FF;
+        }
+        .request-tab-btn.active {
+          color: #FFFFFF;
+        }
+        .request-tab-btn-wrapper {
+          position: relative;
+          display: flex;
+          background: #F3F4F6;
+          padding: 4px;
+          border-radius: 24px;
+          width: 320px;
+        }
+        .request-tab-indicator {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          width: calc(50% - 4px);
+          background-color: #2563EB;
+          border-radius: 20px;
+          transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 1;
+        }
+        .request-tab-indicator.pending { transform: translateX(0); }
+        .request-tab-indicator.history { transform: translateX(100%); }
+        
+        #request-tab-content {
+          transition: opacity 100ms ease, transform 150ms ease-out;
+        }
+      </style>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="request-tab-btn-wrapper">
+          <div id="request-tab-bg-indicator" class="request-tab-indicator ${this.currentRequestTab}"></div>
+          <button id="btn-request-tab-pending" class="request-tab-btn ${isPendingTab ? 'active' : ''}" onclick="Expenses.switchRequestTab('pending')">Pending Requests</button>
+          <button id="btn-request-tab-history" class="request-tab-btn ${!isPendingTab ? 'active' : ''}" onclick="Expenses.switchRequestTab('history')">Request History</button>
+        </div>
+      </div>
+      <div id="request-tab-content" style="width:100%;">
+        <div class="p-8"><div class="spinner"></div></div>
+      </div>
+    `;
+    area.innerHTML = html;
+    
+    const container = document.getElementById('request-tab-content');
+    await this.renderRiderRequestsList(container);
+  },
+
+  async switchRequestTab(tab) {
+    this.currentRequestTab = tab;
+    const indicator = document.getElementById('request-tab-bg-indicator');
+    const btnPending = document.getElementById('btn-request-tab-pending');
+    const btnHistory = document.getElementById('btn-request-tab-history');
+    const container = document.getElementById('request-tab-content');
+    
+    if (indicator) {
+      if (tab === 'pending') {
+        indicator.classList.remove('history');
+        indicator.classList.add('pending');
+      } else {
+        indicator.classList.remove('pending');
+        indicator.classList.add('history');
+      }
+    }
+    
+    if (btnPending) {
+      if (tab === 'pending') btnPending.classList.add('active');
+      else btnPending.classList.remove('active');
+    }
+    
+    if (btnHistory) {
+      if (tab === 'history') btnHistory.classList.add('active');
+      else btnHistory.classList.remove('active');
+    }
+    
+    if (container) {
+      container.style.opacity = '0.5';
+      container.style.transform = 'translateY(4px)';
+      await this.renderRiderRequestsList(container);
+      container.style.opacity = '1';
+      container.style.transform = 'translateY(0)';
+    }
+  },
+
+  async renderRiderRequestsList(container) {
+    try {
+      const isPending = this.currentRequestTab === 'pending';
+      const requests = await API.getRiderRequests(isPending ? 'pending' : 'history');
+      
+      let html = `
+        <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
+          <table class="table-clean">
+            <thead>
+              <tr>
+                <th>Submitted</th>
+                <th>Rider</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th style="text-align:right">Amount</th>
+                ${isPending ? '<th>Actions</th>' : '<th>Status</th><th>Processed By</th><th>Admin Notes / Reason</th><th>Receipt</th>'}
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      if (requests.length === 0) {
+        html += `<tr><td colspan="${isPending ? 6 : 9}" style="text-align:center; padding:64px 20px;">
+          <div style="font-size:16px; font-weight:500; color:#6B7280;">No requests found</div>
+        </td></tr>`;
+      } else {
+        // Fetch expenses to match receipts
+        let expenses = [];
+        if (!isPending) {
+          try {
+            expenses = await API.getExpenses();
+          } catch(e) { console.warn('Failed to load expenses for matching receipts:', e); }
+        }
+
+        requests.forEach(r => {
+          const dateStr = Utils.formatDateTime(r.created_at || r.updated_at);
+          
+          let descText = r.description || '-';
+          let installmentText = '';
+          const match = descText.match(/\[INSTALLMENT_PLAN:(\d+)\]/);
+          if (match) {
+            installmentText = `<br><span style="background:#F5F3FF; color:#7C3AED; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600; margin-top:4px; display:inline-block;">Requested Installments: ${match[1]} Months</span>`;
+            descText = descText.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim() || '-';
+          }
+          
+          let actionOrInfo = '';
+          if (isPending) {
+            actionOrInfo = `
+              <td>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm" style="background:#16A34A; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'approved')">Approve</button>
+                  <button class="btn btn-sm" style="background:#DC2626; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.processRiderRequest(${r.id}, 'rejected')">Reject</button>
+                </div>
+              </td>
+            `;
+          } else {
+            let sBadge = `<span style="color:#D97706; font-weight:600;">Pending</span>`;
+            if (r.status === 'approved') sBadge = `<span style="color:#16A34A; font-weight:600;">Approved</span>`;
+            else if (r.status === 'rejected') sBadge = `<span style="color:#DC2626; font-weight:600;">Rejected</span>`;
+            
+            let progressInfo = '';
+            if (r.status === 'approved' && r.category === 'Advance' && expenses.length > 0) {
+              const relatedExp = expenses.filter(e => String(e.request_id) === String(r.id) && e.is_deductible);
+              if (relatedExp.length > 0) {
+                const total = relatedExp.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                const deducted = relatedExp.filter(e => e.deductionSettled).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                const remaining = total - deducted;
+                progressInfo = `
+                  <div style="margin-top:6px; background:#F9FAFB; border:1px solid #E5E7EB; padding:6px; border-radius:6px; font-size:11px;">
+                    <div style="display:flex; justify-content:space-between; color:#4B5563;"><span>Total:</span> <strong>${Utils.formatCurrency(total)}</strong></div>
+                    <div style="display:flex; justify-content:space-between; color:#16A34A;"><span>Deducted:</span> <strong>${Utils.formatCurrency(deducted)}</strong></div>
+                    <div style="display:flex; justify-content:space-between; color:#D97706;"><span>Remaining:</span> <strong>${Utils.formatCurrency(remaining)}</strong></div>
+                  </div>
+                `;
+              }
+            }
+            
+            let matchedExp = '-';
+            if (r.status === 'approved' && expenses.length > 0) {
+              const eMatch = expenses.find(e => String(e.request_id) === String(r.id) && e.receipt_url);
+              if (eMatch) {
+                matchedExp = `<a href="${eMatch.receipt_url}" target="_blank" style="color:#2563EB; font-size:12px; font-weight:500; text-decoration:none;">View Receipt</a>`;
+              }
+            }
+
+            actionOrInfo = `
+              <td>${sBadge}${progressInfo}</td>
+              <td style="font-size:12px; color:#4B5563;">${Utils.escapeHtml(r.processed_by || '-')}</td>
+              <td style="font-size:12px; color:#4B5563; max-width:200px;">${Utils.escapeHtml(r.admin_note || '-')}</td>
+              <td>${matchedExp}</td>
+            `;
+          }
+
+          html += `
+            <tr style="border-bottom:1px solid #F3F4F6;">
+              <td style="white-space:nowrap; color:#4B5563;">${dateStr}</td>
+              <td><div style="font-weight:600; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div></td>
+              <td><span style="background:#EFF6FF; color:#2563EB; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></td>
+              <td><div style="font-size:13px; color:#4B5563;">${Utils.escapeHtml(descText)}${installmentText}</div></td>
+              <td style="font-weight:700; color:#0F0F0F; text-align:right; white-space:nowrap;">${Utils.formatCurrency(r.amount)}</td></td>
+              ${actionOrInfo}
+            </tr>
+          `;
+        });
+      }
+      html += `</tbody></table></div>`;
+      container.innerHTML = html;
+    } catch(err) {
+      container.innerHTML = `<div style="color:red; padding:20px;">Error loading requests: ${err.message}</div>`;
+    }
+  },
+
+  async processRiderRequest(id, status) {
+    try {
+      Utils.showLoading('Loading request details...');
+      // Fetch requests to get details
+      const requests = await API.getRiderRequests(status === 'approved' ? 'pending' : 'all');
+      const r = requests.find(req => String(req.id) === String(id));
+      Utils.hideLoading();
+      if (!r) {
+        return Utils.showToast('Request details not found', 'error');
+      }
+
+      if (status === 'rejected') {
+        this.showRejectionModal(r);
+      } else {
+        this.showApprovalModal(r);
+      }
+    } catch(err) {
+      Utils.hideLoading();
+      Utils.showToast(err.message, 'error');
+    }
+  },
+
+  showApprovalModal(r) {
+    let descText = r.description || '-';
+    let requestedPlan = 1;
+    const match = descText.match(/\[INSTALLMENT_PLAN:(\d+)\]/);
+    if (match) {
+        requestedPlan = parseInt(match[1]) || 1;
+        descText = descText.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim() || '-';
+    }
+
+    const html = `
+      <form id="approve-request-form" style="padding:4px 0;">
+        <div style="background:#F9FAFB; padding:16px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:14px;">
+            <div><span style="color:#6B7280;">Rider:</span> <strong style="color:#111827;">${Utils.escapeHtml(r.rider_name)}</strong></div>
+            <div><span style="color:#6B7280;">Amount:</span> <strong style="color:#111827;">${Utils.formatCurrency(r.amount)}</strong></div>
+            <div><span style="color:#6B7280;">Category:</span> <span style="background:#EFF6FF; color:#2563EB; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></div>
+            <div><span style="color:#6B7280;">Submitted:</span> <span style="color:#4B5563;">${Utils.formatDateTime(r.created_at)}</span></div>
+          </div>
+          <div style="margin-top:10px; font-size:13px; color:#4B5563; border-top:1px solid #E5E7EB; padding-top:10px;">
+            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(descText)}
+          </div>
+        </div>
+
+        ${r.category === 'Advance' ? `
+        <div style="margin-bottom:16px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Approved Installment Plan</label>
+          <select id="approve-installment-plan" class="expense-form-input" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; font-size:14px; font-weight:500; cursor:pointer; background:#fff;">
+            <option value="1" ${requestedPlan === 1 ? 'selected' : ''}>Direct Deduction (1 Month)</option>
+            <option value="2" ${requestedPlan === 2 ? 'selected' : ''}>2 Months Installment</option>
+            <option value="3" ${requestedPlan === 3 ? 'selected' : ''}>3 Months Installment</option>
+            <option value="4" ${requestedPlan === 4 ? 'selected' : ''}>4 Months Installment</option>
+          </select>
+          <p style="margin:6px 0 0 0; font-size:12px; color:#6B7280;">Deductions will be split evenly across selected months starting from current cycle.</p>
+        </div>
+        <div style="margin-bottom:16px; display:flex; align-items:flex-start; gap:8px; background:#EFF6FF; padding:12px; border-radius:8px; border:1px solid #BFDBFE;">
+          <input type="checkbox" id="deduct-company-funds" checked style="width:18px; height:18px; cursor:pointer; margin-top:2px;">
+          <div>
+            <label for="deduct-company-funds" style="font-size:14px; font-weight:600; color:#1E3A8A; cursor:pointer;">Deduct total amount from Company Funds today?</label>
+            <p style="margin:4px 0 0 0; font-size:12px; color:#1E40AF;">If checked, this advance will lower the overall company balance immediately.</p>
+          </div>
+        </div>
+        ` : ''}
+
+        <div style="margin-bottom:16px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Admin Note (Optional)</label>
+          <textarea name="admin_note" class="expense-form-input" style="width:100%; min-height:60px; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; resize:none;" placeholder="Add details or comments for this approval..."></textarea>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; background:#F9FAFB; padding:10px 14px; border-radius:8px; border:1px solid #E5E7EB;">
+          <input type="checkbox" id="attach-receipt-toggle" style="width:18px; height:18px; cursor:pointer;">
+          <label for="attach-receipt-toggle" style="font-size:14px; font-weight:600; color:#374151; cursor:pointer; user-select:none;">Attach Receipt?</label>
+        </div>
+
+        <div id="receipt-upload-container" style="display:none; margin-bottom:20px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Receipt Upload</label>
+          <div class="expense-upload-zone" onclick="document.getElementById('approve-receipt-upload').click()" style="border:2.5px dashed #D1D5DB; padding:20px; border-radius:10px; text-align:center; cursor:pointer; background:#FFFFFF; transition:border 0.2s;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" style="margin:0 auto 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span class="upload-text" style="font-size:13px; font-weight:500; color:#4B5563;">Click or drag to attach receipt or PDF</span>
+          </div>
+          <div id="approve-receipt-preview-area" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+          <input type="file" id="approve-receipt-upload" multiple accept="image/*,.pdf" style="display:none;">
+          <div style="font-size:11px; color:#9CA3AF; margin-top:6px;">Images compressed automatically · PDFs supported</div>
+          <input type="hidden" id="approve-receipt-base64-hidden">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #E5E7EB; padding-top:16px; margin-top:16px;">
+          <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
+          <button type="submit" id="btn-submit-approve" style="width:140px; height:42px; border-radius:10px; border:none; background:#16A34A; color:white; font-weight:600; cursor:pointer;">Approve</button>
+        </div>
+      </form>
+    `;
+
+    Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#16A34A;">Approve Rider Request</div>', html, 'modal-approve');
+
+    // Toggle receipt container
+    document.getElementById('attach-receipt-toggle').addEventListener('change', (e) => {
+      const container = document.getElementById('receipt-upload-container');
+      container.style.display = e.target.checked ? 'block' : 'none';
+      if (!e.target.checked) {
+        document.getElementById('approve-receipt-base64-hidden').value = '';
+        document.getElementById('approve-receipt-preview-area').innerHTML = '';
+        document.getElementById('approve-receipt-preview-area').style.display = 'none';
+      }
+    });
+
+    // Init file upload functionality
+    this.initMultiUpload('approve-receipt-upload', 'approve-receipt-base64-hidden', 'approve-receipt-preview-area', 'approve-request-form');
+
+    // Form submit
+    document.getElementById('approve-request-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      let adminNote = e.target.elements.admin_note.value.trim();
+      let deductFunds = true;
+      
+      if (r.category === 'Advance') {
+        const planEl = document.getElementById('approve-installment-plan');
+        if (planEl) {
+          const approvedPlan = parseInt(planEl.value) || 1;
+          adminNote += (adminNote ? '\\n' : '') + `[OVERRIDE_PLAN:${approvedPlan}]`;
+        }
+        const deductFundsEl = document.getElementById('deduct-company-funds');
+        if (deductFundsEl) {
+          deductFunds = deductFundsEl.checked;
+        }
+      }
+
+      const attachReceipt = document.getElementById('attach-receipt-toggle').checked;
+      const receiptBase64 = attachReceipt ? document.getElementById('approve-receipt-base64-hidden').value || null : null;
+
+      try {
+        Utils.closeModal();
+        Utils.showLoading('Approving request...');
+        await API.updateRiderRequestStatus(r.id, 'approved', adminNote, receiptBase64, deductFunds);
+        Utils.showToast('Request approved successfully');
+        this.render();
+      } catch(err) {
+        Utils.showToast(err.message, 'error');
+      } finally {
+        Utils.hideLoading();
+      }
+    });
+  },
+
+  showRejectionModal(r) {
+    const html = `
+      <div style="padding:4px 0;">
+        <div style="background:#F9FAFB; padding:16px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:14px;">
+            <div><span style="color:#6B7280;">Rider:</span> <strong style="color:#111827;">${Utils.escapeHtml(r.rider_name)}</strong></div>
+            <div><span style="color:#6B7280;">Amount:</span> <strong style="color:#111827;">${Utils.formatCurrency(r.amount)}</strong></div>
+            <div><span style="color:#6B7280;">Category:</span> <span style="background:#EFF6FF; color:#2563EB; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">${Utils.escapeHtml(r.category)}</span></div>
+            <div><span style="color:#6B7280;">Submitted:</span> <span style="color:#4B5563;">${Utils.formatDateTime(r.created_at)}</span></div>
+          </div>
+          <div style="margin-top:10px; font-size:13px; color:#4B5563; border-top:1px solid #E5E7EB; padding-top:10px;">
+            <span style="color:#6B7280; font-weight:500;">Description:</span> ${Utils.escapeHtml(r.description || '-')}
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label class="expense-form-label" style="font-weight:600; color:#374151; margin-bottom:6px; display:block;">Rejection Reason</label>
+          <textarea id="rejection-reason" class="expense-form-input" style="width:100%; min-height:80px; padding:10px; border-radius:8px; border:1.5px solid #E5E7EB; resize:none;" placeholder="Explain why this request is rejected..."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #E5E7EB; padding-top:16px;">
+          <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
+          <button id="btn-submit-reject" style="width:140px; height:42px; border-radius:10px; border:none; background:#DC2626; color:white; font-weight:600; cursor:pointer;">Reject Request</button>
+        </div>
+      </div>
+    `;
+
+    Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#DC2626;">Reject Rider Request</div>', html, 'modal-reject');
+
+    document.getElementById('btn-submit-reject').addEventListener('click', async () => {
+      const adminNote = document.getElementById('rejection-reason').value.trim();
+      if (!adminNote) {
+        return Utils.showToast('Please enter a reason for rejection', 'error');
+      }
+
+      try {
+        Utils.closeModal();
+        Utils.showLoading('Rejecting request...');
+        await API.updateRiderRequestStatus(r.id, 'rejected', adminNote);
+        Utils.showToast('Request rejected successfully');
+        this.render();
+      } catch(err) {
+        Utils.showToast(err.message, 'error');
+      } finally {
+        Utils.hideLoading();
+      }
+    });
+  },
+
+  renderDeductionsUI(area) {
+    const isPendingTab = this.currentDeductionTab === 'pending';
+    
+    let html = `
+      <style>
+        .deduction-tab-btn {
+          border: none;
+          background: transparent;
+          color: #6B7280;
+          padding: 8px 24px;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: background-color 200ms ease, color 200ms ease;
+          position: relative;
+          z-index: 2;
+          flex: 1;
+        }
+        .deduction-tab-btn:hover:not(.active) {
+          background: #EFF6FF;
+        }
+        .deduction-tab-btn.active {
+          color: #FFFFFF;
+        }
+        .deduction-tab-btn-wrapper {
+          position: relative;
+          display: flex;
+          background: #F3F4F6;
+          padding: 4px;
+          border-radius: 24px;
+          width: 320px;
+        }
+        .tab-indicator {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          width: calc(50% - 4px);
+          background-color: #2563EB;
+          border-radius: 20px;
+          transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 1;
+        }
+        .tab-indicator.pending { transform: translateX(0); }
+        .tab-indicator.settled { transform: translateX(100%); }
+        
+        #deduction-tab-content {
+          transition: opacity 100ms ease, transform 150ms ease-out;
+        }
+      </style>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="deduction-tab-btn-wrapper">
+          <div id="tab-bg-indicator" class="tab-indicator ${this.currentDeductionTab}"></div>
+          <button id="btn-tab-pending" class="deduction-tab-btn ${isPendingTab ? 'active' : ''}" onclick="Expenses.switchDeductionTab('pending')">Pending Deductions</button>
+          <button id="btn-tab-settled" class="deduction-tab-btn ${!isPendingTab ? 'active' : ''}" onclick="Expenses.switchDeductionTab('settled')">Settled History</button>
+        </div>
+        <div style="display:flex; gap:12px;">
+          ${App.isViewer() ? '' : `
+          <button style="display:flex; align-items:center; gap:6px; border:none; background:#FEF3C7; color:#D97706; padding:8px 18px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'" onclick="Expenses.openAddManualDeductionModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Manual Deduction
+          </button>
+          `}
+          <button style="display:flex; align-items:center; gap:6px; border:1.5px solid #16A34A; background:#FFFFFF; color:#16A34A; padding:8px 18px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#F0FDF4'" onmouseout="this.style.background='#FFFFFF'" onclick="Expenses.exportDeductionsExcel()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+        </div>
+      </div>
+      <div id="deduction-tab-content">
+        ${this.getDeductionsHtml(this.currentDeductionTab)}
+      </div>
+    `;
+    
+    // Only update area if we are re-rendering the whole tab
+    // When switching tabs, we only update #deduction-tab-content
+    if (area) {
+      area.innerHTML = html;
+    }
+  },
+
+  switchDeductionTab(tab) {
+    if (this.currentDeductionTab === tab) return;
+    
+    this.currentDeductionTab = tab;
+    
+    // Update buttons
+    const pendingBtn = document.getElementById('btn-tab-pending');
+    const settledBtn = document.getElementById('btn-tab-settled');
+    const indicator = document.getElementById('tab-bg-indicator');
+    
+    if (tab === 'pending') {
+      pendingBtn.classList.add('active');
+      settledBtn.classList.remove('active');
+      indicator.className = 'tab-indicator pending';
+    } else {
+      pendingBtn.classList.remove('active');
+      settledBtn.classList.add('active');
+      indicator.className = 'tab-indicator settled';
+    }
+    
+    // Animate content
+    const contentArea = document.getElementById('deduction-tab-content');
+    if (contentArea) {
+      // Fade out old
+      contentArea.style.opacity = '0';
+      
+      setTimeout(() => {
+        // Update HTML
+        contentArea.innerHTML = this.getDeductionsHtml(tab);
+        
+        // Prepare slide in position
+        const startTranslate = tab === 'pending' ? '-20px' : '20px';
+        contentArea.style.transition = 'none';
+        contentArea.style.transform = `translateX(${startTranslate})`;
+        
+        // Trigger reflow
+        void contentArea.offsetWidth;
+        
+        // Fade and slide in
+        contentArea.style.transition = 'opacity 150ms ease-out, transform 150ms ease-out';
+        contentArea.style.opacity = '1';
+        contentArea.style.transform = 'translateX(0)';
+      }, 100);
+    }
+  },
+
+  getDeductionsHtml(tab) {
+    const ridersWithPending = this.deductionsData.pending;
+    const ridersWithSettled = this.deductionsData.settled;
+
+    // Sort riders by their newest pending expense date (descending)
+    ridersWithPending.sort((a, b) => {
+      const aNewest = a.pending[0];
+      const bNewest = b.pending[0];
+      const aDate = aNewest ? (aNewest.expense_date || aNewest.created_at || '') : '';
+      const bDate = bNewest ? (bNewest.expense_date || bNewest.created_at || '') : '';
+      const cmp = bDate.localeCompare(aDate);
+      if (cmp !== 0) return cmp;
+      
+      const aTime = aNewest ? (aNewest.created_at || '') : '';
+      const bTime = bNewest ? (bNewest.created_at || '') : '';
+      return bTime.localeCompare(aTime);
+    });
+
+    // Sort riders by their newest settled expense date (descending)
+    ridersWithSettled.sort((a, b) => {
+      const aNewest = a.settled[0];
+      const bNewest = b.settled[0];
+      const aDate = aNewest ? (aNewest.settled_at || aNewest.settledDate || aNewest.expense_date || '') : '';
+      const bDate = bNewest ? (bNewest.settled_at || bNewest.settledDate || bNewest.expense_date || '') : '';
+      return bDate.localeCompare(aDate);
+    });
+    
+    let html = '';
+    
+    if (tab === 'pending') {
+      if (ridersWithPending.length === 0) {
+        html += `
+          <div style="text-align:center; padding:64px 20px; background:#FFFFFF; border-radius:12px; border:1px solid #E5E7EB;">
+            <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:50%; background:#d1fae5; margin-bottom:16px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" style="width:32px;height:32px;"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div style="font-size:20px; font-weight:bold; color:#111827;">All Settled</div>
+            <div style="font-size:14px; color:#6b7280; margin-top:8px;">No pending deductions this cycle</div>
+          </div>`;
+      } else {
+          html += '<div style="display:flex; flex-direction:column; gap:16px;">';
+          for (const r of ridersWithPending) {
+            const totalPending = r.pending.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+            let leftBorder = '#9ca3af';
+            if (totalPending > 500) leftBorder = '#ef4444';
+            else if (totalPending >= 100) leftBorder = '#f59e0b';
+            
+            const btnStyle = totalPending > 500 
+              ? `background:#0F0F0F; color:#FFFFFF; border:2px solid #ef4444; border-radius:8px; font-size:13px; display:flex; align-items:center; gap:6px;`
+              : `background:#0F0F0F; color:#FFFFFF; border-radius:8px; font-size:13px; display:flex; align-items:center; gap:6px;`;
+            const warnIcon = totalPending > 500 
+              ? `<svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="width:16px;height:16px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+              : '';
+
+            html += `
+              <div class="card" style="background:#FFFFFF; border:1px solid #E5E7EB; border-left:4px solid ${leftBorder}; border-radius:12px; overflow:hidden;">
+                <div style="background:#F9FAFB; padding:16px 20px; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer;" onclick="const content = this.nextElementSibling; const isCollapsed = content.style.maxHeight === '0px'; content.style.maxHeight = isCollapsed ? '2000px' : '0px'; const icon = this.querySelector('.chevron-icon'); icon.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:#6b7280; transition:transform 200ms ease; transform:rotate(0deg);"><polyline points="9 18 15 12 9 6"/></svg>
+                    <div>
+                      <div style="font-size:16px; font-weight:bold; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div>
+                      <div style="font-size:14px; color:#D97706; font-weight:600; margin-top:4px;">Total Pending: SAR ${Utils.formatCurrency(totalPending).replace('﷼ ', '')}</div>
+                    </div>
+                  </div>
+                  ${App.isViewer() ? '' : `
+                  <button class="btn btn-primary" style="${btnStyle}" title="This will settle SAR ${totalPending} for ${Utils.escapeHtml(r.rider_name)}" onclick="event.stopPropagation(); Expenses.settleRiderDeductions(${r.rider_id}, '${Utils.escapeHtml(r.rider_name)}')">${warnIcon} Mark All Settled</button>
+                  `}
+                </div>
+                <div style="max-height:0px; transition:max-height 200ms ease; overflow:hidden;">
+                  <div style="width:100%; overflow-x:auto;">
+                    <table class="table-clean" style="margin:0; min-width:600px;">
+                      <thead>
+                        <tr>
+                          <th style="padding-left:20px;">Date</th>
+                          <th>Category</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          ${App.isViewer() ? '' : '<th style="text-align:right; padding-right:20px;">Action</th>'}
+                        </tr>
+                      </thead>
+                      <tbody>
+            `;
+            for (const exp of r.pending) {
+              html += `
+                <tr>
+                  <td style="padding-left:20px; color:#4B5563; white-space:nowrap;">${Utils.formatDate(exp.expense_date)}</td>
+                  <td><span style="background:#F3F4F6; color:#4B5563; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:500;">${Utils.escapeHtml(exp.category)}</span></td>
+                  <td style="font-weight:600; color:#0F0F0F;">SAR ${Utils.formatCurrency(exp.amount).replace('﷼ ', '')}</td>
+                  <td>
+                    <span style="background:#fef3c7; color:#92400e; border-radius:9999px; padding:2px 10px; font-size:12px; font-weight:600; display:inline-block;">PENDING</span>
+                    ${exp.notes ? `<div style="font-size:11px; color:#6B7280; margin-top:2px;">${Utils.escapeHtml(exp.notes)}</div>` : ''}
+                  </td>
+                  ${App.isViewer() ? '' : `
+                  <td style="text-align:right; padding-right:20px;">
+                    <button class="btn btn-sm settle-btn" style="border:1px solid #16a34a; background:transparent; color:#16a34a; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 150ms;" onmouseover="this.style.background='#16a34a'; this.style.color='#FFFFFF'" onmouseout="this.style.background='transparent'; this.style.color='#16a34a'" onclick="Expenses.settleSingleDeduction(${exp.id}, ${exp.amount}, '${Utils.escapeHtml(r.rider_name).replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">Mark Settled</button>
+                  </td>
+                  `}
+                </tr>
+              `;
+            }
+            html += `</tbody></table></div></div></div>`;
+          }
+          html += '</div>';
+        }
+      } else {
+        // Settled History
+        if (ridersWithSettled.length === 0) {
+          html += `
+            <div style="text-align:center; padding:64px 20px; background:#FFFFFF; border-radius:12px; border:1px solid #E5E7EB;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px; margin:0 auto 16px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <div style="font-size:16px; font-weight:500; color:#0F0F0F;">No Settlement History</div>
+              <div style="font-size:14px; color:#6B7280; margin-top:8px;">Settled deductions will appear here.</div>
+            </div>`;
+        } else {
+          html += '<div style="display:flex; flex-direction:column; gap:16px;">';
+          for (const r of ridersWithSettled) {
+            html += `
+              <div class="card" style="background:#FFFFFF; border:1px solid #E5E7EB; border-left:4px solid #9ca3af; border-radius:12px; overflow:hidden;">
+                <div style="background:#F9FAFB; padding:16px 20px; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="const content = this.nextElementSibling; const isCollapsed = content.style.maxHeight === '0px'; content.style.maxHeight = isCollapsed ? '2000px' : '0px'; const icon = this.querySelector('.chevron-icon'); icon.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:#6b7280; transition:transform 200ms ease; transform:rotate(0deg);"><polyline points="9 18 15 12 9 6"/></svg>
+                    <div>
+                      <div style="font-size:16px; font-weight:bold; color:#0F0F0F;">${Utils.escapeHtml(r.rider_name)}</div>
+                      <div style="font-size:14px; color:#16A34A; font-weight:600; margin-top:4px;">${r.settled.length} Settled Items</div>
+                    </div>
+                  </div>
+                </div>
+                <div style="max-height:0px; transition:max-height 200ms ease; overflow:hidden;">
+                  <div style="width:100%; overflow-x:auto;">
+                    <table class="table-clean" style="margin:0; min-width:500px;">
+                      <thead>
+                        <tr>
+                          <th style="padding-left:20px;">Date</th>
+                          <th>Category</th>
+                          <th>Amount</th>
+                          <th style="padding-right:20px;">Settlement Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+            `;
+            // Sort settled by settledDate desc
+            const sortedSettled = [...r.settled].sort((a,b) => (b.settledDate || '').localeCompare(a.settledDate || ''));
+            for (const exp of sortedSettled) {
+              const settleDateStr = exp.settledDate ? Utils.formatDate(exp.settledDate.split('T')[0]) : 'Unknown';
+              html += `
+                <tr>
+                  <td style="padding-left:20px; color:#4B5563; white-space:nowrap;">${Utils.formatDate(exp.expense_date)}</td>
+                  <td><span style="background:#F3F4F6; color:#4B5563; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:500;">${Utils.escapeHtml(exp.category)}</span></td>
+                  <td style="font-weight:600; color:#0F0F0F;">SAR ${Utils.formatCurrency(exp.amount).replace('﷼ ', '')}</td>
+                  <td style="padding-right:20px;">
+                    <span style="background:#d1fae5; color:#065f46; border-radius:9999px; padding:2px 10px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> SETTLED</span>
+                    <div style="font-size:11px; color:#6B7280; margin-top:4px;">On ${settleDateStr} by ${Utils.escapeHtml(exp.settledBy || 'Unknown')}</div>
+                  </td>
+                </tr>
+              `;
+            }
+            html += `</tbody></table></div></div></div>`;
+          }
+          html += '</div>';
+        }
+      }
+
+    return html;
+  },
+
+  openAddManualDeductionModal() {
+    if (App.isViewer()) return;
+    let riderOptions = '<option value="" disabled selected>-- Select Rider --</option>';
+    this.riders.forEach(r => {
+      riderOptions += `<option value="${r.id}">${r.name}</option>`;
+    });
+
+    const html = `
+      <form id="manual-deduction-form" style="display:flex;flex-direction:column;gap:16px;padding:4px 0;">
+        <div>
+          <label class="expense-form-label">Rider</label>
+          <select class="expense-form-input" name="rider_id" required>
+            ${riderOptions}
+          </select>
+        </div>
+        <div>
+          <label class="expense-form-label">Amount (SAR)</label>
+          <input type="number" step="0.01" min="0.01" class="expense-form-input" name="amount" required placeholder="0.00">
+        </div>
+        <div>
+          <label class="expense-form-label">Date Added</label>
+          <input type="date" class="expense-form-input" name="expense_date" required value="${Utils.today()}">
+        </div>
+        <div>
+          <label class="expense-form-label">Description / Reason</label>
+          <input type="text" class="expense-form-input" name="notes" required placeholder="e.g. Previous month carryover, Fine, etc.">
+        </div>
+        <div style="background:#FFFBEB; border:1px solid #FEF3C7; color:#B45309; padding:12px; border-radius:8px; font-size:13px; line-height:1.4;">
+          <strong>Note:</strong> This will add a deduction to the rider's pending balance but will <strong>not</strong> be counted as a company operational expense.
+        </div>
+        <div class="form-actions" style="margin-top:10px; display:flex; justify-content:flex-end; gap:12px;">
+          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="manual-deduction-submit-btn">Add Deduction</button>
+        </div>
+      </form>
+    `;
+
+    Utils.openModal('Add Manual Deduction', html);
+
+    document.getElementById('manual-deduction-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const submitBtn = document.getElementById('manual-deduction-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Saving...';
+
+      const data = {
+        expense_date: fd.get('expense_date'),
+        category: 'Manual Deduction',
+        amount: parseFloat(fd.get('amount')) || 0,
+        is_deductible: true,
+        notes: fd.get('notes'),
+        rider_id: parseInt(fd.get('rider_id')),
+        vendor_name: 'Manual Entry',
+        receipt_base64: null
+      };
+
+      try {
+        await API.createExpense(data);
+        Utils.closeModal();
+        Utils.showToast('Manual deduction added', 'success');
+        this.deductionsData = null; // Clear cache to refetch instantly
+        this.render();
+      } catch (err) {
+        Utils.showToast(err.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Add Deduction';
+      }
+    });
+  },
+
+  async exportDeductionsExcel() {
+    Utils.showLoading('Exporting Deductions', 'Building Excel file...');
+    try {
+      const expenses = await API.getExpenses();
+      const funds = await API.getFunds();
+      
+      const formatReadableDate = (dStr) => dStr ? new Date(dStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+      
+      const sortedExpenses = [...expenses].sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
+      const sortedFunds = [...funds].sort((a, b) => new Date(a.receive_date || a.created_at) - new Date(b.receive_date || b.created_at));
+      let currentCompanyBalance = 0;
+      let fundIndex = 0;
+      const paidByMap = {};
+      
+      for (const e of sortedExpenses) {
+        const eDate = new Date(e.expense_date || e.created_at);
+        while (fundIndex < sortedFunds.length) {
+          const fDate = new Date(sortedFunds[fundIndex].receive_date || sortedFunds[fundIndex].created_at);
+          if (fDate <= eDate) {
+            currentCompanyBalance += parseFloat(sortedFunds[fundIndex].amount) || 0;
+            fundIndex++;
+          } else {
+            break;
+          }
+        }
+        const amt = parseFloat(e.amount) || 0;
+        if (currentCompanyBalance >= amt) {
+          paidByMap[e.id] = 'Company';
+          currentCompanyBalance -= amt;
+        } else {
+          paidByMap[e.id] = 'Out of Pocket';
+          currentCompanyBalance -= amt;
+        }
+      }
+
+      const riderExpenses = expenses.filter(e => {
+        const isMedical = (e.category || '').toLowerCase().includes('medical');
+        return !isMedical && (e.is_deductible === 1 || e.is_deductible === true) && e.rider_id;
+      });
+
+      const getCycleString = (dateStr) => {
+        if (!dateStr) return '-';
+        const cycle = Utils.getNoonCyclePeriod(dateStr.split('T')[0]);
+        const s = new Date(cycle.start + 'T12:00:00Z');
+        const e = new Date(cycle.end + 'T12:00:00Z');
+        return `${s.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${e.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+      };
+
+      const activeCycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const activeStart = new Date(activeCycle.start + 'T12:00:00Z');
+      const activeEnd = new Date(activeCycle.end + 'T23:59:59');
+
+      const riderMap = {};
+      
+      for (const e of riderExpenses) {
+        const rName = e.rider_name || `Rider #${e.rider_id}`;
+        if (!riderMap[rName]) riderMap[rName] = { pending: [], settled: [] };
+        if (e.deductionSettled) {
+          const sDate = new Date(e.settledDate || e.expense_date || e.created_at);
+          if (sDate >= activeStart && sDate <= activeEnd) {
+             riderMap[rName].settled.push(e);
+          }
+        } else {
+          riderMap[rName].pending.push(e);
+        }
+      }
+
+      const cycleLabel = `Cycle: ${activeStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${new Date(activeCycle.end + 'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+      const allOutstandingLabel = `All Outstanding Deductions \u2014 As of ${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
+      const monthYear = activeStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Inspiring Roads Logistics';
+
+      const DN = 'FF1A2744', BL = 'FF2563EB', LB = 'FFDBEAFE', SB = 'FFEFF6FF', AR = 'FFF8F9FA';
+      const PBG = 'FFFEF3C7', PTX = 'FF92400E', SBG = 'FFD1FAE5', STX = 'FF065F46';
+      const RD = 'FFDC2626', BT = 'FF2563EB', GT = 'FF16A34A', WH = 'FFFFFFFF';
+      const bdr = {top:{style:'thin',color:{argb:'FFE5E7EB'}},bottom:{style:'thin',color:{argb:'FFE5E7EB'}},left:{style:'thin',color:{argb:'FFE5E7EB'}},right:{style:'thin',color:{argb:'FFE5E7EB'}}};
+
+      const addHeader = (ws, cc, subtitle) => {
+        ws.mergeCells(1,1,1,cc);
+        const c1 = ws.getRow(1).getCell(1);
+        ws.getRow(1).height = 32;
+        c1.value = 'INSPIRING ROADS LOGISTICS \u2014 RIDER DEDUCTIONS REPORT';
+        c1.font = {name:'Calibri',size:14,bold:true,color:{argb:WH}};
+        c1.fill = {type:'pattern',pattern:'solid',fgColor:{argb:DN}};
+        c1.alignment = {horizontal:'center',vertical:'middle'};
+        ws.mergeCells(2,1,2,cc);
+        const c2 = ws.getRow(2).getCell(1);
+        ws.getRow(2).height = 22;
+        c2.value = subtitle;
+        c2.font = {name:'Calibri',size:11,italic:true,color:{argb:'FF1E3A5F'}};
+        c2.fill = {type:'pattern',pattern:'solid',fgColor:{argb:LB}};
+        c2.alignment = {horizontal:'center',vertical:'middle'};
+        ws.getRow(3).height = 8;
+      };
+
+      const setHdr = (ws, hds, rn) => {
+        const row = ws.getRow(rn); row.height = 24;
+        hds.forEach((h,i) => {
+          const c = row.getCell(i+1);
+          c.value = h;
+          c.font = {name:'Calibri',size:11,bold:true,color:{argb:WH}};
+          c.fill = {type:'pattern',pattern:'solid',fgColor:{argb:BL}};
+          c.alignment = {horizontal:'center',vertical:'middle'};
+          c.border = bdr;
+        });
+      };
+
+      const riders = Object.keys(riderMap).sort();
+
+      // ── SHEET 1: Pending ──
+      const ws1 = wb.addWorksheet('Pending Deductions');
+      const h1 = ['RIDER NAME','CATEGORY','DATE','CYCLE','AMOUNT (SAR)','PAID BY','STATUS','NOTES'];
+      ws1.columns = [{width:28},{width:20},{width:18},{width:22},{width:18},{width:16},{width:15},{width:30}];
+      addHeader(ws1, h1.length, allOutstandingLabel); setHdr(ws1, h1, 4);
+
+      let r1 = 5, gp = 0, ri = 0;
+      for (const rn of riders) {
+        const items = riderMap[rn].pending;
+        if (!items.length) continue;
+        
+        items.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
+        
+        let rt = 0, first = true;
+        for (const e of items) {
+          const a = parseFloat(e.amount)||0; rt += a;
+          const row = ws1.getRow(r1); const alt = ri%2===1;
+          row.getCell(1).value = first ? rn : '';
+          row.getCell(1).font = first ? {name:'Calibri',size:11,bold:true,color:{argb:'FF0F172A'}} : {name:'Calibri',size:11};
+          row.getCell(2).value = e.category||'-'; row.getCell(2).font = {name:'Calibri',size:11};
+          row.getCell(3).value = formatReadableDate(e.expense_date); row.getCell(3).font = {name:'Calibri',size:11};
+          row.getCell(4).value = getCycleString(e.expense_date || e.created_at); row.getCell(4).font = {name:'Calibri',size:11};
+          row.getCell(5).value = a; row.getCell(5).numFmt='#,##0.00'; row.getCell(5).alignment={horizontal:'right'};
+          row.getCell(5).font = a>500 ? {name:'Calibri',size:11,bold:true,color:{argb:RD}} : {name:'Calibri',size:11};
+          row.getCell(6).value = paidByMap[e.id] || 'Company'; row.getCell(6).font = {name:'Calibri',size:11};
+          row.getCell(7).value = 'PENDING';
+          row.getCell(7).font = {name:'Calibri',size:11,bold:true,color:{argb:PTX}};
+          row.getCell(7).fill = {type:'pattern',pattern:'solid',fgColor:{argb:PBG}};
+          row.getCell(7).alignment = {horizontal:'center'};
+          row.getCell(8).value = e.notes || e.description || ''; row.getCell(8).font = {name:'Calibri',size:10};
+          if (alt) [1,2,3,4,5,6,7,8].forEach(c=>{row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:AR}};});
+          for (let c=1;c<=8;c++) row.getCell(c).border = bdr;
+          r1++; ri++; first = false;
+        }
+        // rider group bottom border
+        const lb = ws1.getRow(r1-1);
+        for (let c=1;c<=8;c++) lb.getCell(c).border = {...bdr, bottom:{style:'medium',color:{argb:'FFD1D5DB'}}};
+        // subtotal
+        const sr = ws1.getRow(r1);
+        ws1.mergeCells(r1,1,r1,4);
+        sr.getCell(1).value = `Total for ${rn}`; sr.getCell(1).font = {name:'Calibri',size:11,bold:true}; sr.getCell(1).alignment = {horizontal:'right'};
+        sr.getCell(5).value = rt; sr.getCell(5).numFmt='#,##0.00'; sr.getCell(5).alignment={horizontal:'right'};
+        sr.getCell(5).font = {name:'Calibri',size:11,bold:true,color:{argb:BT}};
+        for (let c=1;c<=8;c++){sr.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:SB}};sr.getCell(c).border=bdr;}
+        gp += rt; r1++; ri = 0;
+      }
+      if (gp > 0) {
+        const gr = ws1.getRow(r1); ws1.mergeCells(r1,1,r1,4);
+        gr.getCell(1).value = 'TOTAL PENDING DEDUCTIONS';
+        gr.getCell(5).value = gp; gr.getCell(5).numFmt='#,##0.00'; gr.getCell(5).alignment={horizontal:'right'};
+        for (let c=1;c<=8;c++){gr.getCell(c).font={name:'Calibri',size:12,bold:true,color:{argb:WH}};gr.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:DN}};gr.getCell(c).border=bdr;}
+      }
+      ws1.views = [{state:'frozen',ySplit:4}];
+      ws1.autoFilter = {from:{row:4,column:1},to:{row:4,column:h1.length}};
+
+      // ── SHEET 2: Settled ──
+      const ws2 = wb.addWorksheet('Settled History');
+      const h2 = ['RIDER NAME','CATEGORY','DATE','AMOUNT (SAR)','PAID BY','STATUS','NOTES','SETTLED ON','SETTLED BY'];
+      ws2.columns = [{width:28},{width:20},{width:18},{width:18},{width:16},{width:15},{width:28},{width:16},{width:18}];
+      addHeader(ws2, h2.length, cycleLabel); setHdr(ws2, h2, 4);
+
+      let r2 = 5, gs = 0; ri = 0;
+      for (const rn of riders) {
+        const items = riderMap[rn].settled;
+        if (!items.length) continue;
+        let rt = 0, first = true;
+        for (const e of items) {
+          const a = parseFloat(e.amount)||0; rt += a;
+          const row = ws2.getRow(r2); const alt = ri%2===1;
+          row.getCell(1).value = first ? rn : '';
+          row.getCell(1).font = first ? {name:'Calibri',size:11,bold:true,color:{argb:'FF0F172A'}} : {name:'Calibri',size:11};
+          row.getCell(2).value = e.category||'-'; row.getCell(2).font = {name:'Calibri',size:11};
+          row.getCell(3).value = formatReadableDate(e.expense_date); row.getCell(3).font = {name:'Calibri',size:11};
+          row.getCell(4).value = a; row.getCell(4).numFmt='#,##0.00'; row.getCell(4).alignment={horizontal:'right'};
+          row.getCell(4).font = a>500 ? {name:'Calibri',size:11,bold:true,color:{argb:RD}} : {name:'Calibri',size:11};
+          row.getCell(5).value = paidByMap[e.id] || 'Company'; row.getCell(5).font = {name:'Calibri',size:11};
+          row.getCell(6).value = 'SETTLED';
+          row.getCell(6).font = {name:'Calibri',size:11,bold:true,color:{argb:STX}};
+          row.getCell(6).fill = {type:'pattern',pattern:'solid',fgColor:{argb:SBG}};
+          row.getCell(6).alignment = {horizontal:'center'};
+          row.getCell(7).value = e.notes || e.description || ''; row.getCell(7).font = {name:'Calibri',size:10};
+          row.getCell(8).value = formatReadableDate(e.settledDate ? e.settledDate.split('T')[0] : null); row.getCell(8).font = {name:'Calibri',size:11};
+          row.getCell(9).value = e.settledBy||'-'; row.getCell(9).font = {name:'Calibri',size:11};
+          if (alt) [1,2,3,4,5,6,7,8,9].forEach(c=>{row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:AR}};});
+          for (let c=1;c<=9;c++) row.getCell(c).border = bdr;
+          r2++; ri++; first = false;
+        }
+        const lb = ws2.getRow(r2-1);
+        for (let c=1;c<=9;c++) lb.getCell(c).border = {...bdr, bottom:{style:'medium',color:{argb:'FFD1D5DB'}}};
+        const sr = ws2.getRow(r2);
+        ws2.mergeCells(r2,1,r2,3);
+        sr.getCell(1).value = `Total for ${rn}`; sr.getCell(1).font = {name:'Calibri',size:11,bold:true}; sr.getCell(1).alignment = {horizontal:'right'};
+        sr.getCell(4).value = rt; sr.getCell(4).numFmt='#,##0.00'; sr.getCell(4).alignment={horizontal:'right'};
+        sr.getCell(4).font = {name:'Calibri',size:11,bold:true,color:{argb:BT}};
+        for (let c=1;c<=9;c++){sr.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:SB}};sr.getCell(c).border=bdr;}
+        gs += rt; r2++; ri = 0;
+      }
+      if (gs > 0) {
+        const gr = ws2.getRow(r2); ws2.mergeCells(r2,1,r2,3);
+        gr.getCell(1).value = 'TOTAL SETTLED DEDUCTIONS';
+        gr.getCell(4).value = gs; gr.getCell(4).numFmt='#,##0.00'; gr.getCell(4).alignment={horizontal:'right'};
+        for (let c=1;c<=9;c++){gr.getCell(c).font={name:'Calibri',size:12,bold:true,color:{argb:WH}};gr.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:DN}};gr.getCell(c).border=bdr;}
+      }
+      ws2.views = [{state:'frozen',ySplit:4}];
+      ws2.autoFilter = {from:{row:4,column:1},to:{row:4,column:h2.length}};
+
+      // ── SHEET 3: Summary ──
       const ws3 = wb.addWorksheet('Summary');
-      const h3 = ['PERSON / RIDER NAME','OLDEST PENDING DATE','HISTORICAL TOTAL (SAR)','TOTAL SETTLED (SAR)','REMAINING BALANCE (SAR)','STATUS'];
-      ws3.columns = [{ width: 28 }, { width: 22 }, { width: 24 }, { width: 22 }, { width: 26 }, { width: 25 }];
+      const h3 = ['RIDER NAME','OLDEST PENDING DATE','TOTAL PENDING','TOTAL SETTLED','NET OUTSTANDING'];
+      ws3.columns = [{width:28},{width:22},{width:20},{width:20},{width:22}];
       addHeader(ws3, h3.length, allOutstandingLabel); setHdr(ws3, h3, 4);
 
-      let r3 = 5, totalHist = 0, totalSettled = 0, totalRem = 0;
+      let r3 = 5, sp = 0, ss = 0;
       const today = new Date();
       for (const rn of riders) {
         const pendingItems = riderMap[rn].pending;
-        const pt = pendingItems.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-        const st = riderMap[rn].settled.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-        if (pt === 0 && st === 0) continue;
-
+        const pt = pendingItems.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+        const st = riderMap[rn].settled.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+        if (pt===0 && st===0) continue;
+        
         let oldestDateStr = '-';
         let isFlagged = false;
-        let diffDays = 0;
         if (pendingItems.length > 0) {
           const oldestItem = pendingItems.reduce((oldest, current) => {
             return new Date(current.expense_date || current.created_at) < new Date(oldest.expense_date || oldest.created_at) ? current : oldest;
           });
           const oldestDate = new Date(oldestItem.expense_date || oldestItem.created_at);
           oldestDateStr = formatReadableDate(oldestItem.expense_date || oldestItem.created_at);
-
-          diffDays = Math.floor((today - oldestDate) / (1000 * 60 * 60 * 24));
+          
+          const diffDays = Math.floor((today - oldestDate) / (1000 * 60 * 60 * 24));
           if (diffDays > 60) isFlagged = true;
         }
 
-        const hist = pt + st;
-        const row = ws3.getRow(r3);
-        const alt = (r3 - 5) % 2 === 1;
-        row.getCell(1).value = rn; row.getCell(1).font = { name: 'Calibri', size: 11, bold: true };
-        row.getCell(2).value = oldestDateStr; row.getCell(2).font = { name: 'Calibri', size: 11 };
-        row.getCell(3).value = hist; row.getCell(3).numFmt = '#,##0.00'; row.getCell(3).font = { name: 'Calibri', size: 11 }; row.getCell(3).alignment = { horizontal: 'right' };
-        row.getCell(4).value = st; row.getCell(4).numFmt = '#,##0.00'; row.getCell(4).font = { name: 'Calibri', size: 11 }; row.getCell(4).alignment = { horizontal: 'right' };
-        row.getCell(5).value = pt; row.getCell(5).numFmt = '#,##0.00'; row.getCell(5).alignment = { horizontal: 'right' };
-        row.getCell(5).font = pt > 0 ? { name: 'Calibri', size: 11, bold: true, color: { argb: RD } } : { name: 'Calibri', size: 11, bold: true, color: { argb: GT } };
-
-        let status = pt -== 0 ? 'All Settled' : (isFlagged ? `Flagged (${diffDays} days old)` : 'Active Pending');
-        row.getCell(6).value = status; row.getCell(6).font = { name: 'Calibri', size: 11, italic: true, color: { argb: isFlagged ? RD : 'FF6B7280' } };
-
+        const net = pt;
+        const row = ws3.getRow(r3); const alt = (r3-5)%2===1;
+        row.getCell(1).value = rn; row.getCell(1).font = {name:'Calibri',size:11,bold:true};
+        row.getCell(2).value = oldestDateStr; row.getCell(2).font = {name:'Calibri',size:11};
+        row.getCell(3).value = pt; row.getCell(3).numFmt='#,##0.00'; row.getCell(3).font={name:'Calibri',size:11}; row.getCell(3).alignment={horizontal:'right'};
+        row.getCell(4).value = st; row.getCell(4).numFmt='#,##0.00'; row.getCell(4).font={name:'Calibri',size:11}; row.getCell(4).alignment={horizontal:'right'};
+        row.getCell(5).value = net; row.getCell(5).numFmt='#,##0.00'; row.getCell(5).alignment={horizontal:'right'};
+        row.getCell(5).font = net>0 ? {name:'Calibri',size:11,bold:true,color:{argb:RD}} : {name:'Calibri',size:11,bold:true,color:{argb:GT}};
+        
         if (isFlagged) {
-          for (let c = 1; c <= 6; c++) row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+           for (let c=1;c<=5;c++) row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFEE2E2'}}; // light red
         } else if (alt) {
-          for (let c = 1; c <= 6; c++) row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AR } };
+           for (let c=1;c<=5;c++) row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:AR}};
         }
-        for (let c = 1; c <= 6; c++) row.getCell(c).border = bdr;
-        totalHist += hist; totalSettled += st; totalRem += pt; r3++;
+        for (let c=1;c<=5;c++) row.getCell(c).border = bdr;
+        sp += pt; ss += st; r3++;
       }
-      ws3.mergeCells(r3, 1, r3, 2);
       const g3 = ws3.getRow(r3);
       g3.getCell(1).value = 'GRAND TOTALS';
-      g3.getCell(3).value = totalHist; g3.getCell(3).numFmt = '#,##0.00'; g3.getCell(3).alignment = { horizontal: 'right' };
-      g3.getCell(4).value = totalSettled; g3.getCell(4).numFmt = '#,##0.00'; g3.getCell(4).alignment = { horizontal: 'right' };
-      g3.getCell(5).value = totalRem; g3.getCell(5).numFmt = '#,##0.00'; g3.getCell(5).alignment = { horizontal: 'right' };
-      for (let c = 1; c <= 6; c++) { g3.getCell(c).font = { name: 'Calibri', size: 12, bold: true, color: { argb: WH } }; g3.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DN } }; g3.getCell(c).border = bdr; }
+      g3.getCell(2).value = sp; g3.getCell(2).numFmt='#,##0.00'; g3.getCell(2).alignment={horizontal:'right'};
+      g3.getCell(3).value = ss; g3.getCell(3).numFmt='#,##0.00'; g3.getCell(3).alignment={horizontal:'right'};
+      g3.getCell(4).value = sp; g3.getCell(4).numFmt='#,##0.00'; g3.getCell(4).alignment={horizontal:'right'};
+      for (let c=1;c<=4;c++){g3.getCell(c).font={name:'Calibri',size:12,bold:true,color:{argb:WH}};g3.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:DN}};g3.getCell(c).border=bdr;}
       ws3.views = [{state:'frozen',ySplit:4}];
       ws3.autoFilter = {from:{row:4,column:1},to:{row:4,column:h3.length}};
 
