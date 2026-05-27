@@ -1372,13 +1372,13 @@ const Expenses = {
       const getCycleString = (dateStr) => {
         if (!dateStr) return '-';
         const cycle = Utils.getNoonCyclePeriod(dateStr.split('T')[0]);
-        const s = new Date(cycle.start + 'T00:00:00');
-        const e = new Date(cycle.end + 'T00:00:00');
+        const s = new Date(cycle.start + 'T12:00:00Z');
+        const e = new Date(cycle.end + 'T12:00:00Z');
         return `${s.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${e.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
       };
 
       const activeCycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
-      const activeStart = new Date(activeCycle.start + 'T00:00:00');
+      const activeStart = new Date(activeCycle.start + 'T12:00:00Z');
       const activeEnd = new Date(activeCycle.end + 'T23:59:59');
 
       const riderMap = {};
@@ -1396,7 +1396,7 @@ const Expenses = {
         }
       }
 
-      const cycleLabel = `Cycle: ${activeStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${new Date(activeCycle.end + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+      const cycleLabel = `Cycle: ${activeStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${new Date(activeCycle.end + 'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
       const allOutstandingLabel = `All Outstanding Deductions \u2014 As of ${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
       const monthYear = activeStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -2605,18 +2605,6 @@ const Expenses = {
     const thisYearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
 
     const html = `
-      <form id="custom-excel-form" class="form-grid">
-        <div class="form-group" style="grid-column: 1 / -1;">
-          <label class="form-label" style="margin-bottom:6px;">⚡ Quick Select</label>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-outline" style="font-size:12px; padding:5px 10px; border-radius:6px;" onclick="document.querySelector('#custom-excel-form input[name=start_date]').value='${thisWeekStart}'; document.querySelector('#custom-excel-form input[name=end_date]').value='${today}';">This Week</button>
-            <button type="button" class="btn btn-outline" style="font-size:12px; padding:5px 10px; border-radius:6px; background:#EFF6FF; border-color:#3B82F6; color:#1E40AF; font-weight:600;" onclick="document.querySelector('#custom-excel-form input[name=start_date]').value='${firstOfMonth}'; document.querySelector('#custom-excel-form input[name=end_date]').value='${today}';">This Month</button>
-            <button type="button" class="btn btn-outline" style="font-size:12px; padding:5px 10px; border-radius:6px;" onclick="document.querySelector('#custom-excel-form input[name=start_date]').value='${lastMonthStart}'; document.querySelector('#custom-excel-form input[name=end_date]').value='${lastMonthEnd}';">Last Month</button>
-            <button type="button" class="btn btn-outline" style="font-size:12px; padding:5px 10px; border-radius:6px;" onclick="document.querySelector('#custom-excel-form input[name=start_date]').value='${threeMonthsAgo}'; document.querySelector('#custom-excel-form input[name=end_date]').value='${today}';">Last 3 Months</button>
-            <button type="button" class="btn btn-outline" style="font-size:12px; padding:5px 10px; border-radius:6px;" onclick="document.querySelector('#custom-excel-form input[name=start_date]').value='${thisYearStart}'; document.querySelector('#custom-excel-form input[name=end_date]').value='${today}';">This Year</button>
-          </div>
-        </div>
-        <div class="form-group" style="grid-column: 1 / 2;">
           <label class="form-label">Start Date</label>
           <input type="date" class="form-input" name="start_date" required value="${firstOfMonth}">
         </div>
@@ -2774,8 +2762,8 @@ const Expenses = {
 
       ws.mergeCells(2, 1, 2, 7);
       const h2 = ws.getCell('A2');
-      const startFmt = new Date(start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const endFmt = new Date(end + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const startFmt = new Date(start + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const endFmt = new Date(end + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       h2.value = `Custom Financial Statement  ·  ${startFmt}  →  ${endFmt}`;
       h2.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF94A3B8' } };
       h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
@@ -2962,7 +2950,7 @@ const Expenses = {
           cNum.alignment = { horizontal: 'center', vertical: 'middle' };
 
           const cDate = row.getCell(2);
-          cDate.value = f.receive_date ? new Date(f.receive_date + 'T00:00:00') : '';
+          cDate.value = f.receive_date ? new Date(f.receive_date + 'T12:00:00Z') : '';
           cDate.numFmt = 'dd-mmm-yyyy';
           cDate.alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -3046,7 +3034,7 @@ const Expenses = {
           cNum.alignment = { horizontal: 'center', vertical: 'middle' };
 
           const cDate = row.getCell(2);
-          cDate.value = e.expense_date ? new Date(e.expense_date + 'T00:00:00') : '';
+          cDate.value = e.expense_date ? new Date(e.expense_date + 'T12:00:00Z') : '';
           cDate.numFmt = 'dd-mmm-yyyy';
           cDate.alignment = { horizontal: 'center', vertical: 'middle' };
 

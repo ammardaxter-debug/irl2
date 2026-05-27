@@ -1,6 +1,6 @@
 -- =============================================
 -- IRL Logistics — Supabase PostgreSQL Schema
--- Migrated from Firebase Realtime Database
+-- Updated for migration to new project
 -- =============================================
 
 -- 1. RIDERS (primary entity)
@@ -29,7 +29,19 @@ CREATE TABLE IF NOT EXISTS riders (
   push_token TEXT,
   last_login TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_lat NUMERIC,
+  last_lng NUMERIC,
+  last_location_update TIMESTAMPTZ,
+  is_online BOOLEAN DEFAULT false,
+  kit_notes TEXT,
+  uniform_date TEXT,
+  safety_kit_date TEXT,
+  noon_id TEXT,
+  per_order_rate NUMERIC DEFAULT 0,
+  store_warehouse TEXT,
+  doc_vault TEXT,
+  gps_status TEXT
 );
 
 -- 2. DAILY LOGS
@@ -73,7 +85,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   source TEXT,
   request_id INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ,
+  vendor_name TEXT
 );
 
 -- 4. SALARY ADVANCES
@@ -217,6 +230,15 @@ CREATE TABLE IF NOT EXISTS app_config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 15. AUTH USERS (for admin login)
+CREATE TABLE IF NOT EXISTS auth_users (
+  id SERIAL PRIMARY KEY,
+  phone TEXT UNIQUE,
+  password_hash TEXT,
+  role TEXT DEFAULT 'admin',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =============================================
 -- INDEXES for performance
 -- =============================================
@@ -233,9 +255,6 @@ CREATE INDEX IF NOT EXISTS idx_riders_phone ON riders(phone);
 -- =============================================
 -- Row Level Security (RLS) — disabled for server-side access
 -- =============================================
--- We use service_role key from the server, which bypasses RLS.
--- No RLS policies needed since all access goes through our Express API.
-
 ALTER TABLE riders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
@@ -250,9 +269,9 @@ ALTER TABLE payroll_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
 
--- Service role bypasses RLS, so no policies needed for server access.
--- But let's add a permissive policy for service_role just in case:
+-- Service role bypasses RLS, so permissive policies for safety:
 CREATE POLICY "Service role full access" ON riders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON daily_logs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON expenses FOR ALL USING (true) WITH CHECK (true);
@@ -267,3 +286,20 @@ CREATE POLICY "Service role full access" ON payroll_locks FOR ALL USING (true) W
 CREATE POLICY "Service role full access" ON admin_profiles FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON app_config FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access" ON auth_users FOR ALL USING (true) WITH CHECK (true);
+
+-- =============================================
+-- RESET SEQUENCES (run after data import)
+-- =============================================
+-- SELECT setval('riders_id_seq', COALESCE((SELECT MAX(id) FROM riders), 0) + 1, false);
+-- SELECT setval('daily_logs_id_seq', COALESCE((SELECT MAX(id) FROM daily_logs), 0) + 1, false);
+-- SELECT setval('expenses_id_seq', COALESCE((SELECT MAX(id) FROM expenses), 0) + 1, false);
+-- SELECT setval('salary_advances_id_seq', COALESCE((SELECT MAX(id) FROM salary_advances), 0) + 1, false);
+-- SELECT setval('bonuses_id_seq', COALESCE((SELECT MAX(id) FROM bonuses), 0) + 1, false);
+-- SELECT setval('company_funds_id_seq', COALESCE((SELECT MAX(id) FROM company_funds), 0) + 1, false);
+-- SELECT setval('bikes_id_seq', COALESCE((SELECT MAX(id) FROM bikes), 0) + 1, false);
+-- SELECT setval('rider_requests_id_seq', COALESCE((SELECT MAX(id) FROM rider_requests), 0) + 1, false);
+-- SELECT setval('notifications_id_seq', COALESCE((SELECT MAX(id) FROM notifications), 0) + 1, false);
+-- SELECT setval('payment_status_id_seq', COALESCE((SELECT MAX(id) FROM payment_status), 0) + 1, false);
+-- SELECT setval('audit_logs_id_seq', COALESCE((SELECT MAX(id) FROM audit_logs), 0) + 1, false);
+-- SELECT setval('auth_users_id_seq', COALESCE((SELECT MAX(id) FROM auth_users), 0) + 1, false);
