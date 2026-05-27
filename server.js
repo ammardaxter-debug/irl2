@@ -1409,7 +1409,7 @@ app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
 // Admin: Update rider request status
 app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
   try {
-    const { status, admin_note, receipt_base64 } = req.body;
+    const { status, admin_note, receipt_base64, deduct_funds } = req.body;
     const adminName = req.adminName || 'Admin';
     if (!status) return res.status(400).json({ error: 'Status required' });
 
@@ -1423,7 +1423,7 @@ app.put('/api/admin/rider-requests/:id', verifyAdminToken, async (req, res) => {
       }
     } catch (e) { /* ignore */ }
 
-    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName, adminPhoto, receipt_base64);
+    const result = await db.updateRiderRequestStatus(req.params.id, status, admin_note, adminName, adminPhoto, receipt_base64, deduct_funds);
     
     // Send Push Notification
     try {

@@ -325,10 +325,10 @@ const API = {
     return this.request(`/admin/rider-requests?status=${status}`);
   },
 
-  updateRiderRequestStatus(id, status, adminNote, receiptBase64 = null) {
+  updateRiderRequestStatus(id, status, adminNote, receiptBase64 = null, deduct_funds = true) {
     return this.request(`/admin/rider-requests/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ status, admin_note: adminNote, receipt_base64: receiptBase64 })
+      body: JSON.stringify({ status, admin_note: adminNote, receipt_base64: receiptBase64, deduct_funds })
     });
   },
 

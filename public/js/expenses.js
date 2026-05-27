@@ -780,6 +780,23 @@ const Expenses = {
             if (r.status === 'approved') sBadge = `<span style="color:#16A34A; font-weight:600;">Approved</span>`;
             else if (r.status === 'rejected') sBadge = `<span style="color:#DC2626; font-weight:600;">Rejected</span>`;
             
+            let progressInfo = '';
+            if (r.status === 'approved' && r.category === 'Advance' && expenses.length > 0) {
+              const relatedExp = expenses.filter(e => String(e.request_id) === String(r.id) && e.is_deductible);
+              if (relatedExp.length > 0) {
+                const total = relatedExp.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                const deducted = relatedExp.filter(e => e.deductionSettled).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                const remaining = total - deducted;
+                progressInfo = `
+                  <div style="margin-top:6px; background:#F9FAFB; border:1px solid #E5E7EB; padding:6px; border-radius:6px; font-size:11px;">
+                    <div style="display:flex; justify-content:space-between; color:#4B5563;"><span>Total:</span> <strong>${Utils.formatCurrency(total)}</strong></div>
+                    <div style="display:flex; justify-content:space-between; color:#16A34A;"><span>Deducted:</span> <strong>${Utils.formatCurrency(deducted)}</strong></div>
+                    <div style="display:flex; justify-content:space-between; color:#D97706;"><span>Remaining:</span> <strong>${Utils.formatCurrency(remaining)}</strong></div>
+                  </div>
+                `;
+              }
+            }
+            
             let matchedExp = '-';
             if (r.status === 'approved' && expenses.length > 0) {
               const eMatch = expenses.find(e => String(e.request_id) === String(r.id) && e.receipt_url);
@@ -789,7 +806,7 @@ const Expenses = {
             }
 
             actionOrInfo = `
-              <td>${sBadge}</td>
+              <td>${sBadge}${progressInfo}</td>
               <td style="font-size:12px; color:#4B5563;">${Utils.escapeHtml(r.processed_by || '-')}</td>
               <td style="font-size:12px; color:#4B5563; max-width:200px;">${Utils.escapeHtml(r.admin_note || '-')}</td>
               <td>${matchedExp}</td>
@@ -871,6 +888,13 @@ const Expenses = {
           </select>
           <p style="margin:6px 0 0 0; font-size:12px; color:#6B7280;">Deductions will be split evenly across selected months starting from current cycle.</p>
         </div>
+        <div style="margin-bottom:16px; display:flex; align-items:flex-start; gap:8px; background:#EFF6FF; padding:12px; border-radius:8px; border:1px solid #BFDBFE;">
+          <input type="checkbox" id="deduct-company-funds" checked style="width:18px; height:18px; cursor:pointer; margin-top:2px;">
+          <div>
+            <label for="deduct-company-funds" style="font-size:14px; font-weight:600; color:#1E3A8A; cursor:pointer;">Deduct total amount from Company Funds today?</label>
+            <p style="margin:4px 0 0 0; font-size:12px; color:#1E40AF;">If checked, this advance will lower the overall company balance immediately.</p>
+          </div>
+        </div>
         ` : ''}
 
         <div style="margin-bottom:16px;">
@@ -923,12 +947,17 @@ const Expenses = {
       e.preventDefault();
       
       let adminNote = e.target.elements.admin_note.value.trim();
+      let deductFunds = true;
       
       if (r.category === 'Advance') {
         const planEl = document.getElementById('approve-installment-plan');
         if (planEl) {
           const approvedPlan = parseInt(planEl.value) || 1;
           adminNote += (adminNote ? '\\n' : '') + `[OVERRIDE_PLAN:${approvedPlan}]`;
+        }
+        const deductFundsEl = document.getElementById('deduct-company-funds');
+        if (deductFundsEl) {
+          deductFunds = deductFundsEl.checked;
         }
       }
 
@@ -938,7 +967,7 @@ const Expenses = {
       try {
         Utils.closeModal();
         Utils.showLoading('Approving request...');
-        await API.updateRiderRequestStatus(r.id, 'approved', adminNote, receiptBase64);
+        await API.updateRiderRequestStatus(r.id, 'approved', adminNote, receiptBase64, deductFunds);
         Utils.showToast('Request approved successfully');
         this.render();
       } catch(err) {

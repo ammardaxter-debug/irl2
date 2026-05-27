@@ -394,7 +394,7 @@ async function getExpenseStats() {
 
   const totalReceived = (funds.data || []).reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
   const totalExpenses = (expenses.data || []).reduce((sum, e) => {
-    if (e.category === 'Manual Deduction') return sum;
+    if (e.category === 'Manual Deduction' || e.category === 'Advance Installment') return sum;
     return sum + (parseFloat(e.amount) || 0);
   }, 0);
 
@@ -1050,7 +1050,7 @@ async function getRiderRequests(status = 'pending') {
   return data || [];
 }
 
-async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin', processedByPhoto = '', receiptBase64 = null) {
+async function updateRiderRequestStatus(id, status, adminNote = '', processedBy = 'Admin', processedByPhoto = '', receiptBase64 = null, deductFunds = true) {
   const { data: request, error: fetchErr } = await supabase.from('rider_requests').select('*').eq('id', id).single();
   if (fetchErr || !request) throw new Error('Request not found');
 
@@ -1070,7 +1070,23 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
 
     const originalNote = desc.replace(/\[INSTALLMENT_PLAN:\d+\]/, '').trim();
 
-    if (request.category === 'Advance' && plan > 1) {
+    if (request.category === 'Advance') {
+      if (deductFunds) {
+        // Create the non-deductible cash outflow from company funds today
+        await createExpense({
+          expense_date: todayLocal(),
+          category: 'Advance (Company Funds)',
+          amount: request.amount,
+          rider_id: request.rider_id,
+          rider_name: request.rider_name,
+          is_deductible: false,
+          source: 'rider_request_cash',
+          request_id: id,
+          receipt_base64: receiptBase64,
+          notes: `Advance Paid from Company Funds (Ref: ${id})`
+        });
+      }
+
       const amountPerMonth = request.amount / plan;
       for (let i = 0; i < plan; i++) {
         const d = new Date();
@@ -1081,7 +1097,7 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
         
         await createExpense({
           expense_date: `${yyyy}-${mm}-${dd}`,
-          category: request.category,
+          category: 'Advance Installment',
           amount: amountPerMonth,
           rider_id: request.rider_id,
           rider_name: request.rider_name,
@@ -1113,7 +1129,27 @@ async function updateRiderRequestStatus(id, status, adminNote = '', processedBy 
 async function getMyRequests(riderId) {
   const { data, error } = await supabase.from('rider_requests').select('*').eq('rider_id', riderId).order('created_at', { ascending: false });
   if (error) throw error;
-  return data || [];
+  
+  const requests = data || [];
+  const approvedAdvanceIds = requests.filter(r => r.status === 'approved' && r.category === 'Advance').map(r => r.id);
+  
+  if (approvedAdvanceIds.length > 0) {
+    const { data: expData } = await supabase.from('expenses').select('amount, request_id, deductionSettled, is_deductible').in('request_id', approvedAdvanceIds).eq('is_deductible', true);
+    if (expData) {
+      for (const req of requests) {
+        if (req.status === 'approved' && req.category === 'Advance') {
+          const related = expData.filter(e => String(e.request_id) === String(req.id));
+          if (related.length > 0) {
+            req.advanceTotal = related.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            req.advanceDeducted = related.filter(e => e.deductionSettled).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            req.advanceRemaining = req.advanceTotal - req.advanceDeducted;
+          }
+        }
+      }
+    }
+  }
+
+  return requests;
 }
 
 async function deleteRiderRequest(id, riderId) {
