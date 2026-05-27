@@ -1131,7 +1131,16 @@ async function getAdminProfile(emailKey) {
 }
 
 async function updateAdminProfile(emailKey, profileData) {
-  await supabase.from('admin_profiles').upsert({ email_key: emailKey, ...profileData, updated_at: nowISO() });
+  let photoUrl = profileData.photo_url;
+  if (photoUrl && photoUrl.startsWith('data:image')) {
+    photoUrl = await uploadBase64ToStorage(photoUrl, 'rider-proofs', `admin_profile_${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
+  }
+  
+  const updates = { email_key: emailKey, ...profileData, updated_at: nowISO() };
+  if (photoUrl !== undefined) {
+    updates.photo_url = photoUrl;
+  }
+  await supabase.from('admin_profiles').upsert(updates);
   return { success: true };
 }
 
