@@ -323,7 +323,7 @@ const SprintsPage = {
               const initials = rider.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
               return `
-                <tr>
+                <tr style="cursor: pointer;" onclick="SprintsPage.showRiderSprintDetails(${rider.id})" title="Click to view log submissions breakdown">
                   <td>
                     <span class="rank-badge ${rankClass}">${rank}</span>
                   </td>
@@ -384,6 +384,86 @@ const SprintsPage = {
         `;
       }
     }
+  },
+
+  showRiderSprintDetails(riderId) {
+    const rider = (this.sprintData.leaderboard || []).find(r => r.id === riderId);
+    if (!rider) return;
+
+    const logs = rider.logs || [];
+    const totals = logs.reduce((acc, log) => {
+      acc.primary += log.primary_orders || 0;
+      acc.associate += log.associate_orders || 0;
+      acc.total += log.total_orders || 0;
+      return acc;
+    }, { primary: 0, associate: 0, total: 0 });
+
+    const tableRowsHtml = logs.length === 0 
+      ? `<tr><td colspan="4" style="text-align: center; color: #64748B; padding: 20px;">No daily logs submitted during this sprint range.</td></tr>`
+      : logs.map(log => `
+          <tr>
+            <td style="font-weight: 600;">${Utils.formatDate(log.date)}</td>
+            <td style="text-align: right;">${log.primary_orders}</td>
+            <td style="text-align: right;">${log.associate_orders}</td>
+            <td style="text-align: right; font-weight: 700; color: #1E293B;">${log.total_orders}</td>
+          </tr>
+        `).join('');
+
+    const html = `
+      <style>
+        .details-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+        .details-table th, .details-table td {
+          padding: 10px 12px;
+          border-bottom: 1px solid #E2E8F0;
+          font-size: 13px;
+        }
+        .details-table th {
+          background: #F8FAFC;
+          font-weight: 700;
+          color: #475569;
+        }
+        .details-total-row {
+          background: #F8FAFC;
+          font-weight: 800;
+        }
+        .details-total-row td {
+          border-bottom: 2px solid #CBD5E1;
+        }
+      </style>
+      <div style="margin-bottom: 16px;">
+        <p style="font-size: 14px; color: #475569; margin-bottom: 4px;">Rider: <strong>${Utils.escapeHtml(rider.name)}</strong> (${rider.rider_type})</p>
+        <p style="font-size: 13px; color: #64748B;">Mobile: <strong>${Utils.escapeHtml(rider.mobile)}</strong></p>
+      </div>
+      
+      <h3 style="font-size: 14px; font-weight: 700; color: #1E293B; margin-bottom: 8px;">Logged Submissions Breakdown</h3>
+      <table class="details-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th style="text-align: right;">Primary Orders</th>
+            <th style="text-align: right;">Associate Orders</th>
+            <th style="text-align: right;">Total Orders</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRowsHtml}
+          ${logs.length > 0 ? `
+            <tr class="details-total-row">
+              <td>Total Summary</td>
+              <td style="text-align: right;">${totals.primary}</td>
+              <td style="text-align: right;">${totals.associate}</td>
+              <td style="text-align: right; color: #2563EB;">${totals.total}</td>
+            </tr>
+          ` : ''}
+        </tbody>
+      </table>
+    `;
+
+    Utils.openModal(`Sprint #${this.selectedSprintNumber} Details`, html);
   }
 };
 

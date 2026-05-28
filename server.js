@@ -1252,11 +1252,20 @@ app.get('/api/admin/sprints/leaderboard', verifyAdminToken, async (req, res) => 
     if (logErr) throw logErr;
     
     const statsMap = {};
+    const riderLogsMap = {};
     (allLogs || []).forEach(log => {
       const rid = log.rider_id;
       const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
       if (!statsMap[rid]) statsMap[rid] = 0;
       statsMap[rid] += orders;
+
+      if (!riderLogsMap[rid]) riderLogsMap[rid] = [];
+      riderLogsMap[rid].push({
+        date: log.log_date,
+        primary_orders: log.primary_orders || 0,
+        associate_orders: log.associate_orders || 0,
+        total_orders: orders
+      });
     });
 
     const leaderboard = riders.map(r => ({
@@ -1265,7 +1274,8 @@ app.get('/api/admin/sprints/leaderboard', verifyAdminToken, async (req, res) => 
       mobile: r.mobile || r.phone || 'N/A',
       photo: r.profile_photo || r.photo_url || null,
       total_orders: statsMap[r.id] || 0,
-      rider_type: r.rider_type
+      rider_type: r.rider_type,
+      logs: (riderLogsMap[r.id] || []).sort((a, b) => b.date.localeCompare(a.date))
     })).sort((a, b) => b.total_orders - a.total_orders);
 
     res.json({
@@ -2128,8 +2138,8 @@ app.put('/api/admin/app-version', verifyAdminToken, async (req, res) => {
 function getSprintState(nowStr) {
   const now = nowStr ? new Date(nowStr) : new Date();
   
-  // Anchor: June 1, 2026, 00:00:00 Local Time
-  const anchor = new Date(2026, 5, 1, 0, 0, 0, 0); // Month is 0-indexed
+  // Anchor: June 1, 2026, 00:00:00 Riyadh Time (UTC+3)
+  const anchor = new Date(Date.UTC(2026, 5, 1, 0, 0, 0, 0) - 3 * 60 * 60 * 1000);
   
   if (now.getTime() < anchor.getTime()) {
     return {
