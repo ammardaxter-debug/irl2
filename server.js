@@ -1213,6 +1213,75 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
   }
 });
 
+// ========== ADMIN SPRINTS API ==========
+app.get('/api/admin/sprints/leaderboard', verifyAdminToken, async (req, res) => {
+  try {
+    const state = getSprintState();
+    
+    let start = state.currentSprintStart.toISOString().split('T')[0];
+    let end = state.currentSprintEnd.toISOString().split('T')[0];
+    let querySprintNumber = state.sprintNumber;
+    let queryPhase = state.phase;
+    let queryCountdownMs = state.countdownMs;
+    
+    const targetSprint = req.query.sprintNumber ? parseInt(req.query.sprintNumber, 10) : null;
+    if (targetSprint && targetSprint !== state.sprintNumber) {
+      const COMP_MS = 6 * 24 * 60 * 60 * 1000;
+      const CYCLE_MS = 7 * 24 * 60 * 60 * 1000;
+      const anchor = new Date(2026, 5, 1);
+      
+      const offset = (targetSprint - 1) * CYCLE_MS;
+      const sprintStart = new Date(anchor.getTime() + offset);
+      const sprintEnd = new Date(sprintStart.getTime() + COMP_MS - 1);
+      
+      start = sprintStart.toISOString().split('T')[0];
+      end = sprintEnd.toISOString().split('T')[0];
+      querySprintNumber = targetSprint;
+      queryPhase = Date.now() > sprintEnd.getTime() ? 'FINISHED' : 'ACTIVE';
+      queryCountdownMs = 0;
+    }
+    
+    const riders = await db.getAllRiders('active');
+    
+    const { data: allLogs, error: logErr } = await db.getDb()
+      .from('daily_logs')
+      .select('rider_id, primary_orders, associate_orders, log_date')
+      .gte('log_date', start)
+      .lte('log_date', end);
+
+    if (logErr) throw logErr;
+    
+    const statsMap = {};
+    (allLogs || []).forEach(log => {
+      const rid = log.rider_id;
+      const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      if (!statsMap[rid]) statsMap[rid] = 0;
+      statsMap[rid] += orders;
+    });
+
+    const leaderboard = riders.map(r => ({
+      id: r.id,
+      name: r.name,
+      mobile: r.mobile || r.phone || 'N/A',
+      photo: r.profile_photo || r.photo_url || null,
+      total_orders: statsMap[r.id] || 0,
+      rider_type: r.rider_type
+    })).sort((a, b) => b.total_orders - a.total_orders);
+
+    res.json({
+      sprintNumber: querySprintNumber,
+      phase: queryPhase,
+      countdownMs: queryCountdownMs,
+      startDate: start,
+      endDate: end,
+      leaderboard
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ========== ADMIN PROFILES ==========
 
 app.get('/api/admin/profiles', async (req, res) => {

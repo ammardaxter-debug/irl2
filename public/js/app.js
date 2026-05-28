@@ -226,7 +226,8 @@ const App = {
       'reports-center': 'Reports & Export Center',
       'notifications': 'Rider Alerts & Notifications',
       'live-tracking': 'Live Tracking',
-      'backup': 'Backup & Data Management'
+      'backup': 'Backup & Data Management',
+      'sprints': 'Weekly Sprints & Gamification'
     };
     document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
 
@@ -234,7 +235,8 @@ const App = {
     document.getElementById('sidebar')?.classList.remove('open');
 
     // Render page content
-    switch (page) {      case 'dashboard': Dashboard.render(); break;
+    switch (page) {
+      case 'dashboard': Dashboard.render(); break;
       case 'riders': Riders.render(); break;
       case 'daily-logs': DailyLogs.render(); break;
       case 'payroll': Payroll.render(); break;
@@ -244,6 +246,7 @@ const App = {
       case 'notifications': NotificationsAdmin.render(); break;
       case 'live-tracking': LiveTracking.render(); break;
       case 'backup': Backup.render(); break;
+      case 'sprints': SprintsPage.render(); break;
     }
   }
 };
