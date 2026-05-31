@@ -294,7 +294,7 @@ const SprintsPage = {
               <th>Mobile</th>
               <th>Rider Type</th>
               <th style="text-align: right; width: 150px;">Orders Delivered</th>
-              <th style="text-align: right; width: 180px;">Potential Payout</th>
+              <th style="text-align: right; width: 220px;">Potential Payout (Company Only)</th>
             </tr>
           </thead>
           <tbody>
@@ -310,13 +310,13 @@ const SprintsPage = {
               if (rider.rider_type === 'company') {
                 if (rank === 1) {
                   rankClass = 'rank-1';
-                  prizeHtml = '<span class="prize-tag prize-1">🥇 40 SAR (1st Prize)</span>';
+                  prizeHtml = '<span class="prize-tag prize-1">🥇 75 SAR (1st Prize)</span>';
                 } else if (rank === 2) {
                   rankClass = 'rank-2';
-                  prizeHtml = '<span class="prize-tag prize-2">🥈 20 SAR (2nd Prize)</span>';
+                  prizeHtml = '<span class="prize-tag prize-2">🥈 50 SAR (2nd Prize)</span>';
                 } else if (rank === 3) {
                   rankClass = 'rank-3';
-                  prizeHtml = '<span class="prize-tag prize-3">🥉 15 SAR (3rd Prize)</span>';
+                  prizeHtml = '<span class="prize-tag prize-3">🥉 25 SAR (3rd Prize)</span>';
                 }
               }
 
