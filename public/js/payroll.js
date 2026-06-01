@@ -900,7 +900,7 @@ const Payroll = {
   downloadFinancialReport(isAllTime) {
     if (typeof PayrollFinancialExcel !== 'undefined') {
       document.getElementById('finance-dropdown').classList.add('hidden');
-      PayrollFinancialExcel.generate(isAllTime, this.currentPeriod);
+      PayrollFinancialExcel.generate(isAllTime, this.currentPeriod, this._currentPayrollData);
     } else {
       Utils.showToast('Financial Excel module not loaded', 'error');
     }

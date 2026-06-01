@@ -25,7 +25,7 @@ const PayrollFinancialExcel = {
   
   fill(hex) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + hex } }; },
 
-  async generate(isAllTime = false, currentPeriod = null) {
+  async generate(isAllTime = false, currentPeriod = null, currentPayrollData = null) {
     if (typeof ExcelJS === 'undefined') {
       Utils.showToast('ExcelJS library not loaded.', 'error');
       return;
@@ -39,24 +39,39 @@ const PayrollFinancialExcel = {
       let payouts = [];
       let label = 'All-Time History';
 
+      let riderPayouts = [];
+
       if (isAllTime) {
         // Fetch all-time funds and all-time payouts
-        funds = await API.getCycleTransfers('all'); // wait, the new API is getCycleTransfers
+        funds = await API.getCycleTransfers('all'); 
         payouts = await API.getExpenses(null, null);
+        riderPayouts = payouts.filter(p => (p.category || '').toLowerCase() === 'rider payroll');
       } else {
         if (!currentPeriod) throw new Error('Current cycle period is required.');
         const cycleKey = `${currentPeriod.start}_${currentPeriod.end}`;
         funds = await API.getCycleTransfers(cycleKey);
-        payouts = await API.getExpenses(currentPeriod.start, currentPeriod.end);
+        
+        if (currentPayrollData && currentPayrollData.length > 0) {
+          // Use real-time payroll data for the cycle report
+          riderPayouts = currentPayrollData.map(r => ({
+            expense_date: new Date(currentPeriod.end + 'T00:00:00'),
+            rider_name: r.rider_name || `Rider #${r.rider_id}`,
+            amount: r.calculated_salary,
+            notes: `Payroll for ${cycleKey} (Status: ${r.payment_status || 'unpaid'})`
+          })).filter(r => r.amount > 0);
+        } else {
+          // Fallback
+          payouts = await API.getExpenses(null, null);
+          riderPayouts = payouts.filter(p => 
+            (p.category || '').toLowerCase() === 'rider payroll' && 
+            (p.notes || '').includes(cycleKey)
+          );
+        }
         
         const s = new Date(currentPeriod.start + 'T00:00:00');
         const e = new Date(currentPeriod.end + 'T00:00:00');
         label = `${s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
       }
-
-      // Filter payouts strictly to 'Rider Payroll' category
-      // As per new auto-settlement logic, we create an exact expense when marked "Paid"
-      const riderPayouts = payouts.filter(p => (p.category || '').toLowerCase() === 'rider payroll');
 
       // 2. Initialize Workbook
       const wb = new ExcelJS.Workbook();
