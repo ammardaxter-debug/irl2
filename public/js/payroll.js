@@ -1008,22 +1008,16 @@ const Payroll = {
           </div>
 
           <!-- Summary Grid -->
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:16px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
               <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Received (SR)</div>
               <div style="font-size:20px; font-weight:800; color:#4F46E5;">${Utils.formatCurrency(totalReceived)}</div>
             </div>
 
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Paid to Riders (SR)</div>
-              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
-              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">${paidRiders.length} paid riders</div>
-            </div>
-
-            <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Internal Expenses</div>
-              <div style="font-size:20px; font-weight:800; color:#DC2626;">${Utils.formatCurrency(totalOtherDeductions)}</div>
-              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">Hidden from payslips</div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Payouts (Riders + Commission)</div>
+              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders + totalOtherDeductions)}</div>
+              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">${paidRiders.length} paid riders (Includes SR ${Utils.formatCurrency(totalOtherDeductions)} Commission)</div>
             </div>
 
             <div style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px;">
