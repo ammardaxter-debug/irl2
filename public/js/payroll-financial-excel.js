@@ -58,8 +58,8 @@ const PayrollFinancialExcel = {
             .map(r => ({
               expense_date: new Date(currentPeriod.end + 'T00:00:00'),
               rider_name: r.rider_name || `Rider #${r.rider_id}`,
-              amount: r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary,
-              notes: `Payroll for ${cycleKey}`
+              amount: (r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary) + (Number(r.other_deductions) || 0),
+              notes: `Payroll for ${cycleKey}` + (Number(r.other_deductions) > 0 ? ` (Includes SR ${r.other_deductions} Commission)` : '')
             })).filter(r => r.amount > 0);
         } else {
           // Fallback
