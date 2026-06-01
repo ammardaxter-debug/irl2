@@ -471,24 +471,33 @@ app.get('/api/payroll/lock-status', async (req, res) => {
   }
 });
 
-// ========== CYCLE FINANCES (Company Income Tracker) ==========
+// ========== CYCLE TRANSFERS (Company Income Ledger) ==========
 
-app.get('/api/payroll/cycle-finances', async (req, res) => {
+app.get('/api/payroll/cycle-transfers', async (req, res) => {
   try {
     const { cycle_key } = req.query;
     if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
-    const data = await db.getSettings(`cycle_finances_${cycle_key}`);
-    res.json(data || { company_income: 0 });
+    const data = await db.getCycleTransfers(cycle_key);
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/payroll/cycle-finances', verifyAdminToken, requireAdmin, async (req, res) => {
+app.post('/api/payroll/cycle-transfers', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
-    const { cycle_key, company_income } = req.body;
-    if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
-    await db.updateSettings(`cycle_finances_${cycle_key}`, { company_income: Number(company_income) || 0 });
+    const { cycle_key, amount, description } = req.body;
+    if (!cycle_key || amount === undefined) return res.status(400).json({ error: 'cycle_key and amount required' });
+    const data = await db.addCycleTransfer(cycle_key, Number(amount), description);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/payroll/cycle-transfers/:id', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteCycleTransfer(parseInt(req.params.id));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -305,15 +305,21 @@ const API = {
     return this.request(`/payroll/lock-status?cycle_key=${cycleKey}`);
   },
 
-  // ── Cycle Finances ──
-  getCycleFinances(cycleKey) {
-    return this.request(`/payroll/cycle-finances?cycle_key=${cycleKey}`);
+  // ── Cycle Transfers ──
+  getCycleTransfers(cycleKey) {
+    return this.request(`/payroll/cycle-transfers?cycle_key=${cycleKey}`);
   },
 
-  setCycleFinances(cycleKey, companyIncome) {
-    return this.request('/payroll/cycle-finances', {
-      method: 'PUT',
-      body: JSON.stringify({ cycle_key: cycleKey, company_income: companyIncome })
+  addCycleTransfer(cycleKey, amount, description) {
+    return this.request('/payroll/cycle-transfers', {
+      method: 'POST',
+      body: JSON.stringify({ cycle_key: cycleKey, amount, description })
+    });
+  },
+
+  deleteCycleTransfer(id) {
+    return this.request(`/payroll/cycle-transfers/${id}`, {
+      method: 'DELETE'
     });
   },
 

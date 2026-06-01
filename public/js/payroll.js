@@ -24,12 +24,12 @@ const Payroll = {
       const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
       await WarningWhatsApp.loadSentStatuses(cycleKey);
       
-      // Load cycle finances (company income tracker)
-      let cycleFinances = { company_income: 0 };
+      // Load cycle transfers (company income ledger)
+      let cycleTransfers = [];
       try {
-        cycleFinances = await API.getCycleFinances(cycleKey);
-      } catch (e) { console.warn('Could not load cycle finances', e); }
-      this._cycleFinances = cycleFinances;
+        cycleTransfers = await API.getCycleTransfers(cycleKey);
+      } catch (e) { console.warn('Could not load cycle transfers', e); }
+      this._cycleTransfers = cycleTransfers;
       
       container.innerHTML = this.buildHTML(data);
       this.attachEvents();
@@ -930,123 +930,137 @@ const Payroll = {
   },
 
 
-  // ========== COMPANY INCOME vs RIDER EXPENSE TRACKER ==========
-
-  _buildFinanceTracker(data) {
-    const companyIncome = (this._cycleFinances && this._cycleFinances.company_income) || 0;
+  //   _buildFinanceTracker(data) {
+    const transfers = this._cycleTransfers || [];
+    const totalReceived = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
     
-    // Only count riders marked as "paid" — use final_paid_amount (the actual amount transferred)
+    // Only count riders marked as "paid" - use final_paid_amount (the actual amount transferred)
     const paidRiders = data.filter(r => r.payment_status === 'paid');
     const totalPaidToRiders = paidRiders.reduce((sum, r) => {
       const amt = r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary;
       return sum + amt;
     }, 0);
 
-    const difference = companyIncome - totalPaidToRiders;
+    const difference = totalReceived - totalPaidToRiders;
     const isProfit = difference >= 0;
-    const diffLabel = isProfit ? 'Remaining / Profit' : 'Out of Pocket';
+    const diffLabel = isProfit ? 'Remaining Balance' : 'Out of Pocket';
     const diffColor = isProfit ? '#059669' : '#DC2626';
     const diffBg = isProfit ? '#ECFDF5' : '#FEF2F2';
     const diffBorder = isProfit ? '#A7F3D0' : '#FECACA';
-    const diffIcon = isProfit ? '📈' : '📉';
 
     return `
       <div style="margin-bottom:24px; border-radius:16px; border:1px solid #E0E7FF; background:linear-gradient(135deg, #EEF2FF 0%, #FFFFFF 50%, #F0FDF4 100%); overflow:hidden; box-shadow: 0 2px 12px rgba(99,102,241,0.08);">
         <div style="padding:16px 20px; border-bottom:1px solid #E0E7FF; display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); backdrop-filter:blur(8px);">
           <div style="display:flex; align-items:center; gap:10px;">
             <span style="font-size:20px;">💼</span>
-            <span style="font-size:16px; font-weight:800; color:#312E81;">Company Income vs Rider Expense</span>
+            <span style="font-size:16px; font-weight:800; color:#312E81;">Company Transfers & Salary Expense</span>
           </div>
-          <span style="background:#EEF2FF; color:#4F46E5; padding:3px 12px; border-radius:12px; font-size:11px; font-weight:700;">${paidRiders.length} / ${data.length} Paid</span>
+          <button onclick="Payroll._openTransferModal()" style="background:#4F46E5; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='#4338CA'" onmouseout="this.style.background='#4F46E5'">+ Add Transfer</button>
         </div>
+        
         <div style="padding:20px;">
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; align-items:end;">
-            
-            <!-- Company Income Input -->
+          <!-- Ledger Table -->
+          <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden; margin-bottom:16px;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+              <thead style="background:#F9FAFB; border-bottom:1px solid #E5E7EB;">
+                <tr>
+                  <th style="text-align:left; padding:10px 16px; color:#6B7280; font-weight:600; text-transform:uppercase; font-size:11px;">Amount</th>
+                  <th style="text-align:left; padding:10px 16px; color:#6B7280; font-weight:600; text-transform:uppercase; font-size:11px;">Description</th>
+                  <th style="text-align:left; padding:10px 16px; color:#6B7280; font-weight:600; text-transform:uppercase; font-size:11px;">Date</th>
+                  <th style="text-align:right; padding:10px 16px; color:#6B7280; font-weight:600; text-transform:uppercase; font-size:11px;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${transfers.length === 0 ? `
+                  <tr><td colspan="4" style="text-align:center; padding:20px; color:#9CA3AF;">No transfers recorded for this cycle</td></tr>
+                ` : transfers.map(t => `
+                  <tr style="border-bottom:1px solid #F3F4F6;">
+                    <td style="padding:12px 16px; font-weight:700; color:#0F172A;">SR ${Utils.formatCurrency(t.amount)}</td>
+                    <td style="padding:12px 16px; color:#4B5563;">${Utils.escapeHtml(t.description || '-')}</td>
+                    <td style="padding:12px 16px; color:#6B7280; font-size:12px;">${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td style="padding:12px 16px; text-align:right;">
+                      <button onclick="Payroll._deleteTransfer(${t.id})" style="background:none; border:none; color:#EF4444; cursor:pointer;" title="Delete">🗑️</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Summary Grid -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <label style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:8px;">Company Transferred (SR)</label>
-              <div style="display:flex; gap:8px; align-items:center;">
-                <input type="number" id="company-income-input" value="${companyIncome}" step="any" placeholder="e.g. 15000" style="flex:1; height:42px; border:2px solid #C7D2FE; border-radius:10px; padding:0 12px; font-size:18px; font-weight:700; color:#312E81; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#4F46E5'" onblur="this.style.borderColor='#C7D2FE'">
-                <button id="save-company-income-btn" style="height:42px; padding:0 16px; background:#4F46E5; color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap;" onmouseover="this.style.background='#4338CA'" onmouseout="this.style.background='#4F46E5'">Save</button>
-              </div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Received (SR)</div>
+              <div style="font-size:20px; font-weight:800; color:#4F46E5;">${Utils.formatCurrency(totalReceived)}</div>
             </div>
 
-            <!-- Total Paid to Riders -->
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Total Paid to Riders (SR)</div>
-              <div id="total-paid-riders" style="font-size:24px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
-              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">Only final salary amounts (${paidRiders.length} paid riders)</div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Paid to Riders (SR)</div>
+              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
+              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">${paidRiders.length} paid riders</div>
             </div>
 
-            <!-- Difference -->
-            <div id="finance-diff-card" style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px; transition:all 0.3s;">
-              <div style="font-size:11px; font-weight:700; color:${diffColor}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">${diffIcon} ${diffLabel}</div>
-              <div id="finance-diff-value" style="font-size:24px; font-weight:800; color:${diffColor};">${isProfit ? '' : '-'} SR ${Utils.formatCurrency(Math.abs(difference))}</div>
-              <div id="finance-diff-note" style="font-size:11px; color:${diffColor}; opacity:0.7; margin-top:4px;">${isProfit ? 'This amount stays with you' : 'You paid this from your own pocket'}</div>
+            <div style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px;">
+              <div style="font-size:11px; font-weight:700; color:${diffColor}; text-transform:uppercase; margin-bottom:8px;">${diffLabel}</div>
+              <div style="font-size:20px; font-weight:800; color:${diffColor};">${isProfit ? '' : '-'} SR ${Utils.formatCurrency(Math.abs(difference))}</div>
             </div>
-
           </div>
         </div>
       </div>
     `;
   },
 
-  async _saveCompanyIncome() {
-    const input = document.getElementById('company-income-input');
-    if (!input) return;
-    const value = parseFloat(input.value) || 0;
-    const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
-    
-    const btn = document.getElementById('save-company-income-btn');
-    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
-    
-    try {
-      await API.setCycleFinances(cycleKey, value);
-      this._cycleFinances = { company_income: value };
-      Utils.showToast('Company income saved ✅', 'success');
-      this._recalcFinanceTracker();
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    } finally {
-      if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
-    }
+  _openTransferModal() {
+    Utils.showModal('Add Company Transfer', `
+      <form id="transfer-form" style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">Amount (SR)</label>
+          <input type="number" id="transfer-amount" required step="any" style="width:100%; height:40px; border:1px solid #D1D5DB; border-radius:6px; padding:0 12px; outline:none;" placeholder="e.g. 15000">
+        </div>
+        <div>
+          <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">Description (Optional)</label>
+          <input type="text" id="transfer-description" style="width:100%; height:40px; border:1px solid #D1D5DB; border-radius:6px; padding:0 12px; outline:none;" placeholder="e.g. Salary transfer for May">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+          <button type="button" onclick="Utils.closeModal()" style="padding:8px 16px; border:1px solid #D1D5DB; background:white; border-radius:6px; font-size:13px; cursor:pointer;">Cancel</button>
+          <button type="submit" style="padding:8px 16px; background:#4F46E5; color:white; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">Save</button>
+        </div>
+      </form>
+    `);
+
+    document.getElementById('transfer-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById('transfer-amount').value);
+      const desc = document.getElementById('transfer-description').value;
+      
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.textContent = 'Saving...';
+      btn.disabled = true;
+
+      try {
+        const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
+        const newTransfer = await API.addCycleTransfer(cycleKey, amount, desc);
+        this._cycleTransfers.unshift(newTransfer); // Add to top
+        Utils.closeModal();
+        Utils.showToast('Transfer added successfully', 'success');
+        this.render(); // Re-render page to update UI
+      } catch (err) {
+        Utils.showToast(err.message, 'error');
+        btn.textContent = 'Save';
+        btn.disabled = false;
+      }
+    };
   },
 
-  _recalcFinanceTracker() {
-    const input = document.getElementById('company-income-input');
-    if (!input) return;
-    const companyIncome = parseFloat(input.value) || 0;
-
-    const data = this._currentPayrollData || [];
-    const paidRiders = data.filter(r => r.payment_status === 'paid');
-    const totalPaidToRiders = paidRiders.reduce((sum, r) => {
-      const amt = r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary;
-      return sum + amt;
-    }, 0);
-
-    const difference = companyIncome - totalPaidToRiders;
-    const isProfit = difference >= 0;
-
-    const card = document.getElementById('finance-diff-card');
-    const valueEl = document.getElementById('finance-diff-value');
-    const noteEl = document.getElementById('finance-diff-note');
-    if (!card || !valueEl) return;
-
-    const color = isProfit ? '#059669' : '#DC2626';
-    const bg = isProfit ? '#ECFDF5' : '#FEF2F2';
-    const border = isProfit ? '#A7F3D0' : '#FECACA';
-    const icon = isProfit ? '📈' : '📉';
-    const label = isProfit ? 'Remaining / Profit' : 'Out of Pocket';
-
-    card.style.background = bg;
-    card.style.borderColor = border;
-    card.querySelector('div').style.color = color;
-    card.querySelector('div').innerHTML = `${icon} ${label}`;
-    valueEl.style.color = color;
-    valueEl.textContent = `${isProfit ? '' : '-'} SR ${Utils.formatCurrency(Math.abs(difference))}`;
-    if (noteEl) {
-      noteEl.style.color = color;
-      noteEl.textContent = isProfit ? 'This amount stays with you' : 'You paid this from your own pocket';
+  async _deleteTransfer(id) {
+    if (!confirm('Are you sure you want to delete this transfer?')) return;
+    try {
+      await API.deleteCycleTransfer(id);
+      this._cycleTransfers = this._cycleTransfers.filter(t => t.id !== id);
+      Utils.showToast('Transfer deleted', 'success');
+      this.render(); // Re-render page to update UI
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
     }
   },
 

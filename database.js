@@ -1493,11 +1493,37 @@ module.exports = {
   getAuthUser, upsertAuthUser,
   // Settings
   getSettings, updateSettings,
+  // Cycle Transfers
+  getCycleTransfers, addCycleTransfer, deleteCycleTransfer,
   // App Version
   getAppVersion, setAppVersion,
   // Tracking Shutdown
   isTrackingShutdown, setTrackingShutdown
 };
+
+// ========== CYCLE TRANSFERS ==========
+
+async function getCycleTransfers(cycleKey) {
+  const { data, error } = await supabase.from('cycle_transfers').select('*').eq('cycle_key', cycleKey).order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function addCycleTransfer(cycleKey, amount, description) {
+  const { data, error } = await supabase.from('cycle_transfers').insert([{
+    cycle_key: cycleKey,
+    amount: amount,
+    description: description || '',
+    created_at: nowISO()
+  }]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteCycleTransfer(id) {
+  const { error } = await supabase.from('cycle_transfers').delete().eq('id', id);
+  if (error) throw error;
+}
 
 async function getSettings(key) {
   const { data, error } = await supabase.from('app_config').select('value').eq('key', key).single();

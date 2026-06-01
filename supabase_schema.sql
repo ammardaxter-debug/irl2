@@ -346,3 +346,14 @@ CREATE POLICY "Service role full access" ON rider_heartbeats FOR ALL USING (true
 -- SELECT setval('auth_users_id_seq', COALESCE((SELECT MAX(id) FROM auth_users), 0) + 1, false);
 -- SELECT setval('location_history_id_seq', COALESCE((SELECT MAX(id) FROM location_history), 0) + 1, false);
 -- SELECT setval('rider_heartbeats_id_seq', COALESCE((SELECT MAX(id) FROM rider_heartbeats), 0) + 1, false);
+
+-- ============================================================
+-- CYCLE TRANSFERS (Company salary transfers per payroll cycle)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS cycle_transfers (
+  id SERIAL PRIMARY KEY,
+  cycle_key TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
