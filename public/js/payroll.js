@@ -1011,7 +1011,7 @@ const Payroll = {
   },
 
   _openTransferModal() {
-    Utils.showModal('Add Company Transfer', `
+    Utils.openModal('Add Company Transfer', `
       <form id="transfer-form" style="display:flex; flex-direction:column; gap:16px;">
         <div>
           <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">Amount (SR)</label>
