@@ -1072,7 +1072,6 @@ const Payroll = {
     if (rider.daily_logs && rider.daily_logs.length > 0) {
       messageLines.push(`*Daily Breakdown:*`);
       rider.daily_logs.forEach(log => {
-        // Format date from YYYY-MM-DD to MMM DD (e.g. Apr 21)
         const d = new Date(log.date);
         const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         messageLines.push(`${dateStr}: ${log.orders} orders`);
@@ -1081,22 +1080,47 @@ const Payroll = {
       messageLines.push(``);
     }
 
-    if (!isPending) {
-      messageLines.push(`Gross Salary: ${grossSalary}`);
-    } else {
-      messageLines.push(`Status: Pending final review`);
-    }
-
-    messageLines.push(`Deductions: ${deductions}`);
     messageLines.push(`--------------------------------`);
     
-    if (!isPending) {
-      messageLines.push(`*Net Payout: ${netPayout}*`);
+    if (isPending) {
+      messageLines.push(`*Gross Salary:* SR ${Utils.formatCurrency(rider.total_salary)}`);
+      messageLines.push(`*Total Deductions:* SR ${Utils.formatCurrency(rider.deductions || 0)}`);
+      messageLines.push(``);
+      messageLines.push(`\u26a0\ufe0f *Status: PENDING*`);
+      messageLines.push(`Your payment for this cycle is currently being processed. You will receive an updated notification once it is marked as paid.`);
     } else {
-      messageLines.push(`*Net Payout: Pending*`);
+      messageLines.push(`*Base Income:* SR ${Utils.formatCurrency(rider.total_salary)}`);
+      if (rider.manual_bonus > 0) messageLines.push(`*Manual Bonus:* +SR ${Utils.formatCurrency(rider.manual_bonus)}`);
+      
+      const totalDed = (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.other_deductions||0);
+      if (totalDed > 0) {
+        messageLines.push(`*Deductions:* -SR ${Utils.formatCurrency(totalDed)}`);
+        if (rider.manual_deductions > 0) messageLines.push(`  \u251c Penalty/Absence: -SR ${Utils.formatCurrency(rider.manual_deductions)}`);
+        if (rider.advance_deducted > 0) messageLines.push(`  \u251c Advance Settlement: -SR ${Utils.formatCurrency(rider.advance_deducted)}`);
+        if (rider.cod_settled > 0) messageLines.push(`  \u251c COD Settled: -SR ${Utils.formatCurrency(rider.cod_settled)}`);
+        if (rider.other_deductions > 0) messageLines.push(`  \u2514 Other Deductions: -SR ${Utils.formatCurrency(rider.other_deductions)}`);
+      }
+      
+      const finalPaid = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
+      messageLines.push(``);
+      messageLines.push(`*\ud83d\udcb0 NET PAYOUT:* SR ${Utils.formatCurrency(finalPaid)}`);
+      messageLines.push(``);
+      messageLines.push(`\u2705 *Status: PAID*`);
+      if (rider.notes) messageLines.push(`Notes: ${rider.notes}`);
     }
+
     messageLines.push(`_This is an auto-generated payslip from Inspiring Roads Logistics._`);
+
+    const text = encodeURIComponent(messageLines.join('\n'));
+    let whatsappUrl = `https://wa.me/`;
+    if (rider.phone) {
+      let cleanedPhone = rider.phone.replace(/\D/g, '');
+      if (cleanedPhone.startsWith('0')) cleanedPhone = '966' + cleanedPhone.substring(1);
+      whatsappUrl += `${cleanedPhone}`;
     }
+    whatsappUrl += `?text=${text}`;
+
+    window.open(whatsappUrl, '_blank');
   },
 
   async downloadPayslip(riderId) {

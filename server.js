@@ -332,7 +332,27 @@ app.get('/api/payroll', async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
-    const payroll = await db.calculatePayroll(start, end);
+    const rawPayroll = await db.calculatePayroll(start, end);
+    
+    // Flatten payment_status object into top-level fields for frontend
+    const payroll = rawPayroll.map(r => {
+      const ps = r.payment_status || {};
+      const totalSalary = (r.calculated_salary || 0) + (r.total_bonuses || 0);
+      return {
+        ...r,
+        payment_status: ps.status || 'pending',
+        final_paid_amount: ps.final_paid_amount ?? null,
+        manual_deductions: ps.manual_deductions || 0,
+        manual_bonus: ps.manual_bonus || 0,
+        advance_deducted: ps.advance_deducted || 0,
+        cod_settled: ps.cod_settled || 0,
+        other_deductions: ps.other_deductions || 0,
+        notes: ps.notes || '',
+        total_salary: totalSalary,
+        bonuses: r.total_bonuses || 0,
+      };
+    });
+    
     res.json(payroll);
   } catch (err) {
     res.status(500).json({ error: err.message });
