@@ -330,11 +330,28 @@ const Payroll = {
                     <td class="col-right">
                       <span style="color:#374151; font-size:14px;">${Utils.formatCurrency(r.base_salary)}</span>
                     </td>
-                    <td class="col-right">
-                      <span style="color:${dedColor}; font-size:14px;">${(r.deductions || 0) > 0 ? '-' : ''}${Utils.formatCurrency(r.deductions || 0)}</span>
+                    <td class="col-right" style="text-align:right;">
+                      ${r.payment_status === 'paid' ? `
+                        <div style="display:flex; flex-direction:column; gap:2px; font-size:12px; color:#DC2626; align-items:flex-end;">
+                          ${r.deductions > 0 ? `<div>Absence: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
+                          ${r.manual_deductions > 0 ? `<div>Penalty: -${Utils.formatCurrency(r.manual_deductions)}</div>` : ''}
+                          ${r.advance_deducted > 0 ? `<div>Advance: -${Utils.formatCurrency(r.advance_deducted)}</div>` : ''}
+                          ${r.cod_settled > 0 ? `<div>COD: -${Utils.formatCurrency(r.cod_settled)}</div>` : ''}
+                          ${(r.deductions||0) + (r.manual_deductions||0) + (r.advance_deducted||0) + (r.cod_settled||0) === 0 ? '<span style="color:#9CA3AF">-</span>' : ''}
+                        </div>
+                      ` : `
+                        <span style="color:${dedColor}; font-size:14px;">${(r.deductions || 0) > 0 ? '-' : ''}${Utils.formatCurrency(r.deductions || 0)}</span>
+                      `}
                     </td>
-                    <td class="col-right">
-                      <span style="font-weight:700; color:${netColor}; font-size:14px;">${r.payment_status === 'paid' ? Utils.formatCurrency(r.calculated_salary) : 'Pending'}</span>
+                    <td class="col-right" style="text-align:right;">
+                      <div style="font-weight:700; color:${netColor}; font-size:14px;">
+                        ${r.payment_status === 'paid' ? Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) : 'Pending'}
+                      </div>
+                      ${r.payment_status === 'paid' && (r.other_deductions > 0) ? `
+                        <div style="font-size:12px; color:#DC2626; margin-top:2px;">
+                          ${Utils.formatCurrency(r.other_deductions)}
+                        </div>
+                      ` : ''}
                     </td>
                     <td class="col-center">
                     <td class="col-center">
@@ -436,11 +453,28 @@ const Payroll = {
                     <td class="col-right">
                       <span style="color:#16A34A; font-size:14px;">${r.bonuses > 0 ? '+' : ''}${Utils.formatCurrency(r.bonuses || 0)}</span>
                     </td>
-                    <td class="col-right">
-                      <span style="color:${dedColor}; font-size:14px;">${(r.deductions || 0) > 0 ? '-' : ''}${Utils.formatCurrency(r.deductions || 0)}</span>
+                    <td class="col-right" style="text-align:right;">
+                      ${r.payment_status === 'paid' ? `
+                        <div style="display:flex; flex-direction:column; gap:2px; font-size:12px; color:#DC2626; align-items:flex-end;">
+                          ${r.deductions > 0 ? `<div>Absence: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
+                          ${r.manual_deductions > 0 ? `<div>Penalty: -${Utils.formatCurrency(r.manual_deductions)}</div>` : ''}
+                          ${r.advance_deducted > 0 ? `<div>Advance: -${Utils.formatCurrency(r.advance_deducted)}</div>` : ''}
+                          ${r.cod_settled > 0 ? `<div>COD: -${Utils.formatCurrency(r.cod_settled)}</div>` : ''}
+                          ${(r.deductions||0) + (r.manual_deductions||0) + (r.advance_deducted||0) + (r.cod_settled||0) === 0 ? '<span style="color:#9CA3AF">-</span>' : ''}
+                        </div>
+                      ` : `
+                        <span style="color:${dedColor}; font-size:14px;">${(r.deductions || 0) > 0 ? '-' : ''}${Utils.formatCurrency(r.deductions || 0)}</span>
+                      `}
                     </td>
-                    <td class="col-right">
-                      <span style="font-weight:700; color:${netColor}; font-size:14px;">${r.payment_status === 'paid' ? Utils.formatCurrency(r.calculated_salary) : 'Pending'}</span>
+                    <td class="col-right" style="text-align:right;">
+                      <div style="font-weight:700; color:${netColor}; font-size:14px;">
+                        ${r.payment_status === 'paid' ? Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) : 'Pending'}
+                      </div>
+                      ${r.payment_status === 'paid' && (r.other_deductions > 0) ? `
+                        <div style="font-size:12px; color:#DC2626; margin-top:2px;">
+                          ${Utils.formatCurrency(r.other_deductions)}
+                        </div>
+                      ` : ''}
                     </td>
                     <td class="col-center">
                       ${App.isViewer() ? `
