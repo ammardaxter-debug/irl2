@@ -1180,7 +1180,7 @@ const Payroll = {
       const isPaid = rider.payment_status === 'paid';
       const baseRateDisplay = rider.rider_type === 'company' 
         ? (rider.base_salary || 1950).toLocaleString() 
-        : `${rider.per_order_rate || 0} / order`;
+        : `6.80 / order`;
 
       const qrText = `IRL-${rider.rider_id}-${this.currentPeriod.start}-${isPaid ? 'SR' + rider.calculated_salary : 'PENDING'}`;
       let qrImg = '';
@@ -1251,10 +1251,10 @@ const Payroll = {
                 ${isPaid ? `
                   <tr>
                     <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">
-                      ${rider.rider_type === 'company' ? 'Base Salary (Monthly)' : `Order Earnings (${rider.total_orders} &times; SR ${rider.per_order_rate || 0})`}
+                      ${rider.rider_type === 'company' ? 'Base Salary (Monthly)' : `Order Earnings (${rider.total_orders} &times; SR ${(rider.calculated_salary / (rider.total_orders || 1)).toFixed(2)})`}
                     </td>
                     <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #0f172a; text-align: right;">
-                      SR ${rider.rider_type === 'company' ? (rider.base_salary || 0).toLocaleString() : (rider.total_orders * (rider.per_order_rate || 0)).toLocaleString()}
+                      SR ${(rider.calculated_salary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                   </tr>
                   ${rider.bonuses > 0 ? `
@@ -1272,26 +1272,30 @@ const Payroll = {
                 ${rider.manual_deductions > 0 ? `
                 <tr>
                   <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Penalty / Absent Deductions</td>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.manual_deductions || 0).toLocaleString()}</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.manual_deductions || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>` : ''}
 
                 ${rider.advance_deducted > 0 ? `
                 <tr>
                   <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Advance Deducted</td>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.advance_deducted || 0).toLocaleString()}</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.advance_deducted || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>` : ''}
 
                 ${rider.cod_settled > 0 ? `
                 <tr>
                   <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">COD Settled</td>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.cod_settled || 0).toLocaleString()}</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.cod_settled || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>` : ''}
 
 
                 ${isPaid ? `
+                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                  <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #475569; text-align: right;">Calculated Net Salary</td>
+                  <td style="padding: 12px 20px; font-size: 14px; font-weight: 700; color: #334155; text-align: right;">SR ${((rider.calculated_salary || 0) + (rider.bonuses || 0) - (rider.manual_deductions || 0) - (rider.advance_deducted || 0) - (rider.cod_settled || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                </tr>
                 <tr style="background: #f0fdf4;">
-                  <td style="padding: 20px; font-size: 16px; font-weight: 800; color: #059669;">NET PAYOUT</td>
-                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${(rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary).toLocaleString()}</td>
+                  <td style="padding: 20px; font-size: 16px; font-weight: 800; color: #059669;">FINAL NET PAYOUT</td>
+                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${(rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>` : ''}
               </tbody>
             </table>
