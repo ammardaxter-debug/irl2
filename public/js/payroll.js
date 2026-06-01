@@ -156,6 +156,7 @@ const Payroll = {
           transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(37,211,102,0.3);
         }
         .wa-send-all-btn:hover { transform: scale(1.02); box-shadow: 0 4px 12px rgba(37,211,102,0.4); }
+        .hidden { display: none !important; }
       </style>
 
       <!-- Page Header & Actions -->
@@ -164,6 +165,20 @@ const Payroll = {
         <div style="display:flex; align-items:center; gap:12px;">
           <span style="background:#F0FDF4; color:#16A34A; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">Noon Cycle: 21st → 20th</span>
           ${App.isViewer() ? '' : `
+          <div style="position:relative; display:inline-block;">
+            <button onclick="document.getElementById('finance-dropdown').classList.toggle('hidden')" style="background:#0F172A; color:#FFFFFF; border:none; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Financial Report
+            </button>
+            <div id="finance-dropdown" class="hidden" style="position:absolute; right:0; top:40px; background:white; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); border:1px solid #E2E8F0; z-index:50; width:220px; overflow:hidden;">
+              <div onclick="Payroll.downloadFinancialReport(false)" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid #E2E8F0; font-size:13px; font-weight:500; color:#0F172A; transition:background 0.2s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='white'">
+                📄 Download This Cycle
+              </div>
+              <div onclick="Payroll.downloadFinancialReport(true)" style="padding:12px 16px; cursor:pointer; font-size:13px; font-weight:500; color:#0F172A; transition:background 0.2s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='white'">
+                📚 Download Complete History
+              </div>
+            </div>
+          </div>
           <button id="btn-lock-payroll" style="background:#2563EB; color:#FFFFFF; border:none; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
             🔓 Lock Payroll
           </button>
@@ -880,6 +895,15 @@ const Payroll = {
     a.click();
     URL.revokeObjectURL(url);
     Utils.showToast(`Exported ${unpaid.length} unpaid riders to CSV`, 'success');
+  },
+
+  downloadFinancialReport(isAllTime) {
+    if (typeof PayrollFinancialExcel !== 'undefined') {
+      document.getElementById('finance-dropdown').classList.add('hidden');
+      PayrollFinancialExcel.generate(isAllTime, this.currentPeriod);
+    } else {
+      Utils.showToast('Financial Excel module not loaded', 'error');
+    }
   },
 
   async openMultiMonthCompare() {
