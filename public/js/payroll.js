@@ -930,7 +930,7 @@ const Payroll = {
   },
 
 
-  //   _buildFinanceTracker(data) {
+  _buildFinanceTracker(data) {
     const transfers = this._cycleTransfers || [];
     const totalReceived = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
     
