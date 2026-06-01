@@ -344,14 +344,16 @@ const Payroll = {
                       `}
                     </td>
                     <td class="col-right" style="text-align:right;">
-                      <div style="font-weight:700; color:${netColor}; font-size:14px;">
-                        ${r.payment_status === 'paid' ? Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) : 'Pending'}
-                      </div>
-                      ${r.payment_status === 'paid' && (r.other_deductions > 0) ? `
-                        <div style="font-size:12px; color:#DC2626; margin-top:2px;">
-                          ${Utils.formatCurrency(r.other_deductions)}
+                      ${r.payment_status === 'paid' ? `
+                        <div style="font-weight:700; color:#0F0F0F; font-size:14px;" title="Gross Earnings (Net Paid + All Deductions + Admin Fee)">
+                          ${Utils.formatCurrency((r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) + (r.manual_deductions||0) + (r.advance_deducted||0) + (r.cod_settled||0) + (r.deductions||0) + (r.other_deductions||0) - (r.bonuses||0))}
                         </div>
-                      ` : ''}
+                        <div style="font-size:12px; color:#059669; font-weight:700; margin-top:4px;">
+                          Paid: ${Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary)}
+                        </div>
+                      ` : `
+                        <div style="font-weight:700; color:${netColor}; font-size:14px;">Pending</div>
+                      `}
                     </td>
                     <td class="col-center">
                     <td class="col-center">
@@ -467,14 +469,16 @@ const Payroll = {
                       `}
                     </td>
                     <td class="col-right" style="text-align:right;">
-                      <div style="font-weight:700; color:${netColor}; font-size:14px;">
-                        ${r.payment_status === 'paid' ? Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) : 'Pending'}
-                      </div>
-                      ${r.payment_status === 'paid' && (r.other_deductions > 0) ? `
-                        <div style="font-size:12px; color:#DC2626; margin-top:2px;">
-                          ${Utils.formatCurrency(r.other_deductions)}
+                      ${r.payment_status === 'paid' ? `
+                        <div style="font-weight:700; color:#0F0F0F; font-size:14px;" title="Gross Earnings (Net Paid + All Deductions + Admin Fee)">
+                          ${Utils.formatCurrency((r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary) + (r.manual_deductions||0) + (r.advance_deducted||0) + (r.cod_settled||0) + (r.deductions||0) + (r.other_deductions||0) - (r.bonuses||0))}
                         </div>
-                      ` : ''}
+                        <div style="font-size:12px; color:#059669; font-weight:700; margin-top:4px;">
+                          Paid: ${Utils.formatCurrency(r.final_paid_amount !== null ? r.final_paid_amount : r.calculated_salary)}
+                        </div>
+                      ` : `
+                        <div style="font-weight:700; color:${netColor}; font-size:14px;">Pending</div>
+                      `}
                     </td>
                     <td class="col-center">
                       ${App.isViewer() ? `
@@ -1119,13 +1123,16 @@ const Payroll = {
     messageLines.push(`--------------------------------`);
     
     if (isPending) {
-      messageLines.push(`*Gross Salary:* SR ${Utils.formatCurrency(rider.total_salary)}`);
+      messageLines.push(`*Gross Salary:* SR ${Utils.formatCurrency(rider.calculated_salary)}`);
       messageLines.push(`*Total Deductions:* SR ${Utils.formatCurrency(rider.deductions || 0)}`);
       messageLines.push(``);
       messageLines.push(`\u26a0\ufe0f *Status: PENDING*`);
       messageLines.push(`Your payment for this cycle is currently being processed. You will receive an updated notification once it is marked as paid.`);
     } else {
-      messageLines.push(`*Base Income:* SR ${Utils.formatCurrency(rider.total_salary)}`);
+      const displayNetPayout = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
+      const displayGross = displayNetPayout + (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0) - (rider.manual_bonus||0);
+      
+      messageLines.push(`*Base Income:* SR ${Utils.formatCurrency(displayGross)}`);
       if (rider.manual_bonus > 0) messageLines.push(`*Manual Bonus:* +SR ${Utils.formatCurrency(rider.manual_bonus)}`);
       const totalDed = (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0);
       if (totalDed > 0) {
@@ -1137,9 +1144,8 @@ const Payroll = {
         if (rider.other_deductions > 0) messageLines.push(`  - Admin Fee: -SR ${Utils.formatCurrency(rider.other_deductions)}`);
       }
       
-      const finalPaid = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
       messageLines.push(``);
-      messageLines.push(`*\ud83d\udcb0 NET PAYOUT:* SR ${Utils.formatCurrency(finalPaid)}`);
+      messageLines.push(`*\ud83d\udcb0 NET PAYOUT:* SR ${Utils.formatCurrency(displayNetPayout)}`);
       messageLines.push(``);
       messageLines.push(`\u2705 *Status: PAID*`);
       if (rider.notes) messageLines.push(`Notes: ${rider.notes}`);
@@ -1184,7 +1190,15 @@ const Payroll = {
         ? (rider.base_salary || 1950).toLocaleString() 
         : `Freelancer`;
 
-      const qrText = `IRL-${rider.rider_id}-${this.currentPeriod.start}-${isPaid ? 'SR' + rider.calculated_salary : 'PENDING'}`;
+      let displayGross = rider.calculated_salary || 0;
+      let displayNetPayout = rider.calculated_salary || 0;
+
+      if (isPaid) {
+        displayNetPayout = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
+        displayGross = displayNetPayout + (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0) - (rider.bonuses||0);
+      }
+
+      const qrText = `IRL-${rider.rider_id}-${this.currentPeriod.start}-${isPaid ? 'SR' + displayNetPayout : 'PENDING'}`;
       let qrImg = '';
       if (typeof ReportsCenter !== 'undefined' && ReportsCenter.generateQRDataUrl) {
         qrImg = ReportsCenter.generateQRDataUrl(qrText);
@@ -1256,7 +1270,7 @@ const Payroll = {
                       ${rider.rider_type === 'company' ? 'Base Salary (Monthly)' : `Total Earnings (${rider.total_orders} Orders)`}
                     </td>
                     <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #0f172a; text-align: right;">
-                      SR ${(rider.calculated_salary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      SR ${displayGross.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                   </tr>
                   ${rider.bonuses > 0 ? `
@@ -1305,11 +1319,11 @@ const Payroll = {
                 ${isPaid ? `
                 <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                   <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #475569; text-align: right;">Calculated Net Salary</td>
-                  <td style="padding: 12px 20px; font-size: 14px; font-weight: 700; color: #334155; text-align: right;">SR ${((rider.calculated_salary || 0) + (rider.bonuses || 0) - (rider.manual_deductions || 0) - (rider.advance_deducted || 0) - (rider.cod_settled || 0) - (rider.deductions || 0) - (rider.other_deductions || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  <td style="padding: 12px 20px; font-size: 14px; font-weight: 700; color: #334155; text-align: right;">SR ${(displayGross + (rider.bonuses || 0) - (rider.manual_deductions || 0) - (rider.advance_deducted || 0) - (rider.cod_settled || 0) - (rider.deductions || 0) - (rider.other_deductions || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>
                 <tr style="background: #f0fdf4;">
                   <td style="padding: 20px; font-size: 16px; font-weight: 800; color: #059669;">FINAL NET PAYOUT</td>
-                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${(rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${displayNetPayout.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>` : ''}
               </tbody>
             </table>
