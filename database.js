@@ -847,16 +847,19 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
   }, { onConflict: 'cycle_key, rider_id' });
 
   // Auto-settlement logic for advances
-  if (status === 'paid' && advance_deducted > 0) {
+  if (status === 'paid' && parseFloat(advance_deducted) > 0) {
     const unsettled = await getUnsettledPaymentsForRider(riderId);
-    let remainingToSettle = Number(advance_deducted);
+    let remainingToSettle = parseFloat(advance_deducted) + 0.001; // buffer for floating point
 
     for (const item of unsettled.items) {
       if (remainingToSettle <= 0) break;
-      const amountToSettle = Math.min(item.amount, remainingToSettle);
+      const itemAmount = parseFloat(item.amount);
+      if (remainingToSettle <= 0) break;
+      const amountToSettle = Math.min(itemAmount, remainingToSettle);
       remainingToSettle -= amountToSettle;
 
-      const isFullySettled = amountToSettle === item.amount;
+      // consider fully settled if we are within 1 cent of the item amount
+      const isFullySettled = (itemAmount - amountToSettle) < 0.01;
       
       const settleData = {};
       if (isFullySettled) {
@@ -867,7 +870,7 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
         settleData.settledDate = nowISO();
       } else {
         // Partial settlement: reduce the remaining amount of the advance
-        settleData.amount = item.amount - amountToSettle;
+        settleData.amount = itemAmount - amountToSettle;
       }
 
       if (item.type === 'expense' || item.type === 'deduction') {
@@ -875,6 +878,31 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
       } else if (item.type === 'advance') {
         await supabase.from('salary_advances').update(settleData).eq('id', item.id);
       }
+    }
+  }
+
+  // Create an out expense record for the net paid amount to keep Expense Tracker cashflow synced
+  if (status === 'paid' && parseFloat(final_paid_amount) > 0) {
+    const { data: existingExp } = await supabase.from('expenses')
+      .select('id')
+      .eq('category', 'Rider Payroll')
+      .eq('rider_id', riderId)
+      .eq('notes', `Payroll for ${cycleKey}`)
+      .single();
+
+    if (!existingExp) {
+      // Pass the fully detailed final_paid_amount to the expense tracker.
+      // This ensures Sponsors see the outward cash flow.
+      await createExpense({
+        expense_date: todayLocal(),
+        category: 'Rider Payroll',
+        amount: parseFloat(final_paid_amount),
+        rider_id: riderId,
+        rider_name: '', // createExpense will auto-fill rider_name
+        is_deductible: false,
+        source: 'payroll_system',
+        notes: `Payroll for ${cycleKey}`
+      });
     }
   }
 
