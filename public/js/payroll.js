@@ -909,7 +909,11 @@ const Payroll = {
 
   _buildFinanceTracker(data) {
     const transfers = this._cycleTransfers || [];
-    const totalReceived = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
+    let totalReceived = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    // Deduct "Other Deductions" from the total received company funds
+    const totalOtherDeductions = data.reduce((sum, r) => sum + (Number(r.other_deductions) || 0), 0);
+    totalReceived = totalReceived - totalOtherDeductions;
     
     // Only count riders marked as "paid" - use final_paid_amount (the actual amount transferred)
     const paidRiders = data.filter(r => r.payment_status === 'paid');
@@ -969,6 +973,7 @@ const Payroll = {
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
               <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Received (SR)</div>
               <div style="font-size:20px; font-weight:800; color:#4F46E5;">${Utils.formatCurrency(totalReceived)}</div>
+              ${totalOtherDeductions > 0 ? `<div style="font-size:11px; color:#DC2626; margin-top:4px;">Includes - SR ${Utils.formatCurrency(totalOtherDeductions)} (Other Deductions)</div>` : ''}
             </div>
 
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
