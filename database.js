@@ -768,9 +768,9 @@ async function calculatePayroll(periodStart, periodEnd) {
       
       let calculatedSalary = 0;
       if ((rider.rider_type || '').toLowerCase() === 'company') {
-        calculatedSalary = rider.base_salary || 1950;
+        calculatedSalary = parseFloat(rider.base_salary || 1950);
       } else {
-        calculatedSalary = totalOrders * 6.8;
+        calculatedSalary = totalOrders * (parseFloat(rider.per_order_rate) || 6.8);
       }
 
       // Bonuses
@@ -1078,7 +1078,7 @@ async function getRiderMonthlyReport(riderId, start, end) {
     total_orders: totalOrders,
     avg_checkin_hours: Math.floor(avgCheckinMin / 60),
     avg_checkin_minutes: Math.round(avgCheckinMin % 60),
-    calculated_salary: (rider.rider_type || '').toLowerCase() === 'company' ? (rider.base_salary || 1950) : totalOrders * 6.8,
+    calculated_salary: (rider.rider_type || '').toLowerCase() === 'company' ? parseFloat(rider.base_salary || 1950) : totalOrders * (parseFloat(rider.per_order_rate) || 6.8),
   };
 }
 

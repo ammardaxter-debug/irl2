@@ -333,7 +333,7 @@ const Payroll = {
                     <td class="col-right" style="text-align:right;">
                       ${r.payment_status === 'paid' ? `
                         <div style="display:flex; flex-direction:column; gap:2px; font-size:12px; color:#DC2626; align-items:flex-end;">
-                          ${r.deductions > 0 ? `<div>Absence: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
+                          ${r.deductions > 0 ? `<div>Unsettled Debt/Advance: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
                           ${r.manual_deductions > 0 ? `<div>Penalty: -${Utils.formatCurrency(r.manual_deductions)}</div>` : ''}
                           ${r.advance_deducted > 0 ? `<div>Advance: -${Utils.formatCurrency(r.advance_deducted)}</div>` : ''}
                           ${r.cod_settled > 0 ? `<div>COD: -${Utils.formatCurrency(r.cod_settled)}</div>` : ''}
@@ -404,7 +404,7 @@ const Payroll = {
       <div style="margin-bottom:32px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <h2 style="font-size:16px; font-weight:600; color:#0F0F0F; margin:0;">Freelancer Riders</h2>
-          <span style="background:#F5F3FF; color:#7C3AED; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">${freelancers.length} riders · SR 8/order</span>
+          <span style="background:#F5F3FF; color:#7C3AED; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">${freelancers.length} riders</span>
         </div>
         <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
           <table class="payroll-table">
@@ -456,7 +456,7 @@ const Payroll = {
                     <td class="col-right" style="text-align:right;">
                       ${r.payment_status === 'paid' ? `
                         <div style="display:flex; flex-direction:column; gap:2px; font-size:12px; color:#DC2626; align-items:flex-end;">
-                          ${r.deductions > 0 ? `<div>Absence: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
+                          ${r.deductions > 0 ? `<div>Unsettled Debt/Advance: -${Utils.formatCurrency(r.deductions)}</div>` : ''}
                           ${r.manual_deductions > 0 ? `<div>Penalty: -${Utils.formatCurrency(r.manual_deductions)}</div>` : ''}
                           ${r.advance_deducted > 0 ? `<div>Advance: -${Utils.formatCurrency(r.advance_deducted)}</div>` : ''}
                           ${r.cod_settled > 0 ? `<div>COD: -${Utils.formatCurrency(r.cod_settled)}</div>` : ''}
@@ -1017,7 +1017,7 @@ const Payroll = {
             </div>
 
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Other Exp (Commissions)</div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Internal Expenses</div>
               <div style="font-size:20px; font-weight:800; color:#DC2626;">${Utils.formatCurrency(totalOtherDeductions)}</div>
               <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">Hidden from payslips</div>
             </div>
@@ -1180,7 +1180,7 @@ const Payroll = {
       const isPaid = rider.payment_status === 'paid';
       const baseRateDisplay = rider.rider_type === 'company' 
         ? (rider.base_salary || 1950).toLocaleString() 
-        : `6.80 / order`;
+        : `Freelancer`;
 
       const qrText = `IRL-${rider.rider_id}-${this.currentPeriod.start}-${isPaid ? 'SR' + rider.calculated_salary : 'PENDING'}`;
       let qrImg = '';
@@ -1213,8 +1213,8 @@ const Payroll = {
                 <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-top: 8px;">${rider.rider_type === 'company' ? 'Company Rider' : 'Freelancer'} &bull; ${Utils.escapeHtml(companyName)}</div>
               </div>
               <div style="text-align: right;">
-                <div style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase;">Base / Rate</div>
-                <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 6px;">SR ${baseRateDisplay}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase;">Employee Type</div>
+                <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 6px;">${baseRateDisplay}</div>
                 <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-top: 8px;">Phone: ${Utils.escapeHtml(rider.phone) || '—'}</div>
               </div>
             </div>
@@ -1251,7 +1251,7 @@ const Payroll = {
                 ${isPaid ? `
                   <tr>
                     <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">
-                      ${rider.rider_type === 'company' ? 'Base Salary (Monthly)' : `Order Earnings (${rider.total_orders} &times; SR ${(rider.calculated_salary / (rider.total_orders || 1)).toFixed(2)})`}
+                      ${rider.rider_type === 'company' ? 'Base Salary (Monthly)' : `Total Earnings (${rider.total_orders} Orders)`}
                     </td>
                     <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #0f172a; text-align: right;">
                       SR ${(rider.calculated_salary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -1288,10 +1288,16 @@ const Payroll = {
                 </tr>` : ''}
 
 
+                ${rider.deductions > 0 ? `
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Unsettled Debt / Advance Deducted</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.deductions || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                </tr>` : ''}
+
                 ${isPaid ? `
                 <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                   <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #475569; text-align: right;">Calculated Net Salary</td>
-                  <td style="padding: 12px 20px; font-size: 14px; font-weight: 700; color: #334155; text-align: right;">SR ${((rider.calculated_salary || 0) + (rider.bonuses || 0) - (rider.manual_deductions || 0) - (rider.advance_deducted || 0) - (rider.cod_settled || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  <td style="padding: 12px 20px; font-size: 14px; font-weight: 700; color: #334155; text-align: right;">SR ${((rider.calculated_salary || 0) + (rider.bonuses || 0) - (rider.manual_deductions || 0) - (rider.advance_deducted || 0) - (rider.cod_settled || 0) - (rider.deductions || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>
                 <tr style="background: #f0fdf4;">
                   <td style="padding: 20px; font-size: 16px; font-weight: 800; color: #059669;">FINAL NET PAYOUT</td>
