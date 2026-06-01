@@ -52,13 +52,15 @@ const PayrollFinancialExcel = {
         funds = await API.getCycleTransfers(cycleKey);
         
         if (currentPayrollData && currentPayrollData.length > 0) {
-          // Use real-time payroll data for the cycle report
-          riderPayouts = currentPayrollData.map(r => ({
-            expense_date: new Date(currentPeriod.end + 'T00:00:00'),
-            rider_name: r.rider_name || `Rider #${r.rider_id}`,
-            amount: r.calculated_salary,
-            notes: `Payroll for ${cycleKey} (Status: ${r.payment_status || 'unpaid'})`
-          })).filter(r => r.amount > 0);
+          // Use real-time payroll data for the cycle report, but ONLY marked as paid!
+          riderPayouts = currentPayrollData
+            .filter(r => r.payment_status === 'paid')
+            .map(r => ({
+              expense_date: new Date(currentPeriod.end + 'T00:00:00'),
+              rider_name: r.rider_name || `Rider #${r.rider_id}`,
+              amount: r.calculated_salary,
+              notes: `Payroll for ${cycleKey}`
+            })).filter(r => r.amount > 0);
         } else {
           // Fallback
           payouts = await API.getExpenses(null, null);
