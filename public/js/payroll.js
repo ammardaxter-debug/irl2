@@ -615,7 +615,7 @@ const Payroll = {
 
           <div style="display:grid; grid-template-columns: 1fr; gap:12px; margin-bottom: 20px; text-align:left;">
              <div>
-               <label class="form-label">Other Deductions (SR)</label>
+               <label class="form-label">Referral / Company Expense (Hidden from Rider)</label>
                <input type="number" id="other-deductions" class="form-control calc-input" value="${rider.other_deductions || 0}" step="any" placeholder="0">
              </div>
           </div>
@@ -970,17 +970,22 @@ const Payroll = {
           </div>
 
           <!-- Summary Grid -->
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:16px;">
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
               <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Received (SR)</div>
               <div style="font-size:20px; font-weight:800; color:#4F46E5;">${Utils.formatCurrency(totalReceived)}</div>
             </div>
 
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Expenses (SR)</div>
-              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalExpenses)}</div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Paid to Riders (SR)</div>
+              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
               <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">${paidRiders.length} paid riders</div>
-              ${totalOtherDeductions > 0 ? `<div style="font-size:11px; color:#DC2626; margin-top:4px;">Includes + SR ${Utils.formatCurrency(totalOtherDeductions)} (Other Deductions)</div>` : ''}
+            </div>
+
+            <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Other Exp (Commissions)</div>
+              <div style="font-size:20px; font-weight:800; color:#DC2626;">${Utils.formatCurrency(totalOtherDeductions)}</div>
+              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">Hidden from payslips</div>
             </div>
 
             <div style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px;">
@@ -1088,14 +1093,12 @@ const Payroll = {
     } else {
       messageLines.push(`*Base Income:* SR ${Utils.formatCurrency(rider.total_salary)}`);
       if (rider.manual_bonus > 0) messageLines.push(`*Manual Bonus:* +SR ${Utils.formatCurrency(rider.manual_bonus)}`);
-      
-      const totalDed = (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.other_deductions||0);
+      const totalDed = (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0);
       if (totalDed > 0) {
         messageLines.push(`*Deductions:* -SR ${Utils.formatCurrency(totalDed)}`);
-        if (rider.manual_deductions > 0) messageLines.push(`  \u251c Penalty/Absence: -SR ${Utils.formatCurrency(rider.manual_deductions)}`);
-        if (rider.advance_deducted > 0) messageLines.push(`  \u251c Advance Settlement: -SR ${Utils.formatCurrency(rider.advance_deducted)}`);
-        if (rider.cod_settled > 0) messageLines.push(`  \u251c COD Settled: -SR ${Utils.formatCurrency(rider.cod_settled)}`);
-        if (rider.other_deductions > 0) messageLines.push(`  \u2514 Other Deductions: -SR ${Utils.formatCurrency(rider.other_deductions)}`);
+        if (rider.manual_deductions > 0) messageLines.push(`  - Penalty/Absence: -SR ${Utils.formatCurrency(rider.manual_deductions)}`);
+        if (rider.advance_deducted > 0) messageLines.push(`  - Advance Settlement: -SR ${Utils.formatCurrency(rider.advance_deducted)}`);
+        if (rider.cod_settled > 0) messageLines.push(`  - COD Settled: -SR ${Utils.formatCurrency(rider.cod_settled)}`);
       }
       
       const finalPaid = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
@@ -1250,11 +1253,6 @@ const Payroll = {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.cod_settled || 0).toLocaleString()}</td>
                 </tr>` : ''}
 
-                ${rider.other_deductions > 0 ? `
-                <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Other Deductions</td>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.other_deductions || 0).toLocaleString()}</td>
-                </tr>` : ''}
 
                 ${isPaid ? `
                 <tr style="background: #f0fdf4;">
