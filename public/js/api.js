@@ -276,11 +276,15 @@ const API = {
     });
   },
 
+  getUnsettledPaymentsForAdmin(riderId) {
+    return this.request(`/admin/riders/${riderId}/unsettled-payments`);
+  },
+
   // ── Payment Status ──
-  setPaymentStatus(riderId, cycleKey, status, finalPaidAmount, notes, manualDeductions, manualBonus) {
+  setPaymentStatus(riderId, cycleKey, status, finalPaidAmount, notes, manualDeductions, manualBonus, advanceDeducted, codSettled, otherDeductions) {
     return this.request('/payroll/payment-status', {
       method: 'PUT',
-      body: JSON.stringify({ rider_id: riderId, cycle_key: cycleKey, status, final_paid_amount: finalPaidAmount, notes, manual_deductions: manualDeductions, manual_bonus: manualBonus })
+      body: JSON.stringify({ rider_id: riderId, cycle_key: cycleKey, status, final_paid_amount: finalPaidAmount, notes, manual_deductions: manualDeductions, manual_bonus: manualBonus, advance_deducted: advanceDeducted, cod_settled: codSettled, other_deductions: otherDeductions })
     });
   },
 
@@ -299,6 +303,18 @@ const API = {
 
   getPayrollLockStatus(cycleKey) {
     return this.request(`/payroll/lock-status?cycle_key=${cycleKey}`);
+  },
+
+  // ── Cycle Finances ──
+  getCycleFinances(cycleKey) {
+    return this.request(`/payroll/cycle-finances?cycle_key=${cycleKey}`);
+  },
+
+  setCycleFinances(cycleKey, companyIncome) {
+    return this.request('/payroll/cycle-finances', {
+      method: 'PUT',
+      body: JSON.stringify({ cycle_key: cycleKey, company_income: companyIncome })
+    });
   },
 
   deleteRiderCycleData(riderId, start, end) {

@@ -23,6 +23,14 @@ const Payroll = {
       // Load warning sent statuses
       const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
       await WarningWhatsApp.loadSentStatuses(cycleKey);
+      
+      // Load cycle finances (company income tracker)
+      let cycleFinances = { company_income: 0 };
+      try {
+        cycleFinances = await API.getCycleFinances(cycleKey);
+      } catch (e) { console.warn('Could not load cycle finances', e); }
+      this._cycleFinances = cycleFinances;
+      
       container.innerHTML = this.buildHTML(data);
       this.attachEvents();
     } catch (err) {
@@ -196,6 +204,9 @@ const Payroll = {
         </div>
       </div>
 
+      <!-- Company Income vs Rider Expense Tracker -->
+      ${this._buildFinanceTracker(data)}
+
       <!-- Warnings Detail Panel (hidden by default) -->
       <div id="warnings-detail-panel" style="display:none; margin-bottom:24px; border-radius:16px; border:1px solid #FECACA; background:linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 40%, #FFFBEB 100%); overflow:hidden; animation: slideDown 300ms ease-out; box-shadow: 0 4px 20px rgba(220,38,38,0.08);">
         <div style="padding:16px 20px; border-bottom:1px solid #FECACA; display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); backdrop-filter:blur(8px);">
@@ -350,7 +361,7 @@ const Payroll = {
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         `}
-                        <button onclick="Payroll.shareWhatsApp('${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}', '${r.phone || ''}', '${Utils.formatCurrency(r.total_salary)}', '${Utils.formatCurrency(r.deductions || 0)}', '${Utils.formatCurrency(r.calculated_salary)}', ${r.total_orders}, '${r.rider_type}', '${Payroll.currentPeriod.label}', '${r.payment_status}', JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(r.daily_logs || []))}')))" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
+                        <button onclick="Payroll.shareWhatsApp(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
                           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                         </button>
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
@@ -455,7 +466,7 @@ const Payroll = {
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         `}
-                        <button onclick="Payroll.shareWhatsApp('${Utils.escapeHtml(r.rider_name).replace(/'/g, "\\'")}', '${r.phone || ''}', '${Utils.formatCurrency(r.total_salary)}', '${Utils.formatCurrency(r.deductions || 0)}', '${Utils.formatCurrency(r.calculated_salary)}', ${r.total_orders}, '${r.rider_type}', '${Payroll.currentPeriod.label}', '${r.payment_status}', JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(r.daily_logs || []))}')))" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
+                        <button onclick="Payroll.shareWhatsApp(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#16A34A; padding:4px;" title="WhatsApp Payslip">
                           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                         </button>
                         <button onclick="Payroll.downloadPayslip(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Download PDF">
@@ -528,6 +539,15 @@ const Payroll = {
         }
       });
     }
+
+    // Company Income Tracker events
+    const incomeInput = document.getElementById('company-income-input');
+    const saveIncomeBtn = document.getElementById('save-company-income-btn');
+    if (incomeInput && saveIncomeBtn) {
+      saveIncomeBtn.addEventListener('click', () => this._saveCompanyIncome());
+      incomeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this._saveCompanyIncome(); });
+      incomeInput.addEventListener('input', () => this._recalcFinanceTracker());
+    }
   },
 
   toggleWarningsPanel() {
@@ -542,36 +562,77 @@ const Payroll = {
     }
   },
 
-  openPaymentModal(riderId) {
+  async openPaymentModal(riderId) {
     if (App.isViewer()) return;
     const rider = this._currentPayrollData.find(r => r.rider_id === riderId);
     if (!rider) return Utils.showToast('Rider not found', 'error');
+
+    Utils.showLoading('Loading rider data...');
+    let unsettled = { total_unsettled: 0, total_advances: 0 };
+    try {
+      unsettled = await API.getUnsettledPaymentsForAdmin(riderId);
+    } catch (e) {
+      console.warn("Could not fetch unsettled", e);
+    }
+    Utils.hideLoading();
+
+    const totalUnsettled = (unsettled.total_unsettled || 0) + (unsettled.total_advances || 0);
 
     const html = `
       <div class="form-grid">
         <div class="form-group" style="grid-column: 1/-1; text-align:center;">
           <p style="margin-bottom:8px; font-size:15px; color:var(--text-secondary)">Update payroll details for:<br><strong style="color:var(--text-primary); font-size:18px">${Utils.escapeHtml(rider.rider_name)}</strong></p>
           
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom: 20px; text-align:left;">
+          <div style="background:var(--slate-50); padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid var(--slate-200); text-align:left;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span style="color:var(--text-secondary); font-weight:600;">Total Income (Net Salary)</span>
+              <span style="font-weight:700; color:var(--text-primary); font-size:16px;" id="modal-net-salary">${rider.calculated_salary} SR</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-secondary); font-weight:600;">Unsettled Advances & Deductibles</span>
+              <span style="font-weight:700; color:${totalUnsettled > 0 ? 'var(--danger)' : 'var(--success)'};">${Utils.formatCurrency(totalUnsettled)}</span>
+            </div>
+          </div>
+          
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px; text-align:left;">
              <div>
                <label class="form-label">Manual Deductions (SR)</label>
-               <input type="number" id="manual-deductions" class="form-control" value="${rider.manual_deductions || 0}" step="any" placeholder="0">
+               <input type="number" id="manual-deductions" class="form-control calc-input" value="${rider.manual_deductions || 0}" step="any" placeholder="0">
              </div>
              <div>
                <label class="form-label">Manual Bonus (SR)</label>
-               <input type="number" id="manual-bonus" class="form-control" value="${rider.manual_bonus || 0}" step="any" placeholder="0">
+               <input type="number" id="manual-bonus" class="form-control calc-input" value="${rider.manual_bonus || 0}" step="any" placeholder="0">
+             </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px; text-align:left;">
+             <div>
+               <label class="form-label">Advance Deducted (SR)</label>
+               <input type="number" id="advance-deducted" class="form-control calc-input" value="${rider.advance_deducted || 0}" max="${totalUnsettled}" step="any" placeholder="0">
+               <small style="color:var(--text-tertiary); font-size:11px;">Max: ${totalUnsettled} SR</small>
+             </div>
+             <div>
+               <label class="form-label">COD Settled (SR)</label>
+               <input type="number" id="cod-settled" class="form-control calc-input" value="${rider.cod_settled || 0}" step="any" placeholder="0">
+             </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr; gap:12px; margin-bottom: 20px; text-align:left;">
+             <div>
+               <label class="form-label">Other Deductions (SR)</label>
+               <input type="number" id="other-deductions" class="form-control calc-input" value="${rider.other_deductions || 0}" step="any" placeholder="0">
              </div>
           </div>
           
-          <div style="margin-bottom: 20px; text-align:left;">
+          <div style="margin-bottom: 16px; text-align:left;">
              <label class="form-label">Notes</label>
              <input type="text" id="payment-notes" class="form-control" value="${Utils.escapeHtml(rider.notes || '')}" placeholder="Add optional notes...">
           </div>
 
-          <div style="margin-bottom: 20px; text-align:left;">
-             <label class="form-label">Final Paid Amount (SR)</label>
-             <input type="number" id="final-paid-amount" class="form-control" value="${rider.calculated_salary || 0}" step="any" placeholder="Enter actual paid amount">
-             <small style="color:var(--text-tertiary)">Calculated net is pre-filled. Adjust if you made manual payments or overrides.</small>
+          <div style="margin-bottom: 24px; text-align:left; background:#EFF6FF; padding:16px; border-radius:8px; border:1px solid #BFDBFE;">
+             <label class="form-label" style="color:#1E3A8A; font-size:15px;">Final Paid Amount (SR)</label>
+             <input type="number" id="final-paid-amount" class="form-control" value="${rider.payment_status === 'paid' && rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary}" step="any" style="font-size:20px; font-weight:800; border-color:#93C5FD;" placeholder="Enter actual paid amount">
+             <small style="color:#3B82F6; display:block; margin-top:4px;">Calculates automatically, but you can override it manually.</small>
           </div>
 
           <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
@@ -587,6 +648,26 @@ const Payroll = {
           </div>
         </div>
       </div>
+      <script>
+        (function() {
+          const netSalary = ${rider.calculated_salary};
+          const inputs = document.querySelectorAll('.calc-input');
+          const finalAmtInput = document.getElementById('final-paid-amount');
+          
+          function calculateFinal() {
+            const manualDed = parseFloat(document.getElementById('manual-deductions').value) || 0;
+            const manualBonus = parseFloat(document.getElementById('manual-bonus').value) || 0;
+            const advDed = parseFloat(document.getElementById('advance-deducted').value) || 0;
+            const codSet = parseFloat(document.getElementById('cod-settled').value) || 0;
+            const otherDed = parseFloat(document.getElementById('other-deductions').value) || 0;
+            
+            const final = netSalary - manualDed + manualBonus - advDed - codSet - otherDed;
+            finalAmtInput.value = Math.max(0, final);
+          }
+          
+          inputs.forEach(input => input.addEventListener('input', calculateFinal));
+        })();
+      </script>
     `;
     Utils.openModal('Update Payment Status', html);
   },
@@ -600,6 +681,15 @@ const Payroll = {
     
     const bonInput = document.getElementById('manual-bonus');
     const manualBonus = bonInput ? parseFloat(bonInput.value) || 0 : 0;
+
+    const advInput = document.getElementById('advance-deducted');
+    const advanceDeducted = advInput ? parseFloat(advInput.value) || 0 : 0;
+
+    const codInput = document.getElementById('cod-settled');
+    const codSettled = codInput ? parseFloat(codInput.value) || 0 : 0;
+
+    const otherInput = document.getElementById('other-deductions');
+    const otherDeductions = otherInput ? parseFloat(otherInput.value) || 0 : 0;
     
     const notesInput = document.getElementById('payment-notes');
     const notes = notesInput ? notesInput.value : '';
@@ -608,7 +698,7 @@ const Payroll = {
     Utils.showLoading('Saving status');
     const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
     try {
-      await API.setPaymentStatus(riderId, cycleKey, nextStatus, finalPaidAmount, notes, manualDeductions, manualBonus);
+      await API.setPaymentStatus(riderId, cycleKey, nextStatus, finalPaidAmount, notes, manualDeductions, manualBonus, advanceDeducted, codSettled, otherDeductions);
       Utils.showToast(`Status updated to ${nextStatus.toUpperCase()}`, 'success');
       
       // Re-fetch to ensure the total calculations reflect the new manual deductions/bonuses
@@ -840,26 +930,148 @@ const Payroll = {
   },
 
 
-  shareWhatsApp(name, phone, grossSalary, deductions, netPayout, totalOrders, riderType, periodLabel, paymentStatus, dailyLogs = []) {
-    const typeLabel = riderType === 'company' ? 'Company Rider' : 'Freelancer';
+  // ========== COMPANY INCOME vs RIDER EXPENSE TRACKER ==========
+
+  _buildFinanceTracker(data) {
+    const companyIncome = (this._cycleFinances && this._cycleFinances.company_income) || 0;
     
-    // Check if it's currently paid
-    const isPending = paymentStatus !== 'paid';
+    // Only count riders marked as "paid" — use final_paid_amount (the actual amount transferred)
+    const paidRiders = data.filter(r => r.payment_status === 'paid');
+    const totalPaidToRiders = paidRiders.reduce((sum, r) => {
+      const amt = r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary;
+      return sum + amt;
+    }, 0);
+
+    const difference = companyIncome - totalPaidToRiders;
+    const isProfit = difference >= 0;
+    const diffLabel = isProfit ? 'Remaining / Profit' : 'Out of Pocket';
+    const diffColor = isProfit ? '#059669' : '#DC2626';
+    const diffBg = isProfit ? '#ECFDF5' : '#FEF2F2';
+    const diffBorder = isProfit ? '#A7F3D0' : '#FECACA';
+    const diffIcon = isProfit ? '📈' : '📉';
+
+    return `
+      <div style="margin-bottom:24px; border-radius:16px; border:1px solid #E0E7FF; background:linear-gradient(135deg, #EEF2FF 0%, #FFFFFF 50%, #F0FDF4 100%); overflow:hidden; box-shadow: 0 2px 12px rgba(99,102,241,0.08);">
+        <div style="padding:16px 20px; border-bottom:1px solid #E0E7FF; display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); backdrop-filter:blur(8px);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">💼</span>
+            <span style="font-size:16px; font-weight:800; color:#312E81;">Company Income vs Rider Expense</span>
+          </div>
+          <span style="background:#EEF2FF; color:#4F46E5; padding:3px 12px; border-radius:12px; font-size:11px; font-weight:700;">${paidRiders.length} / ${data.length} Paid</span>
+        </div>
+        <div style="padding:20px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; align-items:end;">
+            
+            <!-- Company Income Input -->
+            <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
+              <label style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:8px;">Company Transferred (SR)</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="company-income-input" value="${companyIncome}" step="any" placeholder="e.g. 15000" style="flex:1; height:42px; border:2px solid #C7D2FE; border-radius:10px; padding:0 12px; font-size:18px; font-weight:700; color:#312E81; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#4F46E5'" onblur="this.style.borderColor='#C7D2FE'">
+                <button id="save-company-income-btn" style="height:42px; padding:0 16px; background:#4F46E5; color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap;" onmouseover="this.style.background='#4338CA'" onmouseout="this.style.background='#4F46E5'">Save</button>
+              </div>
+            </div>
+
+            <!-- Total Paid to Riders -->
+            <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Total Paid to Riders (SR)</div>
+              <div id="total-paid-riders" style="font-size:24px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
+              <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">Only final salary amounts (${paidRiders.length} paid riders)</div>
+            </div>
+
+            <!-- Difference -->
+            <div id="finance-diff-card" style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px; transition:all 0.3s;">
+              <div style="font-size:11px; font-weight:700; color:${diffColor}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">${diffIcon} ${diffLabel}</div>
+              <div id="finance-diff-value" style="font-size:24px; font-weight:800; color:${diffColor};">${isProfit ? '' : '-'} SR ${Utils.formatCurrency(Math.abs(difference))}</div>
+              <div id="finance-diff-note" style="font-size:11px; color:${diffColor}; opacity:0.7; margin-top:4px;">${isProfit ? 'This amount stays with you' : 'You paid this from your own pocket'}</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  async _saveCompanyIncome() {
+    const input = document.getElementById('company-income-input');
+    if (!input) return;
+    const value = parseFloat(input.value) || 0;
+    const cycleKey = `${this.currentPeriod.start}_${this.currentPeriod.end}`;
+    
+    const btn = document.getElementById('save-company-income-btn');
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+    
+    try {
+      await API.setCycleFinances(cycleKey, value);
+      this._cycleFinances = { company_income: value };
+      Utils.showToast('Company income saved ✅', 'success');
+      this._recalcFinanceTracker();
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    } finally {
+      if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
+    }
+  },
+
+  _recalcFinanceTracker() {
+    const input = document.getElementById('company-income-input');
+    if (!input) return;
+    const companyIncome = parseFloat(input.value) || 0;
+
+    const data = this._currentPayrollData || [];
+    const paidRiders = data.filter(r => r.payment_status === 'paid');
+    const totalPaidToRiders = paidRiders.reduce((sum, r) => {
+      const amt = r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary;
+      return sum + amt;
+    }, 0);
+
+    const difference = companyIncome - totalPaidToRiders;
+    const isProfit = difference >= 0;
+
+    const card = document.getElementById('finance-diff-card');
+    const valueEl = document.getElementById('finance-diff-value');
+    const noteEl = document.getElementById('finance-diff-note');
+    if (!card || !valueEl) return;
+
+    const color = isProfit ? '#059669' : '#DC2626';
+    const bg = isProfit ? '#ECFDF5' : '#FEF2F2';
+    const border = isProfit ? '#A7F3D0' : '#FECACA';
+    const icon = isProfit ? '📈' : '📉';
+    const label = isProfit ? 'Remaining / Profit' : 'Out of Pocket';
+
+    card.style.background = bg;
+    card.style.borderColor = border;
+    card.querySelector('div').style.color = color;
+    card.querySelector('div').innerHTML = `${icon} ${label}`;
+    valueEl.style.color = color;
+    valueEl.textContent = `${isProfit ? '' : '-'} SR ${Utils.formatCurrency(Math.abs(difference))}`;
+    if (noteEl) {
+      noteEl.style.color = color;
+      noteEl.textContent = isProfit ? 'This amount stays with you' : 'You paid this from your own pocket';
+    }
+  },
+
+
+  shareWhatsApp(riderId) {
+    const rider = this._currentPayrollData.find(r => r.rider_id === riderId);
+    if (!rider) return Utils.showToast('Rider data not found for WhatsApp share', 'error');
+
+    const typeLabel = rider.rider_type === 'company' ? 'Company Rider' : 'Freelancer';
+    const isPending = rider.payment_status !== 'paid';
 
     const messageLines = [
       `INSPIRING ROADS LOGISTICS`,
-      `Payslip - ${periodLabel}`,
+      `Payslip - ${this.currentPeriod.label}`,
       `--------------------------------`,
       ``,
-      `Rider: *${name}*`,
+      `Rider: *${rider.rider_name}*`,
       `Type: ${typeLabel}`,
-      `Total Orders: ${totalOrders}`,
+      `Total Orders: ${rider.total_orders}`,
       ``
     ];
 
-    if (dailyLogs && dailyLogs.length > 0) {
+    if (rider.daily_logs && rider.daily_logs.length > 0) {
       messageLines.push(`*Daily Breakdown:*`);
-      dailyLogs.forEach(log => {
+      rider.daily_logs.forEach(log => {
         // Format date from YYYY-MM-DD to MMM DD (e.g. Apr 21)
         const d = new Date(log.date);
         const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -883,25 +1095,7 @@ const Payroll = {
     } else {
       messageLines.push(`*Net Payout: Pending*`);
     }
-
-    messageLines.push(`--------------------------------`);
-    messageLines.push(``);
     messageLines.push(`_This is an auto-generated payslip from Inspiring Roads Logistics._`);
-
-    const message = messageLines.join('\n');
-
-    const encoded = encodeURIComponent(message);
-    
-    if (phone) {
-      // Clean phone number
-      let cleanPhone = phone.replace(/[^0-9+]/g, '');
-      if (cleanPhone.startsWith('05')) cleanPhone = '+966' + cleanPhone.substring(1);
-      if (!cleanPhone.startsWith('+')) cleanPhone = '+966' + cleanPhone;
-      window.open(`https://wa.me/${cleanPhone.replace('+', '')}?text=${encoded}`, '_blank');
-    } else {
-      // No phone, open WhatsApp with message only
-      window.open(`https://wa.me/?text=${encoded}`, '_blank');
-      Utils.showToast('No phone number saved for this rider — opened WhatsApp without recipient', 'info');
     }
   },
 
@@ -1017,16 +1211,34 @@ const Payroll = {
                   </tr>
                 `}
                 
-                ${rider.deductions > 0 ? `
+                ${rider.manual_deductions > 0 ? `
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Total Deductions (Advances / Expenses)</td>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${rider.deductions.toLocaleString()}</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Penalty / Absent Deductions</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.manual_deductions || 0).toLocaleString()}</td>
+                </tr>` : ''}
+
+                ${rider.advance_deducted > 0 ? `
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Advance Deducted</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.advance_deducted || 0).toLocaleString()}</td>
+                </tr>` : ''}
+
+                ${rider.cod_settled > 0 ? `
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">COD Settled</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.cod_settled || 0).toLocaleString()}</td>
+                </tr>` : ''}
+
+                ${rider.other_deductions > 0 ? `
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 500; color: #334155;">Other Deductions</td>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #e11d48; text-align: right;">- SR ${(rider.other_deductions || 0).toLocaleString()}</td>
                 </tr>` : ''}
 
                 ${isPaid ? `
                 <tr style="background: #f0fdf4;">
                   <td style="padding: 20px; font-size: 16px; font-weight: 800; color: #059669;">NET PAYOUT</td>
-                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${rider.calculated_salary.toLocaleString()}</td>
+                  <td style="padding: 20px; font-size: 20px; font-weight: 800; color: #059669; text-align: right;">SR ${(rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary).toLocaleString()}</td>
                 </tr>` : ''}
               </tbody>
             </table>
@@ -1212,7 +1424,7 @@ const Payroll = {
 
         <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
           <button class="btn btn-success" style="width:100%; max-width:300px; padding:14px; font-size:16px; font-weight:bold" 
-            onclick="Payroll.processBulkNext('${nameStr}', '${phoneStr}', '${grossStr}', '${dedStr}', '${netStr}', ${ordersStr}, '${rr.rider_type}', '${encodeURIComponent(JSON.stringify(rr.daily_logs || []))}')">
+            onclick="Payroll.processBulkNext(${rr.rider_id})">
             ${phoneStr ? 'Send via WhatsApp & Next' : 'Open WhatsApp Web & Next'}
           </button>
           
@@ -1226,18 +1438,9 @@ const Payroll = {
     Utils.openModal('Bulk WhatsApp Messager', html);
   },
 
-  processBulkNext(name, phone, gross, ded, net, orders, type, dailyLogsEncoded) {
-    let dailyLogs = [];
-    try {
-      if (dailyLogsEncoded) {
-        dailyLogs = JSON.parse(decodeURIComponent(dailyLogsEncoded));
-      }
-    } catch (e) {
-      console.error('Failed to parse daily logs for bulk whatsapp', e);
-    }
-    
+  processBulkNext(riderId) {
     // 1. Trigger the standard WhatsApp share (which opens a new tab)
-    this.shareWhatsApp(name, phone, gross, ded, net, orders, type, this.currentPeriod.label, 'paid', dailyLogs);
+    this.shareWhatsApp(riderId);
     
     // 2. Immediately pop from queue and render the next modal window
     this._bulkQueue.shift();

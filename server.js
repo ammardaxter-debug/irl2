@@ -402,9 +402,9 @@ app.put('/api/salary-advances/:id', async (req, res) => {
 
 app.put('/api/payroll/payment-status', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
-    const { rider_id, cycle_key, status, final_paid_amount, notes, manual_deductions, manual_bonus } = req.body;
+    const { rider_id, cycle_key, status, final_paid_amount, notes, manual_deductions, manual_bonus, advance_deducted, cod_settled, other_deductions } = req.body;
     if (!rider_id || !cycle_key || !status) return res.status(400).json({ error: 'rider_id, cycle_key, and status required' });
-    res.json(await db.setPaymentStatus(rider_id, cycle_key, status, final_paid_amount, notes, manual_deductions, manual_bonus));
+    res.json(await db.setPaymentStatus(rider_id, cycle_key, status, final_paid_amount, notes, manual_deductions, manual_bonus, advance_deducted, cod_settled, other_deductions));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -446,6 +446,30 @@ app.get('/api/payroll/lock-status', async (req, res) => {
   try {
     const locked = await db.isPayrollLocked(req.query.cycle_key);
     res.json({ locked });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== CYCLE FINANCES (Company Income Tracker) ==========
+
+app.get('/api/payroll/cycle-finances', async (req, res) => {
+  try {
+    const { cycle_key } = req.query;
+    if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
+    const data = await db.getSettings(`cycle_finances_${cycle_key}`);
+    res.json(data || { company_income: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/payroll/cycle-finances', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const { cycle_key, company_income } = req.body;
+    if (!cycle_key) return res.status(400).json({ error: 'cycle_key required' });
+    await db.updateSettings(`cycle_finances_${cycle_key}`, { company_income: Number(company_income) || 0 });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1074,6 +1098,16 @@ app.get('/api/rider/my-report', verifyRiderToken, async (req, res) => {
 app.get('/api/rider/unsettled-payments', verifyRiderToken, async (req, res) => {
   try {
     const data = await db.getUnsettledPaymentsForRider(req.riderId);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin version to get unsettled payments for any rider
+app.get('/api/admin/riders/:id/unsettled-payments', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const data = await db.getUnsettledPaymentsForRider(req.params.id);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });

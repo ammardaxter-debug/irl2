@@ -192,6 +192,9 @@ CREATE TABLE IF NOT EXISTS payment_status (
   notes TEXT,
   manual_deductions NUMERIC DEFAULT 0,
   manual_bonus NUMERIC DEFAULT 0,
+  advance_deducted NUMERIC DEFAULT 0,
+  cod_settled NUMERIC DEFAULT 0,
+  other_deductions NUMERIC DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(cycle_key, rider_id)
 );

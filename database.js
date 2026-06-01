@@ -837,12 +837,47 @@ async function unlockPayroll(cycleKey) {
   await supabase.from('payroll_locks').delete().eq('cycle_key', cycleKey);
 }
 
-async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, notes, manual_deductions, manual_bonus) {
+async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, notes, manual_deductions, manual_bonus, advance_deducted = 0, cod_settled = 0, other_deductions = 0) {
   await supabase.from('payment_status').upsert({
     cycle_key: cycleKey,
     rider_id: String(riderId),
-    status, final_paid_amount, notes, manual_deductions, manual_bonus, updated_at: nowISO()
+    status, final_paid_amount, notes, manual_deductions, manual_bonus,
+    advance_deducted, cod_settled, other_deductions,
+    updated_at: nowISO()
   }, { onConflict: 'cycle_key, rider_id' });
+
+  // Auto-settlement logic for advances
+  if (status === 'paid' && advance_deducted > 0) {
+    const unsettled = await getUnsettledPaymentsForRider(riderId);
+    let remainingToSettle = Number(advance_deducted);
+
+    for (const item of unsettled.items) {
+      if (remainingToSettle <= 0) break;
+      const amountToSettle = Math.min(item.amount, remainingToSettle);
+      remainingToSettle -= amountToSettle;
+
+      const isFullySettled = amountToSettle === item.amount;
+      
+      const settleData = {};
+      if (isFullySettled) {
+        settleData.deductionSettled = true;
+        settleData.settled_by = 'System (Payroll Auto-Settle)';
+        settleData.settledBy = 'System (Payroll Auto-Settle)';
+        settleData.settled_at = nowISO();
+        settleData.settledDate = nowISO();
+      } else {
+        // Partial settlement: reduce the remaining amount of the advance
+        settleData.amount = item.amount - amountToSettle;
+      }
+
+      if (item.type === 'expense' || item.type === 'deduction') {
+        await supabase.from('expenses').update(settleData).eq('id', item.id);
+      } else if (item.type === 'advance') {
+        await supabase.from('salary_advances').update(settleData).eq('id', item.id);
+      }
+    }
+  }
+
   return { success: true };
 }
 
