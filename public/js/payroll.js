@@ -911,9 +911,8 @@ const Payroll = {
     const transfers = this._cycleTransfers || [];
     let totalReceived = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
     
-    // Deduct "Other Deductions" from the total received company funds
+    // Calculate "Other Deductions" to add to Total Expenses
     const totalOtherDeductions = data.reduce((sum, r) => sum + (Number(r.other_deductions) || 0), 0);
-    totalReceived = totalReceived - totalOtherDeductions;
     
     // Only count riders marked as "paid" - use final_paid_amount (the actual amount transferred)
     const paidRiders = data.filter(r => r.payment_status === 'paid');
@@ -921,8 +920,10 @@ const Payroll = {
       const amt = r.final_paid_amount !== null && r.final_paid_amount !== undefined ? r.final_paid_amount : r.calculated_salary;
       return sum + amt;
     }, 0);
+    
+    const totalExpenses = totalPaidToRiders + totalOtherDeductions;
 
-    const difference = totalReceived - totalPaidToRiders;
+    const difference = totalReceived - totalExpenses;
     const isProfit = difference >= 0;
     const diffLabel = isProfit ? 'Remaining Balance' : 'Out of Pocket';
     const diffColor = isProfit ? '#059669' : '#DC2626';
@@ -973,13 +974,13 @@ const Payroll = {
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
               <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Received (SR)</div>
               <div style="font-size:20px; font-weight:800; color:#4F46E5;">${Utils.formatCurrency(totalReceived)}</div>
-              ${totalOtherDeductions > 0 ? `<div style="font-size:11px; color:#DC2626; margin-top:4px;">Includes - SR ${Utils.formatCurrency(totalOtherDeductions)} (Other Deductions)</div>` : ''}
             </div>
 
             <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px;">
-              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Paid to Riders (SR)</div>
-              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalPaidToRiders)}</div>
+              <div style="font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; margin-bottom:8px;">Total Expenses (SR)</div>
+              <div style="font-size:20px; font-weight:800; color:#0F172A;">${Utils.formatCurrency(totalExpenses)}</div>
               <div style="font-size:11px; color:#9CA3AF; margin-top:4px;">${paidRiders.length} paid riders</div>
+              ${totalOtherDeductions > 0 ? `<div style="font-size:11px; color:#DC2626; margin-top:4px;">Includes + SR ${Utils.formatCurrency(totalOtherDeductions)} (Other Deductions)</div>` : ''}
             </div>
 
             <div style="background:${diffBg}; border:2px solid ${diffBorder}; border-radius:12px; padding:16px;">
