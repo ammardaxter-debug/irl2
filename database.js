@@ -881,36 +881,20 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
     }
   }
 
-  // Create an out expense record for the net paid amount to keep Expense Tracker cashflow synced
-  if (status === 'paid' && parseFloat(final_paid_amount) > 0) {
-    const { data: existingExp } = await supabase.from('expenses')
-      .select('id')
-      .eq('category', 'Rider Payroll')
-      .eq('rider_id', riderId)
-      .eq('notes', `Payroll for ${cycleKey}`)
-      .single();
-
-    if (!existingExp) {
-      // Pass the fully detailed final_paid_amount to the expense tracker.
-      // This ensures Sponsors see the outward cash flow.
-      await createExpense({
-        expense_date: todayLocal(),
-        category: 'Rider Payroll',
-        amount: parseFloat(final_paid_amount),
-        rider_id: riderId,
-        rider_name: '', // createExpense will auto-fill rider_name
-        is_deductible: false,
-        source: 'payroll_system',
-        notes: `Payroll for ${cycleKey}`
-      });
-    }
-  }
-
   return { success: true };
 }
 
 async function getPaymentStatuses(cycleKey) {
-  const data = await fetchPaginated(() => supabase.from('payment_status').select('*').eq('cycle_key', cycleKey));
+  let query = supabase.from('payment_status').select('*');
+  if (cycleKey && cycleKey !== 'all') {
+    query = query.eq('cycle_key', cycleKey);
+  }
+  const data = await fetchPaginated(() => query);
+  
+  if (cycleKey === 'all') {
+    return data;
+  }
+  
   const result = {};
   data.forEach(p => { result[p.rider_id] = p; });
   return result;

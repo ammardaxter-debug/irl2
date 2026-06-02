@@ -44,8 +44,15 @@ const PayrollFinancialExcel = {
       if (isAllTime) {
         // Fetch all-time funds and all-time payouts
         funds = await API.getCycleTransfers('all'); 
-        payouts = await API.getExpenses(null, null);
-        riderPayouts = payouts.filter(p => (p.category || '').toLowerCase() === 'rider payroll');
+        payouts = await API.request('/payroll/payment-statuses?cycle_key=all');
+        riderPayouts = (payouts || [])
+          .filter(p => p.status === 'paid')
+          .map(p => ({
+            expense_date: new Date(p.updated_at || new Date().toISOString()),
+            rider_name: `Rider #${p.rider_id}`, // Will just use ID since we don't have name mapped here for all-time yet
+            amount: (p.final_paid_amount || 0) + (Number(p.other_deductions) || 0),
+            notes: `Payroll for ${p.cycle_key}` + (Number(p.other_deductions) > 0 ? ` (Includes SR ${p.other_deductions} Commission)` : '')
+          }));
       } else {
         if (!currentPeriod) throw new Error('Current cycle period is required.');
         const cycleKey = `${currentPeriod.start}_${currentPeriod.end}`;
