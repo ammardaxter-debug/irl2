@@ -3,11 +3,12 @@
 // ========================================
 
 const Expenses = {
-  currentTab: 'expenses',
+  currentTab: 'financial_overview',
   currentDeductionTab: 'pending',
   currentRequestTab: 'pending',
   deductionsData: null,
   riders: [],
+  cyclePeriod: null,
 
   async render() {
     const root = document.getElementById('page-expenses');
@@ -31,6 +32,9 @@ const Expenses = {
     
     try {
       this.riders = await API.getRiders();
+      if (!this.cyclePeriod) {
+        this.cyclePeriod = Utils.getNoonCyclePeriod(Utils.today());
+      }
       await this.renderDashboard(root);
     } catch (err) {
       Utils.showToast(err.message, 'error');
@@ -40,12 +44,20 @@ const Expenses = {
 
   async renderDashboard(root) {
     try {
-      const stats = await API.getExpenseStats();
-      const outOfPocketTotal = stats.from_my_pocket;
+      // Fetch cycle-specific data for stats
+      const cp = this.cyclePeriod;
+      const [cycleFunds, cycleExpenses] = await Promise.all([
+        API.getFunds(cp.start, cp.end),
+        API.getExpenses(cp.start, cp.end)
+      ]);
+      const cycleReceived = cycleFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+      const cycleSpent = cycleExpenses.filter(e => e.category !== 'Manual Deduction' && e.category !== 'Advance Installment').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const cycleNet = cycleReceived - cycleSpent;
+      const outOfPocketTotal = Math.max(0, cycleSpent - cycleReceived);
       const isPocketWarn = outOfPocketTotal > 0;
       
-      const remainingBg = stats.remaining_irl > 500 ? '#F0FDF4' : (stats.remaining_irl >= 100 ? '#FFFBEB' : '#FEF2F2');
-      const remainingTextColor = stats.remaining_irl > 500 ? '#16A34A' : (stats.remaining_irl >= 100 ? '#D97706' : '#DC2626');
+      const remainingBg = cycleNet > 500 ? '#F0FDF4' : (cycleNet >= 100 ? '#FFFBEB' : '#FEF2F2');
+      const remainingTextColor = cycleNet > 500 ? '#16A34A' : (cycleNet >= 100 ? '#D97706' : '#DC2626');
       
       const headerHtml = `
         <style>
@@ -157,7 +169,18 @@ const Expenses = {
         </style>
         
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-          <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Expense Tracker</h1>
+          <div>
+            <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F; margin:0;">Expense Tracker</h1>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:8px;">
+              <button onclick="Expenses.cyclePrev()" style="background:none; border:1px solid #E5E7EB; border-radius:8px; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#4B5563; transition:all 0.2s;" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <span style="font-size:14px; font-weight:600; color:#1E3A8A; min-width:200px; text-align:center;">${cp.label}</span>
+              <button onclick="Expenses.cycleNext()" style="background:none; border:1px solid #E5E7EB; border-radius:8px; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#4B5563; transition:all 0.2s;" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>
           ${App.isViewer() ? '' : `
           <div class="btn-group">
             <button class="btn-group-outline" onclick="Expenses.openAddFundsModal()">Log IRL Funds</button>
@@ -181,36 +204,29 @@ const Expenses = {
         </div>
         
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:32px;">
-          <div class="stat-card-new" style="background:#EFF6FF; border-color:#BFDBFE;" title="Total funds received from IRL this cycle">
+          <div class="stat-card-new" style="background:#EFF6FF; border-color:#BFDBFE;" title="Funds received this cycle">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="stat-card-new-title" style="color:#1E3A8A;">Received from Company</span>
+              <span class="stat-card-new-title" style="color:#1E3A8A;">Received (This Cycle)</span>
               <span style="font-size:20px;">💰</span>
             </div>
-            <div class="stat-card-new-value" style="color:#2563EB;">${Utils.formatCurrency(stats.total_received)}</div>
+            <div class="stat-card-new-value" style="color:#2563EB;">${Utils.formatCurrency(cycleReceived)}</div>
           </div>
           
-          <div class="stat-card-new" title="Total of all operational expenses and deductions">
+          <div class="stat-card-new" title="Total expenses this cycle">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="stat-card-new-title">Total Expenses</span>
+              <span class="stat-card-new-title">Spent (This Cycle)</span>
             </div>
-            <div class="stat-card-new-value">${Utils.formatCurrency(stats.total_expenses)}</div>
+            <div class="stat-card-new-value" style="color:#DC2626;">${Utils.formatCurrency(cycleSpent)}</div>
           </div>
           
-          <div class="stat-card-new" title="Total expenses paid using company funds">
+          <div class="stat-card-new" style="background:${remainingBg}; border-color:${remainingBg === '#FFFFFF' ? '#E5E7EB' : 'transparent'};" title="Net balance this cycle">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="stat-card-new-title">Company Funds Used</span>
+              <span class="stat-card-new-title" style="color:${remainingTextColor};">Net Balance</span>
             </div>
-            <div class="stat-card-new-value">${Utils.formatCurrency(stats.used_from_irl)}</div>
+            <div class="stat-card-new-value" style="color:${remainingTextColor};">${cycleNet >= 0 ? '' : '-'}${Utils.formatCurrency(Math.abs(cycleNet))}</div>
           </div>
           
-          <div class="stat-card-new" style="background:${remainingBg}; border-color:${remainingBg === '#FFFFFF' ? '#E5E7EB' : 'transparent'};" title="Unspent company funds">
-            <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="stat-card-new-title" style="color:${remainingTextColor};">Remaining Balance</span>
-            </div>
-            <div class="stat-card-new-value" style="color:${remainingTextColor};">${Utils.formatCurrency(stats.remaining_irl)}</div>
-          </div>
-          
-          <div class="stat-card-new" style="${isPocketWarn ? 'background:#FEF2F2; border-color:#FECACA;' : 'display:none;'}" title="Running Out of Pocket Balance">
+          <div class="stat-card-new" style="${isPocketWarn ? 'background:#FEF2F2; border-color:#FECACA;' : 'display:none;'}" title="Spending exceeds funds received">
             <div style="display:flex; align-items:center; justify-content:space-between;">
               <span class="stat-card-new-title" style="color:#DC2626;">Out of Pocket</span>
             </div>
@@ -218,11 +234,12 @@ const Expenses = {
           </div>
         </div>
 
-        <div style="display:flex; gap:24px; border-bottom:1px solid #E5E7EB; margin-bottom:24px;">
-          <div class="tab-clean ${this.currentTab === 'expenses' ? 'active' : ''}" data-tab="expenses" onclick="Expenses.switchTab('expenses')">Expenses Log</div>
-          <div class="tab-clean ${this.currentTab === 'funds' ? 'active' : ''}" data-tab="funds" onclick="Expenses.switchTab('funds')">Funds Received</div>
-          <div class="tab-clean ${this.currentTab === 'deductions' ? 'active' : ''}" data-tab="deductions" onclick="Expenses.switchTab('deductions')">Rider Deductions</div>
-          <div class="tab-clean ${this.currentTab === 'rider_requests' ? 'active' : ''}" data-tab="rider_requests" onclick="Expenses.switchTab('rider_requests')">Rider Requests</div>
+        <div style="display:flex; gap:24px; border-bottom:1px solid #E5E7EB; margin-bottom:24px; overflow-x:auto;">
+          <div class="tab-clean ${this.currentTab === 'financial_overview' ? 'active' : ''}" data-tab="financial_overview" onclick="Expenses.switchTab('financial_overview')" style="white-space:nowrap;">Financial Overview</div>
+          <div class="tab-clean ${this.currentTab === 'expenses' ? 'active' : ''}" data-tab="expenses" onclick="Expenses.switchTab('expenses')" style="white-space:nowrap;">Expenses Log</div>
+          <div class="tab-clean ${this.currentTab === 'funds' ? 'active' : ''}" data-tab="funds" onclick="Expenses.switchTab('funds')" style="white-space:nowrap;">Funds Received</div>
+          <div class="tab-clean ${this.currentTab === 'deductions' ? 'active' : ''}" data-tab="deductions" onclick="Expenses.switchTab('deductions')" style="white-space:nowrap;">Rider Deductions</div>
+          <div class="tab-clean ${this.currentTab === 'rider_requests' ? 'active' : ''}" data-tab="rider_requests" onclick="Expenses.switchTab('rider_requests')" style="white-space:nowrap;">Rider Requests</div>
         </div>
 
         <div id="expense-content-area">
@@ -258,11 +275,142 @@ const Expenses = {
     await this.renderTabContent();
   },
 
+  cyclePrev() {
+    this.cyclePeriod = Utils.shiftPeriod(this.cyclePeriod.start, -1);
+    this.render();
+  },
+
+  cycleNext() {
+    this.cyclePeriod = Utils.shiftPeriod(this.cyclePeriod.start, 1);
+    this.render();
+  },
+
+  async renderFinancialOverview(area) {
+    const cp = this.cyclePeriod;
+    const [funds, expenses] = await Promise.all([
+      API.getFunds(cp.start, cp.end),
+      API.getExpenses(cp.start, cp.end)
+    ]);
+
+    // Filter out internal categories
+    const realExpenses = expenses.filter(e => e.category !== 'Manual Deduction' && e.category !== 'Advance Installment');
+
+    // Build combined transaction list
+    const transactions = [];
+
+    funds.forEach(f => {
+      transactions.push({
+        date: f.receive_date || f.created_at,
+        description: f.description || f.source || 'Company Transfer',
+        type: 'received',
+        amount: parseFloat(f.amount) || 0,
+        notes: f.notes || ''
+      });
+    });
+
+    realExpenses.forEach(e => {
+      const foundRider = e.rider_id ? this.riders.find(r => r.id == e.rider_id) : null;
+      let recipient = e.rider_name;
+      if (!recipient || recipient === 'Rider') recipient = foundRider ? foundRider.name : (e.vendor_name || 'Other');
+      transactions.push({
+        date: e.expense_date || e.created_at,
+        description: `${e.category}: ${recipient}`,
+        type: 'expense',
+        amount: parseFloat(e.amount) || 0,
+        notes: e.notes || ''
+      });
+    });
+
+    // Sort by date descending
+    transactions.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    const totalReceived = funds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+    const totalSpent = realExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const netBalance = totalReceived - totalSpent;
+
+    let html = `
+      <div style="width:100%; overflow-x:auto; border-radius:16px; border:1px solid #E5E7EB; background:#FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="padding:20px 24px; border-bottom:2px solid #E5E7EB; background:#F8FAFC;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:16px; font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" style="width:20px;height:20px;">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+              Transaction Log — ${cp.label}
+            </div>
+            <div style="font-size:13px; color:#6B7280;">${transactions.length} transactions</div>
+          </div>
+        </div>
+        <table class="table-clean" style="width:100%;">
+          <thead>
+            <tr style="background:#F9FAFB;">
+              <th style="padding:14px 20px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#6B7280; font-weight:700;">Date</th>
+              <th style="padding:14px 20px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#6B7280; font-weight:700;">Description</th>
+              <th style="padding:14px 20px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#6B7280; font-weight:700;">Notes</th>
+              <th style="padding:14px 20px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#16A34A; font-weight:700; text-align:right;">Received (+)</th>
+              <th style="padding:14px 20px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#DC2626; font-weight:700; text-align:right;">Spent (-)</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    if (transactions.length === 0) {
+      html += `<tr><td colspan="5" style="text-align:center; padding:64px 20px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px; margin:0 auto 16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <div style="font-size:16px; font-weight:500; color:#6B7280;">No transactions in this cycle</div>
+      </td></tr>`;
+    } else {
+      transactions.forEach(t => {
+        const dateStr = Utils.formatDate(t.date);
+        const isReceived = t.type === 'received';
+        const rowBg = isReceived ? '#F0FDF4' : 'transparent';
+        html += `
+          <tr style="transition:background 0.2s; background:${rowBg};" onmouseover="this.style.background='${isReceived ? '#DCFCE7' : '#F9FAFB'}'" onmouseout="this.style.background='${rowBg}'">
+            <td style="padding:14px 20px; white-space:nowrap; color:#4B5563; font-size:13px;">${dateStr}</td>
+            <td style="padding:14px 20px;">
+              <div style="font-weight:500; color:#0F0F0F; font-size:14px;">${Utils.escapeHtml(t.description)}</div>
+            </td>
+            <td style="padding:14px 20px; color:#6B7280; font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${Utils.escapeHtml(t.notes)}</td>
+            <td style="padding:14px 20px; text-align:right; font-weight:700; color:${isReceived ? '#16A34A' : 'transparent'}; font-size:14px;">
+              ${isReceived ? '+' + Utils.formatCurrency(t.amount) : ''}
+            </td>
+            <td style="padding:14px 20px; text-align:right; font-weight:700; color:${!isReceived ? '#DC2626' : 'transparent'}; font-size:14px;">
+              ${!isReceived ? '-' + Utils.formatCurrency(t.amount) : ''}
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    // Grand totals row
+    const netColor = netBalance >= 0 ? '#16A34A' : '#DC2626';
+    html += `
+          <tr style="background:#0F172A;">
+            <td colspan="3" style="padding:16px 20px; font-weight:800; color:#FFFFFF; font-size:14px; text-align:right;">GRAND TOTALS</td>
+            <td style="padding:16px 20px; text-align:right; font-weight:800; color:#4ADE80; font-size:15px;">${Utils.formatCurrency(totalReceived)}</td>
+            <td style="padding:16px 20px; text-align:right; font-weight:800; color:#FCA5A5; font-size:15px;">${Utils.formatCurrency(totalSpent)}</td>
+          </tr>
+          <tr style="background:#1E293B;">
+            <td colspan="3" style="padding:14px 20px; font-weight:700; color:#94A3B8; font-size:13px; text-align:right;">NET BALANCE</td>
+            <td colspan="2" style="padding:14px 20px; text-align:right; font-weight:800; color:${netBalance >= 0 ? '#4ADE80' : '#FCA5A5'}; font-size:18px;">
+              ${netBalance >= 0 ? '' : '-'}${Utils.formatCurrency(Math.abs(netBalance))}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    `;
+
+    area.innerHTML = html;
+  },
+
   async renderTabContent() {
     const area = document.getElementById('expense-content-area');
     if (!area) return;
 
-    if (this.currentTab === 'expenses') {
+    if (this.currentTab === 'financial_overview') {
+      await this.renderFinancialOverview(area);
+    } else if (this.currentTab === 'expenses') {
       this.deductionsData = null; // Clear deductions cache
       const expenses = await API.getExpenses();
       this.cachedExpenses = expenses; // Cache for edit modal
