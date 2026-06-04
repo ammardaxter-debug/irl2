@@ -10,6 +10,14 @@ const Expenses = {
   riders: [],
   cyclePeriod: null,
 
+  getDefaultDateForCycle() {
+    const today = Utils.today();
+    if (this.cyclePeriod && today >= this.cyclePeriod.start && today <= this.cyclePeriod.end) {
+      return today;
+    }
+    return this.cyclePeriod ? this.cyclePeriod.end : today;
+  },
+
   async render() {
     const root = document.getElementById('page-expenses');
     if (!root) return;
@@ -415,7 +423,7 @@ const Expenses = {
       await this.renderFinancialOverview(area);
     } else if (this.currentTab === 'expenses') {
       this.deductionsData = null; // Clear deductions cache
-      const expenses = await API.getExpenses();
+      const expenses = await API.getExpenses(this.cyclePeriod.start, this.cyclePeriod.end);
       this.cachedExpenses = expenses; // Cache for edit modal
       let html = `
         <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center;">
@@ -447,7 +455,7 @@ const Expenses = {
               ${App.isViewer() ? '' : `
               <tr class="inline-add-row">
                 <td>
-                  <input type="date" id="qa-date" class="inline-input" value="${Utils.today()}">
+                  <input type="date" id="qa-date" class="inline-input" value="${this.getDefaultDateForCycle()}">
                 </td>
                 <td>
                   <select id="qa-category" class="inline-input">
@@ -650,7 +658,7 @@ const Expenses = {
         if (e.key === 'Enter') handleQuickAdd();
       });
     } else if (this.currentTab === 'funds') {
-      const funds = await API.getFunds();
+      const funds = await API.getFunds(this.cyclePeriod.start, this.cyclePeriod.end);
       let html = `
         <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
           <table class="table-clean">
@@ -1824,20 +1832,20 @@ const Expenses = {
         </div>
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:32px;">
           <button class="btn btn-outline" style="border-radius:8px;" onclick="Utils.closeModal()">Cancel</button>
-          <button class="btn btn-primary" style="background:#16A34A; border-color:#16A34A; border-radius:8px;" onclick="Expenses.confirmSettleRider(${riderId})">Confirm Settlement</button>
+          <button class="btn btn-primary" style="background:#16A34A; border-color:#16A34A; border-radius:8px;" onclick="Expenses.confirmSettleRider(${riderId}, '${Utils.escapeHtml(riderName).replace(/'/g, "\\'")}')">Confirm Settlement</button>
         </div>
       </div>
     `;
     Utils.openModal('Settle All Deductions', html);
   },
 
-  async confirmSettleRider(riderId) {
+  async confirmSettleRider(riderId, riderName) {
     if (App.isViewer()) return;
     const settledBy = document.getElementById('settle-by-select').value;
     Utils.closeModal();
     try {
       Utils.showToast('Settling deductions...', 'info');
-      await API.settleRiderDeductions(riderId, settledBy);
+      await API.settleRiderDeductions(riderId, settledBy, riderName);
       Utils.showToast('All deductions settled successfully.', 'success');
       this.deductionsData = null; // Clear cache
       this.renderTabContent();
@@ -1908,11 +1916,12 @@ const Expenses = {
   openAddFundsModal() {
     if (App.isViewer()) return;
     const today = new Date().toISOString().split('T')[0];
+    const defaultDate = this.getDefaultDateForCycle();
     const html = `
       <form id="funds-form" class="form-grid">
         <div class="form-group">
           <label class="form-label">Receive Date</label>
-          <input type="date" class="form-input" name="receive_date" required value="${today}" max="${today}">
+          <input type="date" class="form-input" name="receive_date" required value="${defaultDate}" max="${today}">
         </div>
         <div class="form-group">
           <label class="form-label">Amount (SAR)</label>
@@ -1977,6 +1986,7 @@ const Expenses = {
   openAddExpenseModal() {
     if (App.isViewer()) return;
     const today = new Date().toISOString().split('T')[0];
+    const defaultDate = this.getDefaultDateForCycle();
     
     // Categories matching user spec
     const categories = ['Advance', 'Food', 'Cash Relay', 'Internet Package', 'Transport', 'Equipment', 'Maintenance', 'Uniform', 'Other', 'Health / Medical'];
@@ -2022,11 +2032,11 @@ const Expenses = {
         <div style="display:flex; gap:16px;">
           <div style="flex:1;">
             <label class="expense-form-label">Date</label>
-            <input type="date" class="expense-form-input" name="expense_date" required value="${today}" max="${today}">
+            <input type="date" class="expense-form-input" name="expense_date" required value="${defaultDate}" max="${today}">
           </div>
           <div style="flex:1;">
             <label class="expense-form-label">Amount (SAR)</label>
-            <input type="number" step="0.01" min="0" class="expense-form-input" name="amount" id="expense-amount" required placeholder="0.00" oninput="document.getElementById('expense-footer-total').innerText = 'Logging: SAR ' + (parseFloat(this.value)||0).toFixed(2) + ' · April 2026 cycle'; document.getElementById('expense-submit-btn').disabled = !(parseFloat(this.value)>0 && document.getElementById('expense-cat').value);">
+            <input type="number" step="0.01" min="0" class="expense-form-input" name="amount" id="expense-amount" required placeholder="0.00">
           </div>
         </div>
         
@@ -2059,7 +2069,7 @@ const Expenses = {
         </div>
         
         <div class="expense-footer">
-          <div id="expense-footer-total" style="font-size:12px; color:#6B7280;">Logging: SAR 0.00 · April 2026 cycle</div>
+          <div id="expense-footer-total" style="font-size:12px; color:#6B7280;">Logging: SAR 0.00 · ${this.cyclePeriod ? this.cyclePeriod.label : 'Current Cycle'}</div>
           <div style="display:flex; gap:12px;">
             <button type="button" onclick="Utils.closeModal()" style="width:120px; height:42px; border-radius:10px; border:1px solid #E5E7EB; background:white; color:#6B7280; font-weight:500; cursor:pointer;">Cancel</button>
             <button type="submit" id="expense-submit-btn" disabled style="width:140px; height:42px; border-radius:10px; border:none; background:#2563EB; color:white; font-weight:600; cursor:pointer; opacity:0.5; transition:opacity 150ms;">Save Expense</button>
@@ -2080,6 +2090,8 @@ const Expenses = {
 
     const checkSubmitBtn = () => {
        const amt = parseFloat(amountInput.value) || 0;
+       const cycleLabelText = this.cyclePeriod ? this.cyclePeriod.label : 'Current Cycle';
+       document.getElementById('expense-footer-total').innerText = `Logging: SAR ${amt.toFixed(2)} · ${cycleLabelText}`;
        if (amt > 0 && catSelect.value) {
           submitBtn.disabled = false;
           submitBtn.style.opacity = '1';

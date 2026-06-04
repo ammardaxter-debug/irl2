@@ -212,10 +212,10 @@ const API = {
     });
   },
 
-  settleRiderDeductions(riderId, settledBy) {
-    return this.request(`/expenses/settle/rider/${riderId}`, {
+  settleRiderDeductions(riderId, settledBy, riderName = null) {
+    return this.request(`/expenses/settle/rider/${riderId || 'null'}`, {
       method: 'PUT',
-      body: JSON.stringify({ settledBy })
+      body: JSON.stringify({ settledBy, riderName })
     });
   },
 

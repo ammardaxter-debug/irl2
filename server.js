@@ -624,9 +624,11 @@ app.put('/api/expenses/:id/settle', verifyAdminToken, requireAdmin, async (req, 
 
 app.put('/api/expenses/settle/rider/:riderId', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
-    const { settledBy } = req.body;
+    const { settledBy, riderName } = req.body;
     if (!settledBy) return res.status(400).json({ error: 'settledBy required' });
-    const count = await db.settleRiderDeductions(parseInt(req.params.riderId), settledBy);
+    let rId = parseInt(req.params.riderId);
+    if (isNaN(rId)) rId = null;
+    const count = await db.settleRiderDeductions(rId, settledBy, riderName);
     res.json({ success: true, count });
   } catch (err) {
     res.status(500).json({ error: err.message });

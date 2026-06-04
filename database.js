@@ -682,7 +682,7 @@ async function getDailyLogsByRider(riderId, start, end) {
 }
 
 // ========== PAYROLL LOGIC ==========
-async function settleRiderDeductions(riderId, settledBy) {
+async function settleRiderDeductions(riderId, settledBy, riderName = null) {
   const settleData = {
     "deductionSettled": true,
     settled_by: settledBy,
@@ -691,9 +691,22 @@ async function settleRiderDeductions(riderId, settledBy) {
     "settledDate": nowISO()
   };
   
+  let expQuery = supabase.from('expenses').update(settleData).eq('is_deductible', true).eq('deductionSettled', false);
+  let advQuery = supabase.from('salary_advances').update(settleData).eq('status', 'approved').eq('deductionSettled', false);
+  
+  if (riderId !== null && !isNaN(riderId)) {
+    expQuery = expQuery.eq('rider_id', riderId);
+    advQuery = advQuery.eq('rider_id', riderId);
+  } else if (riderName) {
+    expQuery = expQuery.eq('vendor_name', riderName);
+    advQuery = advQuery.eq('id', -1); // won't match anything
+  } else {
+    return 0;
+  }
+  
   const [expUpdate, advUpdate] = await Promise.all([
-    supabase.from('expenses').update(settleData).eq('rider_id', riderId).eq('is_deductible', true).eq('deductionSettled', false),
-    supabase.from('salary_advances').update(settleData).eq('rider_id', riderId).eq('status', 'approved').eq('deductionSettled', false)
+    expQuery,
+    advQuery
   ]);
   
   return (expUpdate.count || 0) + (advUpdate.count || 0);
