@@ -298,9 +298,10 @@ const Expenses = {
 
   async renderFinancialOverview(area) {
     const cp = this.cyclePeriod;
-    const [funds, expenses] = await Promise.all([
+    const [funds, expenses, allTimeStats] = await Promise.all([
       API.getFunds(cp.start, cp.end),
-      API.getExpenses(cp.start, cp.end)
+      API.getExpenses(cp.start, cp.end),
+      API.getExpenseStats()
     ]);
 
     // Filter out internal categories
@@ -394,21 +395,38 @@ const Expenses = {
     }
 
     // Grand totals row
-    const netColor = netBalance >= 0 ? '#16A34A' : '#DC2626';
+    const allTimeNet = allTimeStats.remaining_irl;
     html += `
           <tr style="background:#0F172A;">
-            <td colspan="3" style="padding:16px 20px; font-weight:800; color:#FFFFFF; font-size:14px; text-align:right;">GRAND TOTALS</td>
+            <td colspan="3" style="padding:16px 20px; font-weight:800; color:#FFFFFF; font-size:14px; text-align:right;">GRAND TOTALS (THIS CYCLE)</td>
             <td style="padding:16px 20px; text-align:right; font-weight:800; color:#4ADE80; font-size:15px;">${Utils.formatCurrency(totalReceived)}</td>
             <td style="padding:16px 20px; text-align:right; font-weight:800; color:#FCA5A5; font-size:15px;">${Utils.formatCurrency(totalSpent)}</td>
           </tr>
           <tr style="background:#1E293B;">
-            <td colspan="3" style="padding:14px 20px; font-weight:700; color:#94A3B8; font-size:13px; text-align:right;">NET BALANCE</td>
-            <td colspan="2" style="padding:14px 20px; text-align:right; font-weight:800; color:${netBalance >= 0 ? '#4ADE80' : '#FCA5A5'}; font-size:18px;">
-              ${netBalance >= 0 ? '' : '-'}${Utils.formatCurrency(Math.abs(netBalance))}
+            <td colspan="3" style="padding:14px 20px; font-weight:700; color:#94A3B8; font-size:13px; text-align:right;">
+              THIS CYCLE'S NET
+              <span style="display:block; font-size:11px; font-weight:400; color:#94A3B8; margin-top:2px;">(Inflows minus Outflows this cycle)</span>
+            </td>
+            <td colspan="2" style="padding:14px 20px; text-align:right; font-weight:800; color:${netBalance >= 0 ? '#4ADE80' : '#FCA5A5'}; font-size:16px;">
+              ${netBalance >= 0 ? '+' : '-'}${Utils.formatCurrency(Math.abs(netBalance))}
+            </td>
+          </tr>
+          <tr style="background:#0F172A; border-top:1px solid #334155;">
+            <td colspan="3" style="padding:16px 20px; font-weight:700; color:#E2E8F0; font-size:13px; text-align:right;">
+              ALL-TIME REMAINING FUNDS 🏦
+              <span style="display:block; font-size:11px; font-weight:400; color:#94A3B8; margin-top:2px;">(Actual cash balance across all history, including carryovers)</span>
+            </td>
+            <td colspan="2" style="padding:16px 20px; text-align:right; font-weight:800; color:${allTimeNet >= 0 ? '#4ADE80' : '#FCA5A5'}; font-size:20px; border-left: 2px solid #334155;">
+              ${Utils.formatCurrency(allTimeNet)}
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+    
+    <div style="margin-top:12px; padding:12px 16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:12px; color:#475569; display:flex; align-items:center; gap:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span><strong>Clarification:</strong> <em>This Cycle's Net</em> (${netBalance >= 0 ? '+' : '-'}${Utils.formatCurrency(Math.abs(netBalance))}) shows cashflow strictly within the dates above. The <em>All-Time Remaining Funds</em> (${Utils.formatCurrency(allTimeNet)}) represents the total available company wallet balance across all time (matches the top card).</span>
     </div>
     `;
 
