@@ -44,20 +44,22 @@ const Expenses = {
 
   async renderDashboard(root) {
     try {
-      // Fetch cycle-specific data for stats
+      // Fetch cycle-specific data AND all-time stats
       const cp = this.cyclePeriod;
-      const [cycleFunds, cycleExpenses] = await Promise.all([
+      const [cycleFunds, cycleExpenses, allTimeStats] = await Promise.all([
         API.getFunds(cp.start, cp.end),
-        API.getExpenses(cp.start, cp.end)
+        API.getExpenses(cp.start, cp.end),
+        API.getExpenseStats()
       ]);
       const cycleReceived = cycleFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
       const cycleSpent = cycleExpenses.filter(e => e.category !== 'Manual Deduction' && e.category !== 'Advance Installment').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
       const cycleNet = cycleReceived - cycleSpent;
-      const outOfPocketTotal = Math.max(0, cycleSpent - cycleReceived);
+      const allTimeNet = allTimeStats.remaining_irl;
+      const outOfPocketTotal = allTimeStats.from_my_pocket;
       const isPocketWarn = outOfPocketTotal > 0;
       
-      const remainingBg = cycleNet > 500 ? '#F0FDF4' : (cycleNet >= 100 ? '#FFFBEB' : '#FEF2F2');
-      const remainingTextColor = cycleNet > 500 ? '#16A34A' : (cycleNet >= 100 ? '#D97706' : '#DC2626');
+      const remainingBg = allTimeNet > 500 ? '#F0FDF4' : (allTimeNet >= 100 ? '#FFFBEB' : '#FEF2F2');
+      const remainingTextColor = allTimeNet > 500 ? '#16A34A' : (allTimeNet >= 100 ? '#D97706' : '#DC2626');
       
       const headerHtml = `
         <style>
@@ -219,11 +221,12 @@ const Expenses = {
             <div class="stat-card-new-value" style="color:#DC2626;">${Utils.formatCurrency(cycleSpent)}</div>
           </div>
           
-          <div class="stat-card-new" style="background:${remainingBg}; border-color:${remainingBg === '#FFFFFF' ? '#E5E7EB' : 'transparent'};" title="Net balance this cycle">
+          <div class="stat-card-new" style="background:${remainingBg}; border-color:${remainingBg === '#FFFFFF' ? '#E5E7EB' : 'transparent'};" title="All-time remaining funds (total received - total spent)">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="stat-card-new-title" style="color:${remainingTextColor};">Net Balance</span>
+              <span class="stat-card-new-title" style="color:${remainingTextColor};">All-Time Remaining</span>
+              <span style="font-size:20px;">🏦</span>
             </div>
-            <div class="stat-card-new-value" style="color:${remainingTextColor};">${cycleNet >= 0 ? '' : '-'}${Utils.formatCurrency(Math.abs(cycleNet))}</div>
+            <div class="stat-card-new-value" style="color:${remainingTextColor};">${allTimeNet >= 0 ? '' : '-'}${Utils.formatCurrency(Math.abs(allTimeNet))}</div>
           </div>
           
           <div class="stat-card-new" style="${isPocketWarn ? 'background:#FEF2F2; border-color:#FECACA;' : 'display:none;'}" title="Spending exceeds funds received">
