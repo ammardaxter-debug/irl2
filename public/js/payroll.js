@@ -630,6 +630,10 @@ const Payroll = {
     Utils.hideLoading();
 
     const totalUnsettled = (unsettled.total_unsettled || 0) + (unsettled.total_advances || 0);
+    const defaultAdvanceDeducted = rider.payment_status === 'paid' ? (rider.advance_deducted || 0) : totalUnsettled;
+    const defaultFinalPaidAmount = rider.final_paid_amount !== null && rider.final_paid_amount !== undefined
+      ? rider.final_paid_amount
+      : Math.max(0, (rider.calculated_salary || 0) + (rider.manual_bonus || 0) - (rider.manual_deductions || 0) - defaultAdvanceDeducted - (rider.cod_settled || 0) - (rider.other_deductions || 0));
 
     const html = `
       <div class="form-grid">
@@ -657,7 +661,7 @@ const Payroll = {
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px; text-align:left;">
              <div>
                <label class="form-label">Advance Deducted (SR)</label>
-               <input type="number" id="advance-deducted" class="form-control calc-input" value="${rider.advance_deducted || 0}" max="${totalUnsettled}" step="any" placeholder="0">
+               <input type="number" id="advance-deducted" class="form-control calc-input" value="${defaultAdvanceDeducted}" max="${totalUnsettled}" step="any" placeholder="0">
                <small style="color:var(--text-tertiary); font-size:11px;">Max: ${totalUnsettled} SR</small>
              </div>
              <div>
@@ -680,7 +684,7 @@ const Payroll = {
 
           <div style="margin-bottom: 24px; text-align:left; background:#EFF6FF; padding:16px; border-radius:8px; border:1px solid #BFDBFE;">
              <label class="form-label" style="color:#1E3A8A; font-size:15px;">Final Paid Amount (SR)</label>
-             <input type="number" id="final-paid-amount" class="form-control" value="${rider.final_paid_amount !== null && rider.final_paid_amount !== undefined ? rider.final_paid_amount : ''}" step="any" style="font-size:20px; font-weight:800; border-color:#93C5FD;" placeholder="Enter actual paid amount">
+             <input type="number" id="final-paid-amount" class="form-control" value="${defaultFinalPaidAmount.toFixed(2)}" step="any" style="font-size:20px; font-weight:800; border-color:#93C5FD;" placeholder="Enter actual paid amount">
              <small style="color:#3B82F6; display:block; margin-top:4px;">Enter the final amount manually.</small>
           </div>
 
@@ -700,6 +704,31 @@ const Payroll = {
 
     `;
     Utils.openModal('Update Payment Status', html);
+
+    // Live calculation listeners for the modal
+    setTimeout(() => {
+      const inputs = ['manual-deductions', 'manual-bonus', 'advance-deducted', 'cod-settled', 'other-deductions'];
+      const updateNetPayout = () => {
+        const manualDeductions = parseFloat(document.getElementById('manual-deductions')?.value) || 0;
+        const manualBonus = parseFloat(document.getElementById('manual-bonus')?.value) || 0;
+        const advanceDeducted = parseFloat(document.getElementById('advance-deducted')?.value) || 0;
+        const codSettled = parseFloat(document.getElementById('cod-settled')?.value) || 0;
+        const otherDeductions = parseFloat(document.getElementById('other-deductions')?.value) || 0;
+
+        const gross = (rider.calculated_salary || 0) + manualBonus;
+        const totalDeductions = manualDeductions + advanceDeducted + codSettled + otherDeductions;
+        const net = Math.max(0, gross - totalDeductions);
+        
+        const finalInput = document.getElementById('final-paid-amount');
+        if (finalInput) {
+          finalInput.value = net.toFixed(2);
+        }
+      };
+
+      inputs.forEach(id => {
+        document.getElementById(id)?.addEventListener('input', updateNetPayout);
+      });
+    }, 100);
   },
 
   async _setPaymentStatus(riderId, nextStatus) {

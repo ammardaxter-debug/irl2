@@ -635,6 +635,15 @@ app.put('/api/expenses/settle/rider/:riderId', verifyAdminToken, requireAdmin, a
   }
 });
 
+app.put('/api/expenses/:id/unsettle', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    await db.unsettleExpenseDeduction(parseInt(req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/expenses/:id', verifyAdminToken, requireAdmin, async (req, res) => {
   try {
     await db.deleteExpense(parseInt(req.params.id));

@@ -1031,7 +1031,7 @@ const Riders = {
 
     Utils.openModal(titleHtml, html, 'modal-rider-profile');
 
-    // Toggle salary field label based on rider type
+    // Toggle salary field label and default values based on rider type
     const typeSelect = document.getElementById('rider-type-select');
     typeSelect?.addEventListener('change', (e) => {
       const label = document.getElementById('salary-label');
@@ -1039,9 +1039,15 @@ const Riders = {
       if (e.target.value === 'freelancer') {
         label.textContent = 'Per Order Rate (﷼)';
         input.placeholder = '8';
+        if (input.value === '1950' || input.value === '0' || !input.value.trim()) {
+          input.value = '8';
+        }
       } else {
         label.textContent = 'Base Salary (﷼)';
         input.placeholder = '1950';
+        if (input.value === '8' || input.value === '0' || !input.value.trim()) {
+          input.value = '1950';
+        }
       }
     });
 

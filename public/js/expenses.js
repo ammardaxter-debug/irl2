@@ -1354,8 +1354,8 @@ const Expenses = {
     ridersWithSettled.sort((a, b) => {
       const aNewest = a.settled[0];
       const bNewest = b.settled[0];
-      const aDate = aNewest ? (aNewest.settled_at || aNewest.settledDate || aNewest.expense_date || '') : '';
-      const bDate = bNewest ? (bNewest.settled_at || bNewest.settledDate || bNewest.expense_date || '') : '';
+      const aDate = aNewest ? (aNewest.settledDate || aNewest.settled_at || aNewest.expense_date || '') : '';
+      const bDate = bNewest ? (bNewest.settledDate || bNewest.settled_at || bNewest.expense_date || '') : '';
       return bDate.localeCompare(aDate);
     });
     
@@ -1467,15 +1467,17 @@ const Expenses = {
                           <th style="padding-left:20px;">Date</th>
                           <th>Category</th>
                           <th>Amount</th>
-                          <th style="padding-right:20px;">Settlement Details</th>
+                          <th>Settlement Details</th>
+                          ${App.isViewer() ? '' : '<th style="text-align:right; padding-right:20px;">Action</th>'}
                         </tr>
                       </thead>
                       <tbody>
             `;
-            // Sort settled by settledDate desc
-            const sortedSettled = [...r.settled].sort((a,b) => (b.settledDate || '').localeCompare(a.settledDate || ''));
+            // Sort settled by settledDate desc (with fallback to settled_at)
+            const sortedSettled = [...r.settled].sort((a,b) => (b.settledDate || b.settled_at || '').localeCompare(a.settledDate || a.settled_at || ''));
             for (const exp of sortedSettled) {
-              const settleDateStr = exp.settledDate ? Utils.formatDate(exp.settledDate.split('T')[0]) : 'Unknown';
+              const settleTimestamp = exp.settledDate || exp.settled_at;
+              const settleDateStr = settleTimestamp ? Utils.formatDateTime(settleTimestamp) : 'Unknown';
               html += `
                 <tr>
                   <td style="padding-left:20px; color:#4B5563; white-space:nowrap;">${Utils.formatDate(exp.expense_date)}</td>
@@ -1483,8 +1485,16 @@ const Expenses = {
                   <td style="font-weight:600; color:#0F0F0F;">SAR ${Utils.formatCurrency(exp.amount).replace('﷼ ', '')}</td>
                   <td style="padding-right:20px;">
                     <span style="background:#d1fae5; color:#065f46; border-radius:9999px; padding:2px 10px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> SETTLED</span>
-                    <div style="font-size:11px; color:#6B7280; margin-top:4px;">On ${settleDateStr} by ${Utils.escapeHtml(exp.settledBy || 'Unknown')}</div>
+                    <div style="font-size:11px; color:#6B7280; margin-top:4px;">Settled ${settleDateStr} by ${Utils.escapeHtml(exp.settledBy || exp.settled_by || 'Unknown')}</div>
                   </td>
+                  ${App.isViewer() ? '' : `
+                  <td style="text-align:right; padding-right:20px;">
+                    <button class="btn btn-sm" style="border:1px solid #D97706; background:transparent; color:#D97706; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 150ms; display:inline-flex; align-items:center; gap:4px;" onmouseover="this.style.background='#D97706'; this.style.color='#FFFFFF'" onmouseout="this.style.background='transparent'; this.style.color='#D97706'" onclick="Expenses.undoSettlement(${exp.id}, ${exp.amount}, '${Utils.escapeHtml(exp.category).replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                      Undo
+                    </button>
+                  </td>
+                  `}
                 </tr>
               `;
             }
@@ -1714,7 +1724,7 @@ const Expenses = {
       // ── SHEET 2: Settled ──
       const ws2 = wb.addWorksheet('Settled History');
       const h2 = ['RIDER NAME','CATEGORY','DATE','AMOUNT (SAR)','PAID BY','STATUS','NOTES','SETTLED ON','SETTLED BY'];
-      ws2.columns = [{width:28},{width:20},{width:18},{width:18},{width:16},{width:15},{width:28},{width:16},{width:18}];
+      ws2.columns = [{width:28},{width:20},{width:18},{width:18},{width:16},{width:15},{width:28},{width:24},{width:18}];
       addHeader(ws2, h2.length, cycleLabel); setHdr(ws2, h2, 4);
 
       let r2 = 5, gs = 0; ri = 0;
@@ -1737,8 +1747,9 @@ const Expenses = {
           row.getCell(6).fill = {type:'pattern',pattern:'solid',fgColor:{argb:SBG}};
           row.getCell(6).alignment = {horizontal:'center'};
           row.getCell(7).value = e.notes || e.description || ''; row.getCell(7).font = {name:'Calibri',size:10};
-          row.getCell(8).value = formatReadableDate(e.settledDate ? e.settledDate.split('T')[0] : null); row.getCell(8).font = {name:'Calibri',size:11};
-          row.getCell(9).value = e.settledBy||'-'; row.getCell(9).font = {name:'Calibri',size:11};
+          const settleTs = e.settledDate || e.settled_at;
+          row.getCell(8).value = settleTs ? new Date(settleTs).toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '-'; row.getCell(8).font = {name:'Calibri',size:11};
+          row.getCell(9).value = e.settledBy || e.settled_by || '-'; row.getCell(9).font = {name:'Calibri',size:11};
           if (alt) [1,2,3,4,5,6,7,8,9].forEach(c=>{row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:AR}};});
           for (let c=1;c<=9;c++) row.getCell(c).border = bdr;
           r2++; ri++; first = false;
@@ -1924,6 +1935,28 @@ const Expenses = {
       Utils.showToast('Settling deduction...', 'info');
       await API.settleExpenseDeduction(expenseId, settledBy, amountPaid);
       Utils.showToast('Deduction settled successfully.', 'success');
+      this.deductionsData = null;
+      this.renderTabContent();
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    }
+  },
+
+  async undoSettlement(expenseId, amount, category) {
+    if (App.isViewer()) return;
+    const confirmed = await Utils.confirm(
+      `This will move the "${category}" deduction of SAR ${amount} back to PENDING status. The rider will owe this amount again.\n\nAre you sure?`,
+      'Undo Settlement',
+      'Yes, Undo',
+      'Cancel',
+      true
+    );
+    if (!confirmed) return;
+
+    try {
+      Utils.showToast('Undoing settlement...', 'info');
+      await API.unsettleExpenseDeduction(expenseId);
+      Utils.showToast('Settlement undone — deduction is now pending again.', 'success');
       this.deductionsData = null;
       this.renderTabContent();
     } catch (err) {

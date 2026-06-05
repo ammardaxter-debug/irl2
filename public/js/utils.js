@@ -94,17 +94,22 @@ const Utils = {
     }, 100);
   },
 
-  // Format date to display string
+  // Format date to display string (handles both YYYY-MM-DD and full ISO datetime)
   formatDate(dateStr) {
     if (!dateStr) return '—';
-    const d = new Date(dateStr + 'T00:00:00');
+    // Extract just the date part if a full ISO timestamp is passed
+    const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const d = new Date(datePart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
   },
 
-  // Format date short
+  // Format date short (handles both YYYY-MM-DD and full ISO datetime)
   formatDateShort(dateStr) {
     if (!dateStr) return '—';
-    const d = new Date(dateStr + 'T00:00:00');
+    const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const d = new Date(datePart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
@@ -355,8 +360,9 @@ const Utils = {
   },
 
   formatDateTime(dateStr) {
-    if (!dateStr) return '';
+    if (!dateStr) return '—';
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   },
 

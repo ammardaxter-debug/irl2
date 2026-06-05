@@ -219,6 +219,12 @@ const API = {
     });
   },
 
+  unsettleExpenseDeduction(id) {
+    return this.request(`/expenses/${id}/unsettle`, {
+      method: 'PUT'
+    });
+  },
+
   getFunds(start, end) {
     let url = '/funds';
     if (start && end) url += `?start=${start}&end=${end}`;

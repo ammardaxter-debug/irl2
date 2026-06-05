@@ -533,6 +533,24 @@ async function settleExpenseDeduction(id, settledBy, amountPaid = null) {
   if (error) throw error;
 }
 
+async function unsettleExpenseDeduction(id) {
+  const { data: expense } = await supabase.from('expenses').select('*').eq('id', id).single();
+  if (!expense) throw new Error('Expense not found');
+  if (!expense.deductionSettled) throw new Error('Expense is not settled');
+  
+  const { error } = await supabase.from('expenses').update({
+    "deductionSettled": false,
+    settled_by: null,
+    "settledBy": null,
+    settled_at: null,
+    "settledDate": null,
+    updated_at: nowISO()
+  }).eq('id', id);
+  if (error) throw error;
+  await logAudit('UNDO_SETTLE', 'Expense', `Unsettled deduction #${id}: ${expense.category} - ${expense.amount} SAR`);
+  return { success: true };
+}
+
 // ========== SALARY ADVANCES ==========
 
 async function getAdvances(start, end) {
@@ -1495,7 +1513,7 @@ module.exports = {
   syncApprovedRequests,
   getMissingLogs, createDailyLog, updateDailyLog, deleteDailyLog,
   getDashboardStats, calculatePayroll, getExpenseStats, getExpenses,
-  createExpense, updateExpense, deleteExpense, settleExpenseDeduction,
+  createExpense, updateExpense, deleteExpense, settleExpenseDeduction, unsettleExpenseDeduction,
   settleRiderDeductions, getAdvances, createAdvance, updateAdvanceStatus,
   getBonuses, createBonus, deleteBonus, getFunds, createFund, updateFund,
   deleteFund, isPayrollLocked, lockPayroll, unlockPayroll, setPaymentStatus,
