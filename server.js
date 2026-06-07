@@ -2254,6 +2254,7 @@ function getSprintState(nowStr) {
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const CYCLE_MS = 8 * ONE_DAY_MS;
   const COMP_MS = 7 * ONE_DAY_MS;
+  const GRACE_MS = 18 * 60 * 60 * 1000; // 18 hours grace period
   
   const cycleIndex = Math.floor(diffMs / CYCLE_MS);
   const timeInCycle = diffMs % CYCLE_MS;
@@ -2266,6 +2267,14 @@ function getSprintState(nowStr) {
     return {
       phase: 'ACTIVE',
       countdownMs: currentSprintEnd.getTime() - now.getTime(),
+      currentSprintStart,
+      currentSprintEnd,
+      sprintNumber: cycleIndex + 1
+    };
+  } else if (timeInCycle < COMP_MS + GRACE_MS) {
+    return {
+      phase: 'GRACE_PERIOD',
+      countdownMs: (currentSprintStart.getTime() + COMP_MS + GRACE_MS) - now.getTime(),
       currentSprintStart,
       currentSprintEnd,
       sprintNumber: cycleIndex + 1
@@ -2319,6 +2328,10 @@ app.get('/api/cron/sprint-manager', async (req, res) => {
     })).sort((a, b) => b.total_orders - a.total_orders);
 
     const messages = [];
+
+    if (state.phase === 'GRACE_PERIOD') {
+      return res.json({ success: true, message: 'Currently in GRACE_PERIOD. Waiting for riders to submit final logs before calculating winners.' });
+    }
 
     if (state.phase === 'ACTIVE') {
       // Send standard daily progress
