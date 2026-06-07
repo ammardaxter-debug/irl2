@@ -1014,7 +1014,33 @@ app.delete('/api/daily-logs/:id', verifyAdminToken, requireAdmin, async (req, re
   }
 });
 
-// Delete own daily log (within 24 hours)
+// Helper to calculate cycle key from date
+function getCycleKeyForDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDate();
+  const month = d.getMonth();
+  const year = d.getFullYear();
+
+  let start, end;
+  if (day >= 21) {
+    start = new Date(year, month, 21);
+    end = new Date(year, month + 1, 20);
+  } else {
+    start = new Date(year, month - 1, 21);
+    end = new Date(year, month, 20);
+  }
+
+  const toStr = (dateObj) => {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dayVal = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dayVal}`;
+  };
+
+  return `${toStr(start)}_${toStr(end)}`;
+}
+
+// Delete own daily log (unlocked cycles only)
 app.delete('/api/rider/my-logs/:id', verifyRiderToken, async (req, res) => {
   try {
     const supabase = db.getDb();
@@ -1032,12 +1058,11 @@ app.delete('/api/rider/my-logs/:id', verifyRiderToken, async (req, res) => {
       return res.status(403).json({ error: 'You can only delete your own daily logs.' });
     }
 
-    const createdDate = new Date(log.created_at || new Date().toISOString());
-    const now = new Date();
-    const diffHours = (now - createdDate) / (1000 * 60 * 60);
-
-    if (diffHours > 24) {
-      return res.status(403).json({ error: 'You can only delete logs within 24 hours of submission.' });
+    // Check if payroll cycle is locked
+    const cycleKey = getCycleKeyForDate(log.log_date);
+    const isLocked = await db.isPayrollLocked(cycleKey);
+    if (isLocked) {
+      return res.status(403).json({ error: 'This payroll cycle is locked. Logs cannot be deleted.' });
     }
 
     await db.deleteDailyLog(req.params.id);
@@ -1074,23 +1099,23 @@ app.post('/api/rider/my-logs', verifyRiderToken, async (req, res) => {
     };
     if (!data.log_date) return res.status(400).json({ error: 'log_date required' });
     
+    // Check if payroll cycle is locked
+    const cycleKey = getCycleKeyForDate(data.log_date);
+    const isLocked = await db.isPayrollLocked(cycleKey);
+    if (isLocked) {
+      return res.status(403).json({ error: 'This payroll cycle is locked. Daily logs cannot be added or edited.' });
+    }
+
     const existingLogs = await db.getDailyLogsByRider(req.riderId, data.log_date, data.log_date);
     if (existingLogs && existingLogs.length > 0) {
       const existing = existingLogs[0];
-      const createdDate = new Date(existing.created_at || new Date().toISOString());
-      const now = new Date();
-      const diffHours = (now - createdDate) / (1000 * 60 * 60);
       
-      // 24h lock only applies when EDITING an existing log
-      if (diffHours > 24) {
-        return res.status(403).json({ error: 'You can only edit logs within 24 hours of submission.' });
-      }
-      
+      // Cycle is unlocked, so we allow editing. The 24h restriction is bypassed.
       const updatedLog = await db.updateDailyLog(existing.id, data);
       return res.json(updatedLog);
     }
     
-    // New log for a past date (missing day) — always allowed
+    // New log for a past date (missing day) — always allowed if unlocked
     const log = await db.createDailyLog(data);
     res.status(201).json(log);
   } catch (err) {
