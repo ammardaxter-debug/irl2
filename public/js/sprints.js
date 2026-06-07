@@ -101,12 +101,14 @@ const SprintsPage = {
     const phaseColors = {
       'PRE_LAUNCH': 'background: #FEF3C7; color: #D97706;',
       'ACTIVE': 'background: #D1FAE5; color: #059669;',
+      'GRACE_PERIOD': 'background: #DBEAFE; color: #1E40AF;',
       'WINNER_HIGHLIGHT': 'background: #FEF9C3; color: #854D0E;',
       'FINISHED': 'background: #E5E7EB; color: #4B5563;'
     };
     const phaseLabel = {
       'PRE_LAUNCH': 'Pre Launch (Starts June 1st)',
       'ACTIVE': 'Active Competition',
+      'GRACE_PERIOD': 'Grace Period (Finalizing Logs)',
       'WINNER_HIGHLIGHT': 'Winner Highlight Phase',
       'FINISHED': 'Finished'
     };
