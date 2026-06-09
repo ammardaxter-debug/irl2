@@ -23,7 +23,8 @@ function getCurrentWeek() {
 
 // Run every day at 8:00 PM
 cron.schedule('0 20 * * *', async () => {
-  console.log('[CRON] Running daily progress notifications for Weekly Sprint...');
+  console.log('[CRON] Sprints are disabled. Skipping daily progress notifications.');
+  return;
   try {
     const { startStr, endStr } = getCurrentWeek();
     const riders = await db.getAllRiders('active');
