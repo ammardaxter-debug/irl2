@@ -46,7 +46,7 @@ const Bikes = {
     let filtered = bikesWithStatus;
     if (this.currentFilter === 'active') filtered = filtered.filter(b => b.status === 'active');
     if (this.currentFilter === 'maintenance') filtered = filtered.filter(b => b.status === 'maintenance');
-    if (this.currentFilter === 'expiring') filtered = filtered.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0);
+    if (this.currentFilter === 'expiring') filtered = filtered.filter(b => b.worstExpiry <= 30);
     if (this.currentFilter === 'unassigned') filtered = filtered.filter(b => !b.assigned_rider_id);
 
     // Search
@@ -61,7 +61,7 @@ const Bikes = {
     // Stats
     const activeStatus = this.bikes.filter(b => b.status === 'active').length;
     const maintenanceStatus = this.bikes.filter(b => b.status === 'maintenance').length;
-    const expiringSoon = bikesWithStatus.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0).length;
+    const expiringSoon = bikesWithStatus.filter(b => b.worstExpiry <= 30).length;
     const unassignedCount = this.bikes.filter(b => !b.assigned_rider_id).length;
 
     return `
@@ -84,7 +84,7 @@ const Bikes = {
           <div class="stat-card-value">${unassignedCount}</div>
         </div>
         <div class="card stat-card ${expiringSoon > 0 ? 'rose' : 'slate'}">
-          <div class="stat-card-header"><span class="stat-card-label">Docs Expiring</span></div>
+          <div class="stat-card-header"><span class="stat-card-label">Docs Expiring/Expired</span></div>
           <div class="stat-card-value">${expiringSoon}</div>
         </div>
       </div>
@@ -100,7 +100,7 @@ const Bikes = {
           <button class="filter-chip ${this.currentFilter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
           <button class="filter-chip ${this.currentFilter === 'maintenance' ? 'active' : ''}" data-filter="maintenance">Maintenance</button>
           <button class="filter-chip ${this.currentFilter === 'unassigned' ? 'active' : ''}" data-filter="unassigned">Unassigned</button>
-          <button class="filter-chip ${this.currentFilter === 'expiring' ? 'active' : ''}" data-filter="expiring">Expiring Soon</button>
+          <button class="filter-chip ${this.currentFilter === 'expiring' ? 'active' : ''}" data-filter="expiring">Docs Expiring/Expired</button>
         </div>
         ${App.isViewer() ? '' : `
         <button class="btn btn-primary" id="btn-add-bike">
