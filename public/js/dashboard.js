@@ -4,6 +4,8 @@
 
 const Dashboard = {
   _initialized: false,
+  bikeSearchQuery: '',
+  bikeAuthCollapsed: false,
 
   async render() {
     if (!this._initialized) {
@@ -46,6 +48,9 @@ const Dashboard = {
   async renderSilently() {
     const container = document.getElementById('page-dashboard');
     if (!container) return;
+    const searchInput = document.getElementById('bike-search');
+    const isSearchFocused = (document.activeElement === searchInput);
+    const searchVal = searchInput ? searchInput.value : '';
     try {
       const activeDate = Utils.getActiveDate();
       const period = Utils.getNoonCyclePeriod(activeDate);
@@ -55,8 +60,18 @@ const Dashboard = {
         API.getRiders(),
         API.getExpenses()
       ]);
+      if (searchInput) {
+        this.bikeSearchQuery = searchVal;
+      }
       container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses);
       this.attachEvents();
+      if (isSearchFocused) {
+        const newSearchInput = document.getElementById('bike-search');
+        if (newSearchInput) {
+          newSearchInput.focus();
+          newSearchInput.setSelectionRange(newSearchInput.value.length, newSearchInput.value.length);
+        }
+      }
     } catch (err) {
       console.error('Silent refresh failed:', err);
     }
@@ -100,7 +115,7 @@ const Dashboard = {
     (bikes || []).forEach(b => {
       const days = Utils.daysUntil(b.insurance_expiry);
       if (days <= 30) {
-        const assignedRider = riders.find(r => String(r.assigned_bike_id) === String(b.id));
+        const assignedRider = riders.find(r => String(r.bike_id) === String(b.id));
         const phone = assignedRider && assignedRider.phone ? assignedRider.phone.replace(/[^0-9]/g, '') : '';
         const riderName = assignedRider ? assignedRider.name : 'Unassigned';
         const statusText = days < 0 ? 'EXPIRED' : `expires in ${days} day(s)`;
@@ -119,6 +134,9 @@ const Dashboard = {
     return `
       <!-- Smart Greeting -->
       ${this.buildGreeting(stats, period)}
+
+      <!-- Rider Bike Authorizations & Expiries -->
+      ${this.buildBikeAuthorizations(bikes, riders)}
 
       <!-- Stats Cards -->
       <div class="stats-grid">
@@ -549,6 +567,9 @@ const Dashboard = {
       }
     });
 
+    document.getElementById('bike-auth-toggle')?.addEventListener('click', () => this.toggleBikeAuthPanel());
+    document.getElementById('bike-search')?.addEventListener('input', (e) => this.handleBikeSearch(e));
+
     // Load charts asynchronously
     this.loadCharts();
     this.loadActivityTimeline();
@@ -830,5 +851,260 @@ const Dashboard = {
         doCtx.parentElement.innerHTML = '<div class="empty-state" style="padding:40px"><p>No order data this period</p></div>';
       }
     } catch (e) { console.error('Daily orders chart error:', e); }
+  },
+
+  buildBikeAuthorizations(bikes, riders) {
+    const activeRiders = riders.filter(r => r.status === 'active');
+    let totalRiders = activeRiders.length;
+    let authorizedCount = 0;
+    let expiringSoonCount = 0;
+    let expiredCount = 0;
+    let missingCount = 0;
+
+    activeRiders.forEach(r => {
+      const riderBike = r.bike_id ? bikes.find(b => String(b.id) === String(r.bike_id)) : null;
+      if (!r.bike_id || !riderBike) {
+        missingCount++;
+      } else {
+        if (!riderBike.istimara_expiry) {
+          missingCount++;
+        } else {
+          const days = Utils.daysUntil(riderBike.istimara_expiry);
+          if (days < 0) {
+            expiredCount++;
+          } else if (days <= 30) {
+            expiringSoonCount++;
+          } else {
+            authorizedCount++;
+          }
+        }
+      }
+    });
+
+    const rowsHtml = this.buildBikeTableRows(bikes, riders, this.bikeSearchQuery);
+    const summaryBadgeText = expiredCount > 0 
+      ? `⚠️ ${expiredCount} Expired` 
+      : (expiringSoonCount > 0 ? `⚠️ ${expiringSoonCount} Expiring Soon` : '✓ All Clear');
+      
+    const badgeColor = expiredCount > 0 
+      ? 'background:#FDE8E8; color:#9B1C1C; border:1px solid #F87171;' 
+      : (expiringSoonCount > 0 ? 'background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;' : 'background:#DEF7EC; color:#03543F; border:1px solid #34D399;');
+
+    return `
+      <div class="card section-card mt-24" style="margin-bottom: 24px; animation: slideUp 300ms ease both; animation-delay: 100ms; border: 1px solid var(--border-light);">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="bike-auth-toggle">
+          <h2 class="section-title" style="display:flex; align-items:center; gap:10px; margin:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:var(--primary-500);"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H8a2 2 0 0 0-2 2v7.5"/><circle cx="8" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+            <span>Rider Bike Authorizations & Expiries</span>
+          </h2>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="badge" id="bike-auth-summary-badge" style="font-size:12px; font-weight:600; padding:3px 10px; ${badgeColor}">${summaryBadgeText}</span>
+            <svg id="bike-auth-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px; height:18px; transition: transform 0.2s; transform: ${this.bikeAuthCollapsed ? 'rotate(-90deg)' : 'none'};"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        
+        <div id="bike-auth-content-panel" style="display: ${this.bikeAuthCollapsed ? 'none' : 'block'}; padding-top: 16px;">
+          <!-- Internal Grid for Stats -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--primary-500);">
+              <div style="font-size:11px; color:var(--gray-500); font-weight:600; text-transform:uppercase;">Total Riders</div>
+              <div style="font-size:20px; font-weight:800; color:var(--text-primary); margin-top:4px;" id="bike-stat-total">${totalRiders}</div>
+            </div>
+            <div style="background:#F0FDF4; border:1px solid #DCFCE7; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--success-500);">
+              <div style="font-size:11px; color:#15803D; font-weight:600; text-transform:uppercase;">Authorized</div>
+              <div style="font-size:20px; font-weight:800; color:#166534; margin-top:4px;" id="bike-stat-authorized">${authorizedCount}</div>
+            </div>
+            <div style="background:#FFFDF5; border:1px solid #FEF3C7; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--warning-500);">
+              <div style="font-size:11px; color:#B45309; font-weight:600; text-transform:uppercase;">Expiring Soon</div>
+              <div style="font-size:20px; font-weight:800; color:#92400E; margin-top:4px;" id="bike-stat-warning">${expiringSoonCount}</div>
+            </div>
+            <div style="background:#FEF2F2; border:1px solid #FEE2E2; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--danger-500);">
+              <div style="font-size:11px; color:#B91C1C; font-weight:600; text-transform:uppercase;">Expired</div>
+              <div style="font-size:20px; font-weight:800; color:#991B1B; margin-top:4px;" id="bike-stat-expired">${expiredCount}</div>
+            </div>
+            <div style="background:#FFFBEB; border:1px solid #FDE68A; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--orange-500);">
+              <div style="font-size:11px; color:#C2410C; font-weight:600; text-transform:uppercase;">Missing Bike</div>
+              <div style="font-size:20px; font-weight:800; color:#9A3412; margin-top:4px;" id="bike-stat-missing">${missingCount}</div>
+            </div>
+          </div>
+          
+          <!-- Search / Filter Bar -->
+          <div style="margin-bottom: 14px; display:flex; gap:12px; align-items:center;">
+            <div style="position:relative; flex:1;">
+              <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:16px; height:16px; display:flex; align-items:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input type="text" id="bike-search" placeholder="Search rider name, plate number, status, or type..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border-medium); border-radius:10px; font-size:13px; outline:none; transition:border-color 0.15s;" value="${Utils.escapeHtml(this.bikeSearchQuery || '')}">
+            </div>
+          </div>
+          
+          <!-- Table Container -->
+          <div class="table-container" style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px;">
+            <table class="data-table" style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+              <thead style="position: sticky; top: 0; background: #F8FAFC; z-index: 1; border-bottom: 2px solid var(--border-light); box-shadow: 0 1px 0 var(--border-light);">
+                <tr>
+                  <th style="padding: 10px 12px;">Rider Name</th>
+                  <th style="padding: 10px 12px;">Rider Type</th>
+                  <th style="padding: 10px 12px;">Assigned Bike</th>
+                  <th style="padding: 10px 12px;">Authorization Status</th>
+                  <th style="padding: 10px 12px;">Expiry Date</th>
+                  <th style="padding: 10px 12px;">Days Remaining</th>
+                  <th style="padding: 10px 12px; text-align:center;">Alert</th>
+                </tr>
+              </thead>
+              <tbody id="bike-auth-table-body">
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  buildBikeTableRows(bikes, riders, searchQuery) {
+    const activeRiders = riders.filter(r => r.status === 'active');
+    const query = (searchQuery || '').toLowerCase().trim();
+    
+    return activeRiders.map(r => {
+      const riderBike = r.bike_id ? bikes.find(b => String(b.id) === String(r.bike_id)) : null;
+      
+      let bikePlate = '';
+      let bikeModel = '';
+      let bikeInfo = '—';
+      let expiryText = '—';
+      let remainingText = '—';
+      let statusBadge = '';
+      let statusText = '';
+      let rowStatusVal = '';
+      
+      if (!r.bike_id || !riderBike) {
+        rowStatusVal = 'missing';
+        if (r.rider_type === 'company') {
+          statusBadge = `<span class="badge" style="background:#FDE8E8; color:#9B1C1C; border:1.5px solid #F87171; font-weight:700; font-size:11px;">Missing Bike (Critical)</span>`;
+          statusText = 'Missing Bike (Critical)';
+        } else {
+          statusBadge = `<span class="badge" style="background:#F0F9FF; color:#0369A1; border:1.5px solid #7DD3FC; font-weight:600; font-size:11px;">Missing Bike</span>`;
+          statusText = 'Missing Bike';
+        }
+      } else {
+        bikePlate = riderBike.plate_number || 'No Plate';
+        bikeModel = riderBike.model || 'Unknown';
+        bikeInfo = `<strong>${Utils.escapeHtml(bikePlate)}</strong> <span style="color:var(--gray-500); font-size:12px;">(${Utils.escapeHtml(bikeModel)})</span>`;
+        
+        if (!riderBike.istimara_expiry) {
+          rowStatusVal = 'unauthorized';
+          statusBadge = `<span class="badge" style="background:#FDF2F2; color:#B91C1C; border:1.5px solid #F87171; font-weight:700; font-size:11px;">No Auth Date</span>`;
+          statusText = 'No Auth Date';
+        } else {
+          const days = Utils.daysUntil(riderBike.istimara_expiry);
+          expiryText = Utils.formatDateShort(riderBike.istimara_expiry);
+          
+          if (days < 0) {
+            rowStatusVal = 'expired';
+            const absDays = Math.abs(days);
+            statusBadge = `<span class="badge" style="background:#FDE8E8; color:#9B1C1C; border:1.5px solid #F87171; font-weight:700; font-size:11px;">Expired</span>`;
+            remainingText = `<span style="color:#DC2626; font-weight:700;">Expired ${absDays} day${absDays !== 1 ? 's' : ''} ago</span>`;
+            statusText = 'Expired';
+          } else if (days <= 30) {
+            rowStatusVal = 'warning';
+            statusBadge = `<span class="badge" style="background:#FEF3C7; color:#92400E; border:1.5px solid #FCD34D; font-weight:600; font-size:11px;">Expiring Soon</span>`;
+            remainingText = `<span style="color:#D97706; font-weight:600;">${days} day${days !== 1 ? 's' : ''} left</span>`;
+            statusText = 'Expiring Soon';
+          } else {
+            rowStatusVal = 'authorized';
+            statusBadge = `<span class="badge" style="background:#DEF7EC; color:#03543F; border:1.5px solid #34D399; font-weight:600; font-size:11px;">Authorized</span>`;
+            remainingText = `<span style="color:#16A34A; font-weight:600;">${days} day${days !== 1 ? 's' : ''} left</span>`;
+            statusText = 'Authorized';
+          }
+        }
+      }
+
+      let actionHtml = '—';
+      if (r.phone) {
+        const cleanPhone = r.phone.replace(/[^0-9]/g, '');
+        let msg = '';
+        if (rowStatusVal === 'missing' && r.rider_type === 'company') {
+          msg = `Dear ${r.name}, you do not have a bike assigned in the system. Please coordinate with the admin immediately. — Inspiring Roads Logistics`;
+        } else if (rowStatusVal === 'expired') {
+          const days = Math.abs(Utils.daysUntil(riderBike?.istimara_expiry));
+          msg = `Dear ${r.name}, your bike ${bikePlate} authorization (Istimara) expired ${days} day(s) ago on ${expiryText}. Please coordinate renewal urgently. — Inspiring Roads Logistics`;
+        } else if (rowStatusVal === 'warning') {
+          const days = Utils.daysUntil(riderBike?.istimara_expiry);
+          msg = `Dear ${r.name}, your bike ${bikePlate} authorization (Istimara) expires in ${days} day(s) on ${expiryText}. Please arrange for renewal. — Inspiring Roads Logistics`;
+        }
+        
+        if (msg) {
+          const encMsg = encodeURIComponent(msg);
+          actionHtml = `
+            <a href="https://wa.me/${cleanPhone}?text=${encMsg}" target="_blank" class="wa-action-btn" title="Send WhatsApp Warning" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); color:white; box-shadow:0 1px 4px rgba(37,211,102,0.25);">
+              <svg viewBox="0 0 24 24" fill="white" style="width:12px; height:12px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            </a>
+          `;
+        }
+      }
+
+      const isVisible = !query || 
+                        r.name.toLowerCase().includes(query) ||
+                        bikePlate.toLowerCase().includes(query) ||
+                        bikeModel.toLowerCase().includes(query) ||
+                        statusText.toLowerCase().includes(query) ||
+                        r.rider_type.toLowerCase().includes(query);
+
+      return `
+        <tr data-rider-name="${Utils.escapeHtml(r.name)}" 
+            data-plate-number="${Utils.escapeHtml(bikePlate)}" 
+            data-bike-model="${Utils.escapeHtml(bikeModel)}" 
+            data-status="${Utils.escapeHtml(statusText)}" 
+            data-rider-type="${Utils.escapeHtml(r.rider_type)}" 
+            style="border-bottom: 1px solid var(--border-light); ${isVisible ? '' : 'display:none;'}">
+          <td style="padding: 10px 12px; font-weight: 600; color: var(--text-primary);">${Utils.escapeHtml(r.name)}</td>
+          <td style="padding: 10px 12px; text-transform: capitalize; color: var(--text-secondary);">${Utils.escapeHtml(r.rider_type)}</td>
+          <td style="padding: 10px 12px; color: var(--text-primary);">${bikeInfo}</td>
+          <td style="padding: 10px 12px;">${statusBadge}</td>
+          <td style="padding: 10px 12px; color: var(--text-secondary);">${expiryText}</td>
+          <td style="padding: 10px 12px;">${remainingText}</td>
+          <td style="padding: 10px 12px; text-align:center;">${actionHtml}</td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  toggleBikeAuthPanel() {
+    this.bikeAuthCollapsed = !this.bikeAuthCollapsed;
+    const panel = document.getElementById('bike-auth-content-panel');
+    const chevron = document.getElementById('bike-auth-chevron');
+    if (panel) {
+      panel.style.display = this.bikeAuthCollapsed ? 'none' : 'block';
+    }
+    if (chevron) {
+      chevron.style.transform = this.bikeAuthCollapsed ? 'rotate(-90deg)' : 'none';
+    }
+  },
+
+  handleBikeSearch(e) {
+    const query = e.target.value.toLowerCase().trim();
+    this.bikeSearchQuery = query;
+    
+    const rows = document.querySelectorAll('#bike-auth-table-body tr');
+    rows.forEach(row => {
+      const riderName = row.getAttribute('data-rider-name')?.toLowerCase() || '';
+      const plateNumber = row.getAttribute('data-plate-number')?.toLowerCase() || '';
+      const bikeModel = row.getAttribute('data-bike-model')?.toLowerCase() || '';
+      const status = row.getAttribute('data-status')?.toLowerCase() || '';
+      const riderType = row.getAttribute('data-rider-type')?.toLowerCase() || '';
+      
+      const matches = riderName.includes(query) || 
+                      plateNumber.includes(query) || 
+                      bikeModel.includes(query) ||
+                      status.includes(query) ||
+                      riderType.includes(query);
+                      
+      if (matches) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
   }
 };
