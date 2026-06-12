@@ -785,6 +785,99 @@ app.delete('/api/bikes/:id', verifyAdminToken, requireAdmin, async (req, res) =>
   }
 });
 
+// Get available (unassigned) bikes for rider self-selection
+app.get('/api/bikes/available', async (req, res) => {
+  try {
+    const allBikes = await db.getAllBikes();
+    const available = allBikes.filter(b => 
+      b.status !== 'retired' && !b.assigned_rider_id
+    );
+    res.json(available);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Assign a bike to a rider (admin only)
+app.put('/api/bikes/:id/assign', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const bikeId = parseInt(req.params.id);
+    const { rider_id } = req.body;
+    if (!rider_id) return res.status(400).json({ error: 'rider_id is required' });
+
+    const riderId = parseInt(rider_id);
+    const rider = await db.getRiderById(riderId);
+    if (!rider) return res.status(404).json({ error: 'Rider not found' });
+
+    // Clear the rider's previous bike assignment if any
+    if (rider.bike_id) {
+      try {
+        await db.updateBike(rider.bike_id, { assigned_rider_id: null, assigned_rider_name: null });
+      } catch (err) {
+        console.error('Failed to clear old bike assignment:', err);
+      }
+    }
+
+    // Clear this bike's previous rider if any
+    const bike = (await db.getAllBikes()).find(b => b.id === bikeId);
+    if (!bike) return res.status(404).json({ error: 'Bike not found' });
+    if (bike.assigned_rider_id) {
+      try {
+        const prevRider = await db.getRiderById(parseInt(bike.assigned_rider_id));
+        if (prevRider) {
+          await db.updateRider(prevRider.id, { bike_id: null });
+        }
+      } catch (err) {
+        console.error('Failed to clear previous rider from bike:', err);
+      }
+    }
+
+    // Assign bike to rider
+    const updatedBike = await db.updateBike(bikeId, {
+      assigned_rider_id: String(riderId),
+      assigned_rider_name: rider.name
+    });
+
+    // Set rider's bike_id
+    await db.updateRider(riderId, { bike_id: String(bikeId) });
+
+    res.json(updatedBike);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unassign a bike from its rider (admin only)
+app.put('/api/bikes/:id/unassign', verifyAdminToken, requireAdmin, async (req, res) => {
+  try {
+    const bikeId = parseInt(req.params.id);
+    const bike = (await db.getAllBikes()).find(b => b.id === bikeId);
+    if (!bike) return res.status(404).json({ error: 'Bike not found' });
+
+    // Clear rider's bike_id
+    if (bike.assigned_rider_id) {
+      try {
+        const rider = await db.getRiderById(parseInt(bike.assigned_rider_id));
+        if (rider) {
+          await db.updateRider(rider.id, { bike_id: null });
+        }
+      } catch (err) {
+        console.error('Failed to clear rider bike_id:', err);
+      }
+    }
+
+    // Clear bike's rider assignment
+    const updatedBike = await db.updateBike(bikeId, {
+      assigned_rider_id: null,
+      assigned_rider_name: null
+    });
+
+    res.json(updatedBike);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========== AUDIT LOGS ==========
 app.get('/api/audit-logs', async (req, res) => {
   try {

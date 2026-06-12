@@ -957,19 +957,49 @@ async function deleteRiderCycleLogs(riderId, start, end) {
 // ========== BIKES ==========
 async function getAllBikes() {
   const data = await fetchPaginated(() => supabase.from('bikes').select('*'));
-  return data;
+  return (data || []).map(b => ({
+    ...b,
+    authorization_expiry: b.istimara_expiry,
+    auth_expiry: b.istimara_expiry
+  }));
 }
 
 async function createBike(bikeData) {
-  const { data, error } = await supabase.from('bikes').insert([{ ...bikeData, status: 'available', created_at: nowISO(), updated_at: nowISO() }]).select().single();
+  const mapped = { ...bikeData };
+  if (mapped.authorization_expiry !== undefined) {
+    mapped.istimara_expiry = mapped.authorization_expiry;
+    delete mapped.authorization_expiry;
+  }
+  if (mapped.auth_expiry !== undefined) {
+    mapped.istimara_expiry = mapped.auth_expiry;
+    delete mapped.auth_expiry;
+  }
+  const { data, error } = await supabase.from('bikes').insert([{ ...mapped, status: mapped.status || 'available', created_at: nowISO(), updated_at: nowISO() }]).select().single();
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    authorization_expiry: data.istimara_expiry,
+    auth_expiry: data.istimara_expiry
+  };
 }
 
 async function updateBike(id, bikeData) {
-  const { data, error } = await supabase.from('bikes').update({ ...bikeData, updated_at: nowISO() }).eq('id', id).select().single();
+  const mapped = { ...bikeData };
+  if (mapped.authorization_expiry !== undefined) {
+    mapped.istimara_expiry = mapped.authorization_expiry;
+    delete mapped.authorization_expiry;
+  }
+  if (mapped.auth_expiry !== undefined) {
+    mapped.istimara_expiry = mapped.auth_expiry;
+    delete mapped.auth_expiry;
+  }
+  const { data, error } = await supabase.from('bikes').update({ ...mapped, updated_at: nowISO() }).eq('id', id).select().single();
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    authorization_expiry: data.istimara_expiry,
+    auth_expiry: data.istimara_expiry
+  };
 }
 
 async function deleteBike(id) {

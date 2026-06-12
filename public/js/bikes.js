@@ -47,6 +47,7 @@ const Bikes = {
     if (this.currentFilter === 'active') filtered = filtered.filter(b => b.status === 'active');
     if (this.currentFilter === 'maintenance') filtered = filtered.filter(b => b.status === 'maintenance');
     if (this.currentFilter === 'expiring') filtered = filtered.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0);
+    if (this.currentFilter === 'unassigned') filtered = filtered.filter(b => !b.assigned_rider_id);
 
     // Search
     if (this.searchQuery) {
@@ -61,10 +62,11 @@ const Bikes = {
     const activeStatus = this.bikes.filter(b => b.status === 'active').length;
     const maintenanceStatus = this.bikes.filter(b => b.status === 'maintenance').length;
     const expiringSoon = bikesWithStatus.filter(b => b.worstExpiry <= 30 && b.worstExpiry >= 0).length;
+    const unassignedCount = this.bikes.filter(b => !b.assigned_rider_id).length;
 
     return `
       <!-- Stats Row -->
-      <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+      <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
         <div class="card stat-card blue">
           <div class="stat-card-header"><span class="stat-card-label">Total Bikes</span></div>
           <div class="stat-card-value">${this.bikes.length}</div>
@@ -76,6 +78,10 @@ const Bikes = {
         <div class="card stat-card orange">
           <div class="stat-card-header"><span class="stat-card-label">Maintenance</span></div>
           <div class="stat-card-value">${maintenanceStatus}</div>
+        </div>
+        <div class="card stat-card slate">
+          <div class="stat-card-header"><span class="stat-card-label">Unassigned</span></div>
+          <div class="stat-card-value">${unassignedCount}</div>
         </div>
         <div class="card stat-card ${expiringSoon > 0 ? 'rose' : 'slate'}">
           <div class="stat-card-header"><span class="stat-card-label">Docs Expiring</span></div>
@@ -93,6 +99,7 @@ const Bikes = {
           <button class="filter-chip ${this.currentFilter === 'all' ? 'active' : ''}" data-filter="all">All Bikes</button>
           <button class="filter-chip ${this.currentFilter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
           <button class="filter-chip ${this.currentFilter === 'maintenance' ? 'active' : ''}" data-filter="maintenance">Maintenance</button>
+          <button class="filter-chip ${this.currentFilter === 'unassigned' ? 'active' : ''}" data-filter="unassigned">Unassigned</button>
           <button class="filter-chip ${this.currentFilter === 'expiring' ? 'active' : ''}" data-filter="expiring">Expiring Soon</button>
         </div>
         ${App.isViewer() ? '' : `
@@ -139,11 +146,24 @@ const Bikes = {
          expiryText = `Expiring (${bike.worstExpiry} days)`;
       }
 
+      // Status Badge
       const statusBadge = bike.status === 'active' 
           ? `<span style="background:#F0FDF4; color:#16A34A; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Active</span>`
           : bike.status === 'maintenance' 
           ? `<span style="background:#FFFBEB; color:#D97706; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Maintenance</span>`
           : `<span style="background:#F3F4F6; color:#6B7280; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Retired</span>`;
+
+      // Authorization Status Badge
+      const authDays = Utils.daysUntil(bike.authorization_expiry);
+      const hasAuth = !!bike.authorization_expiry;
+      let authBadge = '';
+      if (hasAuth && authDays >= 0) {
+        authBadge = `<span style="background:#E6F4EA; color:#137333; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Authorized</span>`;
+      } else if (hasAuth && authDays < 0) {
+        authBadge = `<span style="background:#FCE8E6; color:#C5221F; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Expired</span>`;
+      } else {
+        authBadge = `<span style="background:#FEF7E0; color:#B06000; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">Pending</span>`;
+      }
 
       const authAlert = bike.daysUntilAuthExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
       const insAlert = bike.daysUntilExpiry <= 30 ? 'color: var(--danger-600); font-weight: bold;' : '';
@@ -156,14 +176,15 @@ const Bikes = {
             </div>
             <div style="flex:1;">
               <div style="font-size:15px; font-weight:600; color:#0F0F0F; margin-bottom:4px;">${Utils.escapeHtml(bike.plate_number)}</div>
-              <div style="display:flex; gap:6px;">
+              <div style="display:flex; gap:6px; flex-wrap: wrap;">
                 ${statusBadge}
+                ${authBadge}
                 ${bike.model ? `<span style="background:#F3F4F6; color:#6B7280; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">${Utils.escapeHtml(bike.model)}</span>` : ''}
               </div>
             </div>
           </div>
           
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom: 16px;">
             <div>
               <div style="font-size:11px; font-weight:600; color:#9CA3AF; text-transform:uppercase; margin-bottom:2px;">Health Status</div>
               <div style="font-size:13px; font-weight:500; ${expiryClass}">${healthDot} ${expiryText}</div>
@@ -181,6 +202,23 @@ const Bikes = {
               <div style="font-size:13px; font-weight:500; ${insAlert ? insAlert : 'color:#374151;'}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</div>
             </div>
           </div>
+
+          <!-- Quick Actions -->
+          ${App.isViewer() ? '' : `
+            <div style="border-top: 1px solid #E5E7EB; padding-top: 12px; display: flex; gap: 8px;">
+              ${bike.assigned_rider_id ? `
+                <button class="btn btn-outline btn-sm btn-unassign-bike" data-id="${bike.id}" style="color: var(--danger-600); border-color: var(--danger-200); width: 100%; height: 32px; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/></svg>
+                  Unassign Rider
+                </button>
+              ` : `
+                <button class="btn btn-outline btn-sm btn-assign-bike" data-id="${bike.id}" style="color: var(--primary-600); border-color: var(--primary-200); width: 100%; height: 32px; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  Assign Rider
+                </button>
+              `}
+            </div>
+          `}
         </div>
       `;
     }).join('');
@@ -205,11 +243,100 @@ const Bikes = {
     // Add Bike
     document.getElementById('btn-add-bike')?.addEventListener('click', () => this.openBikeForm(null));
 
-    // Card Clicks
+    // Card Clicks (Open Edit modal)
     document.querySelectorAll('.bike-card').forEach(card => {
       card.addEventListener('click', () => {
         const bike = this.bikes.find(b => b.id === parseInt(card.dataset.id));
         if (bike) this.openBikeForm(bike);
+      });
+    });
+
+    // Assign Rider Clicks
+    document.querySelectorAll('.btn-assign-bike').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Stop opening edit modal
+        const bikeId = parseInt(btn.dataset.id);
+        const bike = this.bikes.find(b => b.id === bikeId);
+        
+        try {
+          Utils.showLoading('Loading active riders');
+          const activeRiders = await API.getRiders('active');
+          const availableRiders = activeRiders.filter(r => !r.bike_id);
+          Utils.hideLoading();
+          
+          if (availableRiders.length === 0) {
+            alert('All active riders already have a bike assigned.');
+            return;
+          }
+          
+          const html = `
+            <div style="padding: 4px;">
+              <p style="font-size: 14px; margin-bottom: 16px; color: #4B5563;">
+                Assign bike <strong>${bike.plate_number}</strong> to a rider.
+              </p>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>Select Rider</label>
+                <select id="assign-rider-select" class="form-select">
+                  <option value="">-- Choose Rider --</option>
+                  ${availableRiders.map(r => `<option value="${r.id}">${r.name} (${r.noon_id || 'No ID'})</option>`).join('')}
+                </select>
+              </div>
+              <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                <button class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
+                <button id="btn-confirm-assign" class="btn btn-primary" disabled>Confirm Assignment</button>
+              </div>
+            </div>
+          `;
+          
+          Utils.openModal('Assign Rider to Bike', html);
+          
+          const select = document.getElementById('assign-rider-select');
+          const confirmBtn = document.getElementById('btn-confirm-assign');
+          
+          select.addEventListener('change', () => {
+            confirmBtn.disabled = !select.value;
+          });
+          
+          confirmBtn.addEventListener('click', async () => {
+            const riderId = select.value;
+            try {
+              Utils.showLoading('Assigning bike');
+              await API.assignBike(bikeId, riderId);
+              Utils.showToast('Bike assigned successfully', 'success');
+              Utils.closeModal();
+              this.render();
+            } catch (err) {
+              Utils.showToast(err.message, 'error');
+            } finally {
+              Utils.hideLoading();
+            }
+          });
+        } catch (err) {
+          Utils.hideLoading();
+          Utils.showToast(err.message, 'error');
+        }
+      });
+    });
+
+    // Unassign Rider Clicks
+    document.querySelectorAll('.btn-unassign-bike').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Stop opening edit modal
+        const bikeId = parseInt(btn.dataset.id);
+        const bike = this.bikes.find(b => b.id === bikeId);
+        
+        if (confirm(`Are you sure you want to unassign bike ${bike.plate_number} from ${bike.assigned_rider_name}?`)) {
+          try {
+            Utils.showLoading('Unassigning bike');
+            await API.unassignBike(bikeId);
+            Utils.showToast('Bike unassigned successfully', 'success');
+            this.render();
+          } catch (err) {
+            Utils.showToast(err.message, 'error');
+          } finally {
+            Utils.hideLoading();
+          }
+        }
       });
     });
   },
@@ -217,10 +344,6 @@ const Bikes = {
   openBikeForm(bike) {
     const isEdit = !!bike;
     const isViewer = App.isViewer();
-    
-    // We need to fetch riders to see who could be assigned this bike, if we were taking a rider-centric approach here.
-    // However, the rider form is where bike assignment happens generally.
-    // Here we'll just focus on the bike details.
 
     const html = `
       <form id="bike-form" class="form-grid">
@@ -265,7 +388,7 @@ const Bikes = {
       </form>
     `;
 
-    Utils.openModal(isEdit ? 'Edit Bike' : 'Register New Bike', html);
+    Utils.openModal(isEdit ? 'Edit Bike Details' : 'Register New Bike', html);
 
     document.getElementById('bike-form').addEventListener('submit', async (e) => {
       e.preventDefault();

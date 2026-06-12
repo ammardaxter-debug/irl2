@@ -860,6 +860,7 @@ const Dashboard = {
     let expiringSoonCount = 0;
     let expiredCount = 0;
     let missingCount = 0;
+    const unassignedCount = bikes.filter(b => !b.assigned_rider_id).length;
 
     activeRiders.forEach(r => {
       const riderBike = r.bike_id ? bikes.find(b => String(b.id) === String(r.bike_id)) : null;
@@ -867,7 +868,7 @@ const Dashboard = {
         missingCount++;
       } else {
         if (!riderBike.istimara_expiry) {
-          missingCount++;
+          expiredCount++;
         } else {
           const days = Utils.daysUntil(riderBike.istimara_expiry);
           if (days < 0) {
@@ -905,7 +906,7 @@ const Dashboard = {
         
         <div id="bike-auth-content-panel" style="display: ${this.bikeAuthCollapsed ? 'none' : 'block'}; padding-top: 16px;">
           <!-- Internal Grid for Stats -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px;">
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--primary-500);">
               <div style="font-size:11px; color:var(--gray-500); font-weight:600; text-transform:uppercase;">Total Riders</div>
               <div style="font-size:20px; font-weight:800; color:var(--text-primary); margin-top:4px;" id="bike-stat-total">${totalRiders}</div>
@@ -925,6 +926,10 @@ const Dashboard = {
             <div style="background:#FFFBEB; border:1px solid #FDE68A; padding:12px 14px; border-radius:10px; border-left: 4px solid var(--orange-500);">
               <div style="font-size:11px; color:#C2410C; font-weight:600; text-transform:uppercase;">Missing Bike</div>
               <div style="font-size:20px; font-weight:800; color:#9A3412; margin-top:4px;" id="bike-stat-missing">${missingCount}</div>
+            </div>
+            <div style="background:#F1F5F9; border:1px solid #CBD5E1; padding:12px 14px; border-radius:10px; border-left: 4px solid #64748B;">
+              <div style="font-size:11px; color:#475569; font-weight:600; text-transform:uppercase;">Unassigned Bikes</div>
+              <div style="font-size:20px; font-weight:800; color:#334155; margin-top:4px;" id="bike-stat-unassigned">${unassignedCount}</div>
             </div>
           </div>
           
@@ -1021,12 +1026,12 @@ const Dashboard = {
       }
 
       let actionHtml = '—';
-      if (r.phone) {
+      if (rowStatusVal === 'missing') {
+        actionHtml = `<a href="javascript:void(0)" onclick="App.navigate('fleet'); Bikes.currentFilter = 'unassigned'; Bikes.render();" style="color:var(--primary-600); font-weight:700; text-decoration:underline; font-size:12px;">Assign Bike</a>`;
+      } else if (r.phone) {
         const cleanPhone = r.phone.replace(/[^0-9]/g, '');
         let msg = '';
-        if (rowStatusVal === 'missing' && r.rider_type === 'company') {
-          msg = `Dear ${r.name}, you do not have a bike assigned in the system. Please coordinate with the admin immediately. — Inspiring Roads Logistics`;
-        } else if (rowStatusVal === 'expired') {
+        if (rowStatusVal === 'expired') {
           const days = Math.abs(Utils.daysUntil(riderBike?.istimara_expiry));
           msg = `Dear ${r.name}, your bike ${bikePlate} authorization (Istimara) expired ${days} day(s) ago on ${expiryText}. Please coordinate renewal urgently. — Inspiring Roads Logistics`;
         } else if (rowStatusVal === 'warning') {

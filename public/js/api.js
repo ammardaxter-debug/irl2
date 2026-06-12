@@ -92,6 +92,23 @@ const API = {
     });
   },
 
+  getAvailableBikes() {
+    return this.request('/bikes/available');
+  },
+
+  assignBike(bikeId, riderId) {
+    return this.request(`/bikes/${bikeId}/assign`, {
+      method: 'PUT',
+      body: JSON.stringify({ rider_id: riderId })
+    });
+  },
+
+  unassignBike(bikeId) {
+    return this.request(`/bikes/${bikeId}/unassign`, {
+      method: 'PUT'
+    });
+  },
+
   // ── Daily Logs ──
   getDailyLogs(date, page = 1, limit = 20, search = '') {
     return this.request(`/daily-logs?date=${date}&page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
