@@ -793,8 +793,9 @@ async function calculatePayroll(periodStart, periodEnd) {
       const absentLogs = riderLogs.filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
       const weekoffLogs = riderLogs.filter(l => ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes((l.attendance_status || '').toLowerCase().trim()));
 
-      const totalPrimaryOrders = presentLogs.reduce((sum, l) => sum + (l.primary_orders || 0), 0);
-      const totalAssociateOrders = presentLogs.reduce((sum, l) => sum + (l.associate_orders || 0), 0);
+      // Count orders from ALL logs (not just present days) to match leaderboard/ranking
+      const totalPrimaryOrders = riderLogs.reduce((sum, l) => sum + (l.primary_orders || 0), 0);
+      const totalAssociateOrders = riderLogs.reduce((sum, l) => sum + (l.associate_orders || 0), 0);
       const totalOrders = totalPrimaryOrders + totalAssociateOrders;
       
       let calculatedSalary = 0;
@@ -1139,7 +1140,8 @@ async function getRiderMonthlyReport(riderId, start, end) {
   const absentLogs = logs.filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
   const weekoffLogs = logs.filter(l => ['weekoff', 'week off', 'week_off', 'day off', 'dayoff'].includes((l.attendance_status || '').toLowerCase().trim()));
 
-  const totalOrders = presentLogs.reduce((sum, l) => sum + (l.primary_orders || 0) + (l.associate_orders || 0), 0);
+  // Count orders from ALL logs (not just present days) to match leaderboard/ranking
+  const totalOrders = logs.reduce((sum, l) => sum + (l.primary_orders || 0) + (l.associate_orders || 0), 0);
   const avgCheckinMin = presentLogs.length > 0 ? presentLogs.reduce((sum, l) => sum + ((l.checkin_hours || 0) * 60 + (l.checkin_minutes || 0)), 0) / presentLogs.length : 0;
 
   return {
@@ -1150,8 +1152,8 @@ async function getRiderMonthlyReport(riderId, start, end) {
     present_days: presentLogs.length,
     absent_days: absentLogs.length,
     weekoff_days: weekoffLogs.length,
-    total_primary: presentLogs.reduce((sum, l) => sum + (l.primary_orders || 0), 0),
-    total_associate: presentLogs.reduce((sum, l) => sum + (l.associate_orders || 0), 0),
+    total_primary: logs.reduce((sum, l) => sum + (l.primary_orders || 0), 0),
+    total_associate: logs.reduce((sum, l) => sum + (l.associate_orders || 0), 0),
     total_orders: totalOrders,
     avg_checkin_hours: Math.floor(avgCheckinMin / 60),
     avg_checkin_minutes: Math.round(avgCheckinMin % 60),
