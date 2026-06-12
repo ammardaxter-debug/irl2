@@ -363,10 +363,7 @@ const Bikes = {
             <option value="retired" ${isEdit && bike.status === 'retired' ? 'selected' : ''}>Retired / Sold</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Insurance Start Date</label>
-          <input type="date" id="bf-ins-start" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_start ? bike.insurance_start : ''}">
-        </div>
+
         <div class="form-group">
           <label>Authorization Expiry</label>
           <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.authorization_expiry ? bike.authorization_expiry : ''}">
@@ -404,7 +401,7 @@ const Bikes = {
         plate_number: document.getElementById('bf-plate').value.trim(),
         model: document.getElementById('bf-model').value.trim(),
         status: document.getElementById('bf-status').value,
-        insurance_start: document.getElementById('bf-ins-start').value || null,
+
         insurance_expiry: document.getElementById('bf-ins-expiry').value || null,
         authorization_expiry: document.getElementById('bf-auth-expiry').value || null,
         notes: document.getElementById('bf-notes').value.trim(),

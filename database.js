@@ -974,6 +974,8 @@ async function createBike(bikeData) {
     mapped.istimara_expiry = mapped.auth_expiry;
     delete mapped.auth_expiry;
   }
+  // insurance_start does not exist in the bikes table – strip it out
+  delete mapped.insurance_start;
   const { data, error } = await supabase.from('bikes').insert([{ ...mapped, status: mapped.status || 'available', created_at: nowISO(), updated_at: nowISO() }]).select().single();
   if (error) throw error;
   return {
@@ -993,6 +995,8 @@ async function updateBike(id, bikeData) {
     mapped.istimara_expiry = mapped.auth_expiry;
     delete mapped.auth_expiry;
   }
+  // insurance_start does not exist in the bikes table – strip it out
+  delete mapped.insurance_start;
   const { data, error } = await supabase.from('bikes').update({ ...mapped, updated_at: nowISO() }).eq('id', id).select().single();
   if (error) throw error;
   return {
