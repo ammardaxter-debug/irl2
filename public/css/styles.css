@@ -2522,3 +2522,1277 @@ textarea.expense-form-input {
   background: #CBD5E1;
   border-radius: 99px;
 }
+
+/* ========================================
+   FLEET MANAGEMENT MODULE
+   All classes prefixed .fleet- to avoid collisions
+   ======================================== */
+
+/* ── 1. Fleet Stats Cards ── */
+
+.fleet-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.fleet-stat-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  animation: slideUp 0.4s ease both;
+}
+
+.fleet-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--primary-500);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.fleet-stat-card.accent-success::before { background: var(--success-500); }
+.fleet-stat-card.accent-warning::before { background: var(--warning-500); }
+.fleet-stat-card.accent-danger::before  { background: var(--danger-500); }
+.fleet-stat-card.accent-blue::before    { background: var(--primary-500); }
+
+.fleet-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), var(--shadow-glow-blue);
+}
+
+.fleet-stat-card-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.fleet-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fleet-stat-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.fleet-stat-icon.icon-blue    { background: var(--primary-100); color: var(--primary-600); }
+.fleet-stat-icon.icon-green   { background: var(--success-100); color: var(--success-600); }
+.fleet-stat-icon.icon-amber   { background: var(--warning-100); color: var(--warning-600); }
+.fleet-stat-icon.icon-red     { background: var(--danger-100);  color: var(--danger-600); }
+
+.fleet-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.fleet-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.fleet-stat-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+
+/* ── 2. Fleet Utilization Ring ── */
+
+.fleet-util-ring {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.fleet-util-ring svg {
+  width: 60px;
+  height: 60px;
+  transform: rotate(-90deg);
+}
+
+.fleet-util-ring .ring-bg {
+  fill: none;
+  stroke: var(--gray-200);
+  stroke-width: 5;
+}
+
+.fleet-util-ring .ring-fill {
+  fill: none;
+  stroke: var(--primary-500);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fleet-util-ring .ring-fill.fill-green  { stroke: var(--success-500); }
+.fleet-util-ring .ring-fill.fill-amber  { stroke: var(--warning-500); }
+.fleet-util-ring .ring-fill.fill-red    { stroke: var(--danger-500); }
+
+.fleet-util-ring .ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+
+/* ── 3. Fleet Toolbar ── */
+
+.fleet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fleet-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.fleet-view-toggle button {
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  font-family: inherit;
+}
+
+.fleet-view-toggle button.active {
+  background: var(--primary-500);
+  color: #fff;
+}
+
+.fleet-view-toggle button:not(.active):hover {
+  background: var(--gray-50);
+}
+
+.fleet-sort-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 8px 32px 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-card) url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.fleet-sort-select:focus {
+  outline: none;
+  border-color: var(--primary-400);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.fleet-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fleet-filter-chip:hover {
+  border-color: var(--primary-300);
+  color: var(--primary-600);
+}
+
+.fleet-filter-chip.active {
+  background: var(--primary-500);
+  border-color: var(--primary-500);
+  color: #fff;
+}
+
+.fleet-filter-chip .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  background: var(--gray-200);
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.fleet-filter-chip.active .badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+
+/* ── 4. Fleet Bike Card ── */
+
+.fleet-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.35s ease both;
+}
+
+.fleet-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Staggered card entry */
+.fleet-card:nth-child(1)  { animation-delay: 0ms; }
+.fleet-card:nth-child(2)  { animation-delay: 40ms; }
+.fleet-card:nth-child(3)  { animation-delay: 80ms; }
+.fleet-card:nth-child(4)  { animation-delay: 120ms; }
+.fleet-card:nth-child(5)  { animation-delay: 160ms; }
+.fleet-card:nth-child(6)  { animation-delay: 200ms; }
+.fleet-card:nth-child(7)  { animation-delay: 240ms; }
+.fleet-card:nth-child(8)  { animation-delay: 280ms; }
+.fleet-card:nth-child(9)  { animation-delay: 320ms; }
+.fleet-card:nth-child(10) { animation-delay: 360ms; }
+.fleet-card:nth-child(11) { animation-delay: 400ms; }
+.fleet-card:nth-child(12) { animation-delay: 440ms; }
+
+/* Health gradient stripe */
+.fleet-card-gradient {
+  height: 4px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.fleet-card.health-ok .fleet-card-gradient {
+  background: linear-gradient(90deg, var(--success-400), var(--success-500));
+}
+
+.fleet-card.health-warn .fleet-card-gradient {
+  background: linear-gradient(90deg, var(--warning-400), var(--warning-500));
+}
+
+.fleet-card.health-danger .fleet-card-gradient {
+  background: linear-gradient(90deg, var(--danger-400), var(--danger-500));
+}
+
+.fleet-card-body {
+  padding: 16px 18px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fleet-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fleet-card-plate {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.fleet-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fleet-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.fleet-card-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+}
+
+.fleet-card-field-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Expiry progress bar */
+.fleet-card-expiry-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--gray-100);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.fleet-card-expiry-bar .fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--success-400);
+}
+
+.fleet-card-expiry-bar .fill.fill-warn  { background: var(--warning-400); }
+.fleet-card-expiry-bar .fill.fill-danger { background: var(--danger-400); }
+
+/* Card actions footer */
+.fleet-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border-light);
+}
+
+.fleet-card-actions button {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.fleet-card-actions button:hover {
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+
+
+/* ── 5. Fleet Table ── */
+
+.fleet-table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.fleet-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.fleet-table th {
+  position: sticky;
+  top: 0;
+  background: var(--gray-50);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 12px 16px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-light);
+  z-index: 2;
+}
+
+.fleet-table td {
+  font-size: 14px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+.fleet-table tbody tr {
+  transition: background var(--transition-fast);
+  animation: slideUp 0.3s ease both;
+}
+
+.fleet-table tbody tr:nth-child(1)  { animation-delay: 0ms; }
+.fleet-table tbody tr:nth-child(2)  { animation-delay: 30ms; }
+.fleet-table tbody tr:nth-child(3)  { animation-delay: 60ms; }
+.fleet-table tbody tr:nth-child(4)  { animation-delay: 90ms; }
+.fleet-table tbody tr:nth-child(5)  { animation-delay: 120ms; }
+.fleet-table tbody tr:nth-child(6)  { animation-delay: 150ms; }
+.fleet-table tbody tr:nth-child(7)  { animation-delay: 180ms; }
+.fleet-table tbody tr:nth-child(8)  { animation-delay: 210ms; }
+.fleet-table tbody tr:nth-child(9)  { animation-delay: 240ms; }
+.fleet-table tbody tr:nth-child(10) { animation-delay: 270ms; }
+
+.fleet-table tbody tr:hover {
+  background: var(--primary-50);
+  cursor: pointer;
+}
+
+.fleet-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+
+/* ── 6. Fleet Badge ── */
+
+.fleet-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.fleet-badge-green {
+  background: var(--success-50);
+  color: var(--success-600);
+}
+
+.fleet-badge-amber {
+  background: var(--warning-50);
+  color: var(--warning-600);
+}
+
+.fleet-badge-red {
+  background: var(--danger-50);
+  color: var(--danger-600);
+}
+
+.fleet-badge-gray {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.fleet-badge-blue {
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+
+
+/* ── 7. Fleet Dialog ── */
+
+.fleet-dialog {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 560px;
+  animation: modalIn 0.3s ease;
+}
+
+.fleet-dialog-header {
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+  padding: 24px 28px;
+  color: #fff;
+}
+
+.fleet-dialog-header .plate {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  letter-spacing: 0.03em;
+}
+
+.fleet-dialog-header .subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.fleet-dialog-content {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.fleet-dialog-section {
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--gray-25);
+}
+
+.fleet-dialog-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.fleet-dialog-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.fleet-dialog-countdown .number {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.fleet-dialog-countdown .number.expiring {
+  color: var(--danger-500);
+  animation: countdownPulse 2s ease-in-out infinite;
+}
+
+.fleet-dialog-countdown .unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.fleet-dialog-rider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.fleet-dialog-rider .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-100);
+  color: var(--primary-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fleet-dialog-rider .info {
+  flex: 1;
+  min-width: 0;
+}
+
+.fleet-dialog-rider .name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fleet-dialog-rider .id {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.fleet-dialog-danger {
+  border: 1px solid var(--danger-400);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fleet-dialog-danger summary {
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger-600);
+  cursor: pointer;
+  background: var(--danger-50);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fleet-dialog-danger summary::-webkit-details-marker { display: none; }
+
+.fleet-dialog-danger[open] summary {
+  border-bottom: 1px solid var(--danger-100);
+}
+
+.fleet-dialog-danger .content {
+  padding: 16px 18px;
+  background: var(--bg-card);
+}
+
+
+/* ── 8. Fleet Rider Picker ── */
+
+.fleet-rider-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fleet-rider-search {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-card) url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='11' cy='11' r='7' stroke='%2394a3b8' stroke-width='2'/%3E%3Cpath d='M16 16L20 20' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 12px center;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.fleet-rider-search::placeholder {
+  color: var(--text-tertiary);
+}
+
+.fleet-rider-search:focus {
+  outline: none;
+  border-color: var(--primary-400);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.fleet-rider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.fleet-rider-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.fleet-rider-option:hover {
+  border-color: var(--primary-300);
+  background: var(--primary-50);
+}
+
+.fleet-rider-option.selected {
+  border-color: var(--primary-500);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.fleet-rider-option.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  background: var(--primary-500);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.fleet-rider-option .avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--gray-100);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fleet-rider-option .name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fleet-rider-option .meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+
+/* ── 9. Fleet Alert Banner ── */
+
+.fleet-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--danger-50);
+  border-left: 4px solid;
+  border-image: linear-gradient(to bottom, var(--danger-400), var(--warning-400)) 1;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-bottom: 20px;
+  animation: slideUp 0.35s ease;
+}
+
+.fleet-alert-banner .alert-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--danger-100);
+  color: var(--danger-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fleet-alert-banner .alert-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fleet-alert-banner .alert-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fleet-alert-banner .alert-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--danger-600);
+}
+
+.fleet-alert-banner .alert-msg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.fleet-alert-banner .alert-action {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--danger-500);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.fleet-alert-banner .alert-action:hover {
+  background: var(--danger-600);
+}
+
+.fleet-alert-banner .alert-dismiss {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.fleet-alert-banner .alert-dismiss:hover {
+  background: var(--danger-100);
+  color: var(--danger-500);
+}
+
+
+/* ── 10. Fleet Bulk Actions Bar ── */
+
+.fleet-bulk-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--gray-900);
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  animation: slideUpBulk 0.3s ease;
+  z-index: 50;
+}
+
+.fleet-bulk-bar .count {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fleet-bulk-bar .count strong {
+  font-weight: 800;
+  color: var(--primary-400);
+}
+
+.fleet-bulk-bar .actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.fleet-bulk-bar .actions button {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.fleet-bulk-bar .actions button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.fleet-bulk-bar .actions button.primary {
+  background: var(--primary-500);
+  border-color: var(--primary-500);
+}
+
+.fleet-bulk-bar .actions button.primary:hover {
+  background: var(--primary-600);
+  border-color: var(--primary-600);
+}
+
+.fleet-bulk-bar .actions button.danger {
+  background: var(--danger-500);
+  border-color: var(--danger-500);
+}
+
+.fleet-bulk-bar .actions button.danger:hover {
+  background: var(--danger-600);
+  border-color: var(--danger-600);
+}
+
+
+/* ── 11. Responsive ── */
+
+@media (max-width: 768px) {
+  .fleet-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .fleet-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fleet-toolbar .fleet-view-toggle,
+  .fleet-toolbar .fleet-sort-select {
+    width: 100%;
+  }
+
+  .fleet-view-toggle button {
+    flex: 1;
+    text-align: center;
+  }
+
+  .fleet-card {
+    width: 100%;
+  }
+
+  .fleet-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .fleet-table {
+    min-width: 640px;
+  }
+
+  .fleet-rider-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fleet-dialog {
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .fleet-bulk-bar {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .fleet-bulk-bar .actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .fleet-alert-banner {
+    flex-wrap: wrap;
+  }
+}
+
+
+/* ── 12. Animations ── */
+
+@keyframes pulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes countdownPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes slideUpBulk {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Fleet – Missing utility classes ── */
+
+/* Toolbar layout */
+.fleet-toolbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.fleet-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.fleet-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Filter count badge (used as class fleet-filter-badge) */
+.fleet-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--gray-200);
+  color: var(--gray-600);
+  margin-left: 4px;
+}
+.fleet-filter-chip.active .fleet-filter-badge {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+/* Card body */
+.fleet-card-body {
+  padding: 16px 18px 14px;
+}
+
+/* Card action buttons */
+.fleet-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-light);
+  background: #fff;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex: 1;
+}
+.fleet-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.fleet-action-primary {
+  color: var(--primary-600);
+  border-color: var(--primary-200);
+  background: var(--primary-50);
+}
+.fleet-action-primary:hover {
+  background: var(--primary-100);
+  border-color: var(--primary-300);
+}
+.fleet-action-secondary {
+  color: var(--gray-600);
+  flex: 0;
+  padding: 0 10px;
+}
+.fleet-action-secondary:hover {
+  background: var(--gray-50);
+}
+.fleet-action-danger {
+  color: var(--danger-600);
+  border-color: var(--danger-200);
+  background: var(--danger-50);
+}
+.fleet-action-danger:hover {
+  background: var(--danger-100);
+  border-color: var(--danger-300);
+}
+
+/* Text helper */
+.fleet-text-danger {
+  color: var(--danger-600) !important;
+  font-weight: 600 !important;
+}
+
+/* Stat card glow for unassigned */
+.fleet-stat-glow {
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(148, 163, 184, 0.15), 0 0 20px rgba(148, 163, 184, 0.1);
+}
+
+/* Stat card pulse for danger */
+.fleet-stat-pulse-danger {
+  animation: pulseStatDanger 3s ease-in-out infinite;
+}
+@keyframes pulseStatDanger {
+  0%, 100% { box-shadow: var(--shadow-md); }
+  50% { box-shadow: var(--shadow-md), 0 0 16px rgba(225, 29, 72, 0.12); }
+}
+
+/* Rider picker checkmark */
+.fleet-rider-check {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-500);
+  color: #fff;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.fleet-rider-option.selected .fleet-rider-check {
+  display: flex;
+}
+.fleet-rider-option {
+  position: relative;
+  padding: 12px;
+  border: 1.5px solid var(--border-light);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: #fff;
+}
+.fleet-rider-option:hover {
+  border-color: var(--primary-300);
+  background: var(--primary-50);
+}
+.fleet-rider-option.selected {
+  border-color: var(--primary-500);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+/* Fleet dialog actions bar */
+.fleet-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Fleet card actions row */
+.fleet-card-actions {
+  display: flex;
+  gap: 6px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Fleet card plate mono */
+.fleet-card-plate {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+/* Fleet card badges row */
+.fleet-card-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* Fleet card data grid */
+.fleet-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+
+/* Fleet card field styles */
+.fleet-card-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.fleet-card-field-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Fleet card expiry progress bar */
+.fleet-card-expiry-bar {
+  height: 4px;
+  background: var(--gray-100);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+.fleet-card-expiry-bar .fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fleet table wrap */
+.fleet-table-wrap {
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+  .fleet-toolbar-left,
+  .fleet-toolbar-right {
+    width: 100%;
+  }
+  .fleet-toolbar-right {
+    flex-wrap: wrap;
+  }
+  .fleet-rider-picker {
+    grid-template-columns: 1fr !important;
+  }
+}
