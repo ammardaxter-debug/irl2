@@ -91,6 +91,7 @@ const Bikes = {
       let healthStatus = 'ok';
       if (worstExpiry < 0) healthStatus = 'danger';
       else if (worstExpiry <= 30) healthStatus = 'warn';
+      else if (!b.authorization_expiry) healthStatus = 'warn'; // Missing authorization expiry is marked as warn (yellow alert)
 
       return { ...b, daysUntilExpiry, daysUntilAuthExpiry, worstExpiry, healthStatus };
     });
@@ -108,7 +109,8 @@ const Bikes = {
     } else if (this.currentFilter === 'retired') {
       filtered = filtered.filter(b => b.status === 'retired');
     } else if (this.currentFilter === 'expiring') {
-      filtered = filtered.filter(b => b.worstExpiry <= 30);
+      // Include expired, expiring, or missing authorization expiry under compliance alert filter
+      filtered = filtered.filter(b => b.worstExpiry <= 30 || !b.authorization_expiry);
     } else if (this.currentFilter === 'unassigned') {
       filtered = filtered.filter(b => !b.assigned_rider_id);
     } else if (this.currentFilter === 'assigned') {
@@ -139,6 +141,8 @@ const Bikes = {
           filtered = filtered.filter(b => b.worstExpiry < 0);
         } else if (token === 'expiring') {
           filtered = filtered.filter(b => b.worstExpiry >= 0 && b.worstExpiry <= 30);
+        } else if (token === 'missing' || token === 'missing-auth') {
+          filtered = filtered.filter(b => !b.authorization_expiry);
         } else if (token === 'unassigned') {
           filtered = filtered.filter(b => !b.assigned_rider_id);
         } else if (token === 'assigned') {
@@ -182,7 +186,7 @@ const Bikes = {
       retired: this.bikes.filter(b => b.status === 'retired').length,
       assigned: this.bikes.filter(b => !!b.assigned_rider_id).length,
       unassigned: this.bikes.filter(b => !b.assigned_rider_id).length,
-      expiring: all.filter(b => b.worstExpiry <= 30).length,
+      expiring: all.filter(b => b.worstExpiry <= 30 || !b.authorization_expiry).length,
       expired: all.filter(b => b.worstExpiry < 0).length,
     };
   },
@@ -195,15 +199,23 @@ const Bikes = {
     const allProcessed = this.processBikes();
     const expired = allProcessed.filter(b => b.worstExpiry < 0);
     const expiringSoon = allProcessed.filter(b => b.worstExpiry >= 0 && b.worstExpiry <= 30);
+    const missingAuth = allProcessed.filter(b => !b.authorization_expiry);
 
-    if (expired.length === 0 && expiringSoon.length === 0) {
+    if (expired.length === 0 && expiringSoon.length === 0 && missingAuth.length === 0) {
       container.innerHTML = '';
       return;
     }
 
     const messages = [];
-    if (expired.length > 0) messages.push(`<strong>${expired.length} bike${expired.length > 1 ? 's have' : ' has'} expired documents</strong>`);
-    if (expiringSoon.length > 0) messages.push(`${expiringSoon.length} bike${expiringSoon.length > 1 ? 's' : ''} expiring within 30 days`);
+    if (expired.length > 0) {
+      messages.push(`<strong>${expired.length} bike${expired.length > 1 ? 's have' : ' has'} expired documents</strong>`);
+    }
+    if (missingAuth.length > 0) {
+      messages.push(`<strong>${missingAuth.length} bike${missingAuth.length > 1 ? 's' : ''} missing authorization expiry</strong>`);
+    }
+    if (expiringSoon.length > 0) {
+      messages.push(`${expiringSoon.length} bike${expiringSoon.length > 1 ? 's' : ''} expiring within 30 days`);
+    }
 
     container.innerHTML = `
       <div class="fleet-alert-banner" id="fleet-alert">
@@ -488,7 +500,9 @@ const Bikes = {
           <div class="fleet-card-grid">
             <div>
               <div class="fleet-card-field-label">Authorization</div>
-              <div class="fleet-card-field-value ${bike.daysUntilAuthExpiry <= 30 ? 'fleet-text-danger' : ''}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : '—'}</div>
+              <div class="fleet-card-field-value ${!bike.authorization_expiry || bike.daysUntilAuthExpiry <= 30 ? 'fleet-text-danger' : ''}" style="${!bike.authorization_expiry ? 'font-weight:700;' : ''}">
+                ${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : 'MISSING'}
+              </div>
             </div>
             <div>
               <div class="fleet-card-field-label">Insurance</div>
@@ -579,7 +593,7 @@ const Bikes = {
                   <td style="color:var(--text-secondary);">${highlightedModel}</td>
                   <td><span class="fleet-badge ${statusInfo.badgeClass}">${statusInfo.label}</span></td>
                   <td><span class="fleet-badge ${authInfo.badgeClass}">${authInfo.label}</span></td>
-                  <td style="${bike.daysUntilAuthExpiry <= 30 ? 'color:var(--danger-600); font-weight:600;' : ''}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : '—'}</td>
+                  <td style="${!bike.authorization_expiry || bike.daysUntilAuthExpiry <= 30 ? 'color:var(--danger-600); font-weight:700;' : ''}">${bike.authorization_expiry ? Utils.formatDateShort(bike.authorization_expiry) : 'MISSING'}</td>
                   <td style="${bike.daysUntilExpiry <= 30 ? 'color:var(--danger-600); font-weight:600;' : ''}">${bike.insurance_expiry ? Utils.formatDateShort(bike.insurance_expiry) : '—'}</td>
                   <td>${highlightedRider}</td>
                   <td>${healthIcon}</td>
@@ -1112,7 +1126,7 @@ const Bikes = {
     const hasAuth = !!bike.authorization_expiry;
     if (hasAuth && days >= 0) return { label: 'Authorized', badgeClass: 'fleet-badge-green' };
     if (hasAuth && days < 0) return { label: 'Auth Expired', badgeClass: 'fleet-badge-red' };
-    return { label: 'Pending', badgeClass: 'fleet-badge-amber' };
+    return { label: 'Missing Auth', badgeClass: 'fleet-badge-red' };
   },
 
   getExpiryBarPct(days) {
