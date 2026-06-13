@@ -161,6 +161,18 @@ const Bikes = {
 
     // Sort
     filtered.sort((a, b) => {
+      // 1. Sort by Priority (High operational priority first; exclude retired bikes)
+      const isHighA = a.status !== 'retired' && (!a.assigned_rider_id || !a.authorization_expiry || a.daysUntilAuthExpiry <= 30);
+      const isHighB = b.status !== 'retired' && (!b.assigned_rider_id || !b.authorization_expiry || b.daysUntilAuthExpiry <= 30);
+
+      const priorityA = isHighA ? 1 : 0;
+      const priorityB = isHighB ? 1 : 0;
+
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA; // 1 goes before 0 (High priority first)
+      }
+
+      // 2. Secondary sort by selected sort option
       switch (this.currentSort) {
         case 'plate': return (a.plate_number || '').localeCompare(b.plate_number || '');
         case 'status': {
