@@ -852,6 +852,13 @@ const Bikes = {
     `;
   },
 
+  renderBulkBar() {
+    const container = document.getElementById('fleet-bulk-container');
+    if (container) {
+      container.innerHTML = this.buildBulkBar();
+    }
+  },
+
   // ── Dynamic Leaflet Loader ──
   async loadLeaflet() {
     if (window.L) return;
