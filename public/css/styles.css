@@ -1740,9 +1740,9 @@ img { max-width: 100%; display: block; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -1752,7 +1752,12 @@ img { max-width: 100%; display: block; }
 
 .modal-overlay.active {
   display: flex;
-  animation: fadeIn 200ms ease;
+  animation: modalFadeIn 200ms ease forwards;
+}
+
+.modal-overlay.closing {
+  display: flex !important;
+  animation: modalFadeOut 200ms ease forwards;
 }
 
 .modal {
@@ -1763,9 +1768,36 @@ img { max-width: 100%; display: block; }
   max-width: 640px;
   max-height: 90vh;
   overflow-y: auto;
-  animation: scaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none;  /* IE and Edge */
+}
+
+.modal-overlay.active .modal {
+  animation: modalScaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.modal-overlay.closing .modal {
+  animation: modalScaleOut 200ms ease forwards;
+}
+
+@keyframes modalFadeIn {
+  from { background: rgba(15, 23, 42, 0); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+  to { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+}
+
+@keyframes modalFadeOut {
+  from { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  to { background: rgba(15, 23, 42, 0); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+}
+
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.95) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes modalScaleOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(12px); }
 }
 .modal::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
@@ -3225,7 +3257,7 @@ textarea.expense-form-input {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 12px 44px 12px 14px;
   border: 1.5px solid var(--border-light);
   border-radius: var(--radius-md);
   background: var(--bg-card);
@@ -3248,8 +3280,9 @@ textarea.expense-form-input {
 .fleet-rider-option.selected::after {
   content: '✓';
   position: absolute;
-  top: 6px;
-  right: 8px;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
   width: 18px;
   height: 18px;
   background: var(--primary-500);
@@ -3672,21 +3705,22 @@ textarea.expense-form-input {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--primary-500);
   color: #fff;
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
 }
 .fleet-rider-option.selected .fleet-rider-check {
   display: flex;
 }
 .fleet-rider-option {
   position: relative;
-  padding: 12px;
+  padding: 12px 44px 12px 12px;
   border: 1.5px solid var(--border-light);
   border-radius: 12px;
   cursor: pointer;

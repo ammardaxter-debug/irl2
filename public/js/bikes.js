@@ -1179,15 +1179,6 @@ const Bikes = {
       this.updateView();
     });
 
-    // Filter Chips
-    container.addEventListener('click', (e) => {
-      const chip = e.target.closest('.fleet-filter-chip');
-      if (chip && chip.dataset.filter) {
-        this.currentFilter = chip.dataset.filter;
-        this.updateView();
-      }
-    });
-
     // Sort Dropdown
     document.getElementById('fleet-sort')?.addEventListener('change', (e) => {
       this.currentSort = e.target.value;
@@ -1205,59 +1196,73 @@ const Bikes = {
     // Add Bike
     document.getElementById('btn-add-bike')?.addEventListener('click', () => this.openBikeForm(null));
 
-    // Card clicks (except buttons)
-    container.addEventListener('click', (e) => {
-      const card = e.target.closest('.fleet-card');
-      if (card && !e.target.closest('button')) {
-        const bike = this.bikes.find(b => b.id === parseInt(card.dataset.id));
-        if (bike) this.openBikeForm(bike);
-      }
-    });
+    // Attach delegated container events only once
+    if (container.dataset.delegatedEventsAttached !== 'true') {
+      container.dataset.delegatedEventsAttached = 'true';
 
-    // Table rows clicks
-    container.addEventListener('click', (e) => {
-      const row = e.target.closest('.fleet-table-row');
-      if (row && !e.target.closest('button')) {
-        const bike = this.bikes.find(b => b.id === parseInt(row.dataset.id));
-        if (bike) this.openBikeForm(bike);
-      }
-    });
+      // Filter Chips
+      container.addEventListener('click', (e) => {
+        const chip = e.target.closest('.fleet-filter-chip');
+        if (chip && chip.dataset.filter) {
+          this.currentFilter = chip.dataset.filter;
+          this.updateView();
+        }
+      });
 
-    // Assign / Unassign / Track click delegation
-    container.addEventListener('click', (e) => {
-      const btnEdit = e.target.closest('.btn-edit-bike');
-      if (btnEdit) {
-        e.stopPropagation();
-        const bike = this.bikes.find(b => b.id === parseInt(btnEdit.dataset.id));
-        if (bike) this.openBikeForm(bike);
-        return;
-      }
+      // Card clicks (except buttons)
+      container.addEventListener('click', (e) => {
+        const card = e.target.closest('.fleet-card');
+        if (card && !e.target.closest('button')) {
+          const bike = this.bikes.find(b => b.id === parseInt(card.dataset.id));
+          if (bike) this.openBikeForm(bike);
+        }
+      });
 
-      const btnAssign = e.target.closest('.btn-assign-bike');
-      if (btnAssign) {
-        e.stopPropagation();
-        const bike = this.bikes.find(b => b.id === parseInt(btnAssign.dataset.id));
-        if (bike) this.openAssignDialog(bike);
-        return;
-      }
+      // Table rows clicks
+      container.addEventListener('click', (e) => {
+        const row = e.target.closest('.fleet-table-row');
+        if (row && !e.target.closest('button')) {
+          const bike = this.bikes.find(b => b.id === parseInt(row.dataset.id));
+          if (bike) this.openBikeForm(bike);
+        }
+      });
 
-      const btnTrack = e.target.closest('.btn-track-bike');
-      if (btnTrack) {
-        e.stopPropagation();
-        const bike = this.bikes.find(b => b.id === parseInt(btnTrack.dataset.id));
-        if (bike) this.openIndividualTracking(bike);
-        return;
-      }
+      // Assign / Unassign / Track click delegation
+      container.addEventListener('click', (e) => {
+        const btnEdit = e.target.closest('.btn-edit-bike');
+        if (btnEdit) {
+          e.stopPropagation();
+          const bike = this.bikes.find(b => b.id === parseInt(btnEdit.dataset.id));
+          if (bike) this.openBikeForm(bike);
+          return;
+        }
 
-      const btnUnassign = e.target.closest('.btn-unassign-bike');
-      if (btnUnassign) {
-        e.stopPropagation();
-        const bikeId = parseInt(btnUnassign.dataset.id);
-        const bike = this.bikes.find(b => b.id === bikeId);
-        this.confirmUnassign(bike);
-        return;
-      }
-    });
+        const btnAssign = e.target.closest('.btn-assign-bike');
+        if (btnAssign) {
+          e.stopPropagation();
+          const bike = this.bikes.find(b => b.id === parseInt(btnAssign.dataset.id));
+          if (bike) this.openAssignDialog(bike);
+          return;
+        }
+
+        const btnTrack = e.target.closest('.btn-track-bike');
+        if (btnTrack) {
+          e.stopPropagation();
+          const bike = this.bikes.find(b => b.id === parseInt(btnTrack.dataset.id));
+          if (bike) this.openIndividualTracking(bike);
+          return;
+        }
+
+        const btnUnassign = e.target.closest('.btn-unassign-bike');
+        if (btnUnassign) {
+          e.stopPropagation();
+          const bikeId = parseInt(btnUnassign.dataset.id);
+          const bike = this.bikes.find(b => b.id === bikeId);
+          this.confirmUnassign(bike);
+          return;
+        }
+      });
+    }
 
     // Export CSV
     document.getElementById('fleet-export-csv')?.addEventListener('click', () => this.exportCSV());
@@ -1391,11 +1396,13 @@ const Bikes = {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 Documents & Expiry
               </div>
-              <div class="form-grid" style="gap:16px;">
+              <div class="form-grid" style="gap:16px; ${(!isEdit || !bike.assigned_rider_id) ? 'grid-template-columns: 1fr;' : ''}">
+                ${(isEdit && bike.assigned_rider_id) ? `
                 <div class="form-group">
                   <label>Authorization Expiry (Istimara)</label>
-                  <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.authorization_expiry ? bike.authorization_expiry : ''}">
+                  <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${bike.authorization_expiry ? bike.authorization_expiry : ''}">
                 </div>
+                ` : ''}
                 <div class="form-group">
                   <label>Insurance Expiry</label>
                   <input type="date" id="bf-ins-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}">
@@ -1465,7 +1472,7 @@ const Bikes = {
         model: document.getElementById('bf-model').value.trim(),
         status: document.getElementById('bf-status').value,
         insurance_expiry: document.getElementById('bf-ins-expiry').value || null,
-        authorization_expiry: document.getElementById('bf-auth-expiry').value || null,
+        authorization_expiry: document.getElementById('bf-auth-expiry')?.value || (isEdit ? bike.authorization_expiry : null),
         notes: JSON.stringify(this._currentLogs), // Save serialized array to notes column
       };
 

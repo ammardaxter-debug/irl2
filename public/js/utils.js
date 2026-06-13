@@ -216,10 +216,10 @@ const Utils = {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay active';
-      overlay.style.zIndex = '9999';
+      overlay.style.zIndex = '10001';
       
       overlay.innerHTML = `
-        <div class="modal" style="max-width:400px; animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);">
+        <div class="modal" style="max-width:400px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);">
           <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
             <h2 class="modal-title" style="display:flex; align-items:center; gap:8px; font-size:18px; font-weight:700; color:#0f172a;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-600)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -238,6 +238,7 @@ const Utils = {
       document.body.appendChild(overlay);
       
       const cleanup = () => {
+        overlay.classList.add('closing');
         overlay.classList.remove('active');
         setTimeout(() => overlay.remove(), 200);
       };
@@ -260,13 +261,13 @@ const Utils = {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay active';
-      overlay.style.zIndex = '9999';
+      overlay.style.zIndex = '10001';
       
       const btnColor = isDanger ? '#DC2626' : '#2563EB';
       const btnHover = isDanger ? '#B91C1C' : '#1D4ED8';
       
       overlay.innerHTML = `
-        <div class="modal" style="max-width:400px; animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div class="modal" style="max-width:400px;">
           <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
             <h2 class="modal-title" style="display:flex; align-items:center; gap:8px;">
               ${isDanger ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : ''}
@@ -286,6 +287,7 @@ const Utils = {
       document.body.appendChild(overlay);
       
       const cleanup = () => {
+        overlay.classList.add('closing');
         overlay.classList.remove('active');
         setTimeout(() => overlay.remove(), 200);
       };
@@ -320,7 +322,11 @@ const Utils = {
   // Close modal
   closeModal() {
     const overlay = document.getElementById('modal-overlay');
-    overlay.classList.remove('active');
+    if (!overlay) return;
+    overlay.classList.add('closing');
+    setTimeout(() => {
+      overlay.classList.remove('active', 'closing');
+    }, 200);
   },
 
   // Debounce
@@ -371,10 +377,10 @@ const Utils = {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay active';
-      overlay.style.zIndex = '9999';
+      overlay.style.zIndex = '10001';
       
       overlay.innerHTML = `
-        <div class="modal" style="max-width:450px; animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div class="modal" style="max-width:450px;">
           <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
             <h2 class="modal-title" style="font-size:20px; font-weight:700;">${this.escapeHtml(title)}</h2>
           </div>
@@ -394,6 +400,7 @@ const Utils = {
       input.focus();
       
       const cleanup = () => {
+        overlay.classList.add('closing');
         overlay.classList.remove('active');
         setTimeout(() => overlay.remove(), 200);
       };
