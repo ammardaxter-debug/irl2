@@ -1104,7 +1104,7 @@ const Dashboard = {
         statusBadge = `<span class="badge" style="background:#FFFDF5; color:#D97706; border:1px solid #FCD34D; font-weight:700; font-size:11px; border-radius: 6px;">Pending Doc</span>`;
       }
 
-      if (rowStatusVal === 'expired' || rowStatusVal === 'warning') {
+      if (rowStatusVal === 'expired' || rowStatusVal === 'warning' || rowStatusVal === 'unauthorized') {
         const phone = rider ? rider.phone : null;
         if (phone) {
           const cleanPhone = phone.replace(/[^0-9]/g, '');
@@ -1115,6 +1115,8 @@ const Dashboard = {
           } else if (rowStatusVal === 'warning') {
             const days = Utils.daysUntil(bike.istimara_expiry);
             msg = `Dear *${rider.name}*\n\nYour bike *${bikePlate}* authorization (Istimara) will expire in *${days} days* on *${expiryText}*.\n\nPlease arrange renewal as soon as possible.\n\n*If already authorized* please send a screenshot of the expiry date from your *Absher*:\n1 Open Absher\n2 Go to My Vehicles\n3 Select the bike\n4 Under Vehicle Details click Authorization Details\n5 Take screenshot and send it here\n\nInspiring Roads Logistics`;
+          } else if (rowStatusVal === 'unauthorized') {
+            msg = `Dear *${rider.name}*\n\nYour bike *${bikePlate}* authorization (Istimara) is missing or pending in our system.\n\nPlease send a screenshot of the expiry date from your *Absher*:\n1 Open Absher\n2 Go to My Vehicles\n3 Select the bike\n4 Under Vehicle Details click Authorization Details\n5 Take screenshot and send it here\n\nInspiring Roads Logistics`;
           }
           
           if (msg) {
