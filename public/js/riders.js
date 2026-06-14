@@ -60,67 +60,81 @@ const Riders = {
   buildHTML(riders) {
     return `
       <!-- Page Header -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Riders</h1>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; animation: fadeIn var(--transition-base) both;">
+        <div>
+          <h1 style="font-size:24px; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em; margin-bottom:4px;">Riders</h1>
+          <div style="font-size:13px; color:var(--text-secondary); font-weight:500;">Manage delivery logistics team and system profiles</div>
+        </div>
         <div style="display:flex; gap:16px; align-items:center;">
-          <div style="display:flex; gap:8px;">
-            <button class="filter-tab ${this.currentFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
-            <button class="filter-tab ${this.currentFilter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
-            <button class="filter-tab ${this.currentFilter === 'inactive' ? 'active' : ''}" data-filter="inactive">Inactive</button>
-            <button class="filter-tab ${this.currentFilter === 'company' ? 'active' : ''}" data-filter="company">Company</button>
-            <button class="filter-tab ${this.currentFilter === 'freelancer' ? 'active' : ''}" data-filter="freelancer">Freelancer</button>
-            <button class="filter-tab ${this.currentFilter === 'commission_partner' ? 'active' : ''}" data-filter="commission_partner">Partners</button>
-          </div>
-          <button id="btn-add-rider" style="background:#2563EB; color:white; font-size:14px; font-weight:500; height:36px; padding:0 16px; border-radius:12px; box-shadow:0 2px 4px rgba(37,99,235,0.2); cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
-            + Add Rider
+          <button id="btn-add-rider" style="background:var(--primary-600); color:white; font-size:13px; font-weight:700; height:38px; padding:0 18px; border-radius:12px; box-shadow:var(--shadow-glow-primary); cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:8px; transition:all var(--transition-fast);" onmouseover="this.style.background='var(--primary-700)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='var(--primary-600)'; this.style.transform='none';">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add New Rider
           </button>
         </div>
       </div>
 
-      <!-- Search Bar -->
-      <div style="margin-bottom:24px;">
-        <div style="position:relative; width:100%;">
-          <div style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#9CA3AF; pointer-events:none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </div>
-          <input type="text" id="rider-search" placeholder="Search riders by name, phone, company..." value="${Utils.escapeHtml(this.searchQuery)}" style="width:100%; height:44px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:12px; padding:0 16px 0 44px; font-size:14px; color:#0F0F0F; outline:none; transition:all 0.2s;" onfocus="this.style.background='#FFFFFF'; this.style.borderColor='#2563EB';" onblur="this.style.background='#F9FAFB'; this.style.borderColor='#E5E7EB';">
+      <!-- Search & Filters Row -->
+      <div style="display:flex; flex-direction:row; gap:16px; margin-bottom:28px; align-items:center; flex-wrap:wrap; animation: fadeIn var(--transition-base) both; animation-delay: 50ms;">
+        <div style="position:relative; flex:1; min-width:280px;">
+          <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:18px; height:18px; display:flex; align-items:center; pointer-events:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input type="text" id="rider-search" class="dashboard-search-input" placeholder="Search riders by name, phone, company..." value="${Utils.escapeHtml(this.searchQuery)}" style="padding-left:40px; height:42px;">
+        </div>
+
+        <div class="filters-container" style="display:flex; gap:6px; flex-wrap:wrap; background:var(--gray-100); padding:4px; border-radius:12px;">
+          <button class="filter-tab ${this.currentFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+          <button class="filter-tab ${this.currentFilter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
+          <button class="filter-tab ${this.currentFilter === 'inactive' ? 'active' : ''}" data-filter="inactive">Inactive</button>
+          <button class="filter-tab ${this.currentFilter === 'company' ? 'active' : ''}" data-filter="company">Company</button>
+          <button class="filter-tab ${this.currentFilter === 'freelancer' ? 'active' : ''}" data-filter="freelancer">Freelancer</button>
+          <button class="filter-tab ${this.currentFilter === 'commission_partner' ? 'active' : ''}" data-filter="commission_partner">Partners</button>
         </div>
       </div>
 
       <style>
         .filter-tab {
-          padding: 6px 16px;
+          padding: 6px 14px;
           border-radius: 8px;
-          font-size: 13px;
-          font-weight: 500;
+          font-size: 12px;
+          font-weight: 700;
           cursor: pointer;
-          transition: all 0.2s;
-          background: #F3F4F6;
-          color: #6B7280;
+          transition: all var(--transition-fast);
+          background: transparent;
+          color: var(--text-secondary);
           border: none;
         }
+        .filter-tab:hover {
+          color: var(--text-primary);
+        }
         .filter-tab.active {
-          background: #2563EB;
-          color: white;
+          background: var(--bg-card);
+          color: var(--primary-600);
+          box-shadow: var(--shadow-sm);
         }
         .rider-card-new {
-          background: #FFFFFF;
-          border: 1px solid #E5E7EB;
-          border-radius: 12px;
-          padding: 16px;
+          background: rgba(255, 255, 255, 0.85);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          border-radius: 16px;
+          padding: 20px;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all var(--transition-base);
+          box-shadow: var(--shadow-premium), inset 0 1px 0 rgba(255, 255, 255, 0.6);
           position: relative;
         }
         .rider-card-new:hover {
-          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-          border-color: #D1D5DB;
-          transform: translateY(-2px);
+          transform: translateY(-4px) scale(1.01);
+          box-shadow: var(--shadow-lg), 0 12px 20px -8px rgba(37,99,235,0.08);
+          border-color: rgba(59,130,246,0.2);
         }
         .riders-grid-new {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
+          gap: 20px;
+          animation: slideUp 400ms ease both;
+          animation-delay: 150ms;
         }
         @media (max-width: 1024px) {
           .riders-grid-new { grid-template-columns: repeat(2, 1fr); }

@@ -1,13 +1,18 @@
 // ========================================
-//  DAILY LOGS - Log & track rider data
+//  DAILY LOGS - Log, track & verify rider data
 // ========================================
 
 const DailyLogs = {
   currentDate: null,
   currentPage: 1,
-  limit: 20,
+  limit: 15,
   searchQuery: '',
-
+  cycleSearchQuery: '',
+  activeTab: 'all', // 'all', 'verified', 'pending' for logged feed
+  activeCycleRiders: [],
+  activeCycleLogs: [],
+  bikesList: [],
+  
   async render() {
     if (!this.currentDate) this.currentDate = Utils.today();
     const container = document.getElementById('page-daily-logs');
@@ -15,86 +20,482 @@ const DailyLogs = {
     // Reset search and page on fresh render (tab navigate)
     this.currentPage = 1;
     this.searchQuery = '';
+    this.cycleSearchQuery = '';
+    this.activeTab = 'all';
 
     container.innerHTML = this.buildShellHTML();
     this.attachShellEvents();
+    
+    // Load all required data
+    await this.loadCycleTracker();
     await this.loadGridData();
   },
 
   buildShellHTML() {
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Daily Logs</h1>
+      <!-- Page Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; animation: fadeIn var(--transition-base) both;">
+        <div>
+          <h1 style="font-size:24px; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em; margin-bottom:4px;">Daily Submissions & Auditing</h1>
+          <div style="font-size:13px; color:var(--text-secondary); font-weight:500;">Verify rider self-submitted metrics, audit screenshots, and nudge missing logs</div>
+        </div>
         <div style="display:flex; align-items:center; gap:12px;">
-          <span id="date-label" style="background:#FEF3C7; color:#D97706; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">${Utils.formatDate(this.currentDate)}</span>
-          <button id="bulk-lodge-btn" style="background:#FFFFFF; color:#2563EB; border:1px solid #2563EB; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-            Bulk Lodge Data
+          <span id="date-label" style="background:var(--warning-50); color:var(--warning-600); border: 1px solid var(--warning-100); padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:0.2px;">${Utils.formatDate(this.currentDate)}</span>
+          <button id="bulk-lodge-btn" style="background:var(--primary-600); color:white; border:none; border-radius:12px; padding:0 18px; height:38px; font-size:13px; font-weight:700; cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:8px; transition:all var(--transition-fast); box-shadow:var(--shadow-glow-primary);" onmouseover="this.style.background='var(--primary-700)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='var(--primary-600)'; this.style.transform='none';">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            Bulk Override
           </button>
         </div>
       </div>
 
-      <!-- Search Bar & Date Picker Row -->
-      <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:24px;">
-        <div style="position:relative; width:100%;">
-          <div style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#9CA3AF; pointer-events:none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <!-- Noon Cycle Compliance Tracker (Top Section) -->
+      <div id="cycle-tracker-section" class="glass-card" style="border-radius:16px; padding:20px; margin-bottom:28px; border:1px solid var(--border-light); animation: slideUp 400ms ease both; animation-delay: 50ms;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 id="cycle-label" style="font-size:16px; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-600)" stroke-width="2.2" style="width:18px;height:18px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Noon Cycle Compliance Tracker
+            </h2>
+            <div id="cycle-dates-sub" style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Loading cycle details...</div>
           </div>
-          <input type="text" id="logs-search" placeholder="Search riders by name..." style="width:100%; height:44px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:12px; padding:0 16px 0 44px; font-size:14px; color:#0F0F0F; outline:none; transition:all 0.2s;" onfocus="this.style.background='#FFFFFF'; this.style.borderColor='#2563EB';" onblur="this.style.background='#F9FAFB'; this.style.borderColor='#E5E7EB';">
+          <div style="display:flex; gap:12px; align-items:center;">
+            <input type="text" id="cycle-search" class="dashboard-search-input" placeholder="Search cycle compliance..." style="padding-left:36px; height:36px; max-width:240px; font-size:12px; background:rgba(255,255,255,0.7);">
+          </div>
         </div>
 
-        <div style="display:flex; justify-content:center;">
-          <div style="display:flex; align-items:center; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:4px;">
-            <button id="date-prev" style="width:32px; height:32px; border:none; background:transparent; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6B7280; transition:all 0.2s;" onmouseover="this.style.background='#E5E7EB'" onmouseout="this.style.background='transparent'">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><polyline points="15 18 9 12 15 6"/></svg>
+        <!-- Cycle Statistics Overview -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:16px; margin-bottom:20px;">
+          <div style="background:rgba(255,255,255,0.6); padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.4); display:flex; align-items:center; gap:12px;">
+            <div style="background:var(--primary-50); color:var(--primary-600); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Compliance Rate</div>
+              <div id="cycle-stat-rate" style="font-size:18px; font-weight:800; color:var(--text-primary);">--%</div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,0.6); padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.4); display:flex; align-items:center; gap:12px;">
+            <div style="background:var(--success-50); color:var(--success-600); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Verified Logs</div>
+              <div id="cycle-stat-verified" style="font-size:18px; font-weight:800; color:var(--text-primary);">0</div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,0.6); padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.4); display:flex; align-items:center; gap:12px;">
+            <div style="background:var(--warning-50); color:var(--warning-600); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Pending Audit</div>
+              <div id="cycle-stat-pending" style="font-size:18px; font-weight:800; color:var(--text-primary);">0</div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,0.6); padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.4); display:flex; align-items:center; gap:12px;">
+            <div style="background:var(--danger-50); color:var(--danger-600); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Missing Logs</div>
+              <div id="cycle-stat-missing" style="font-size:18px; font-weight:800; color:var(--text-primary);">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable Riders Compliance Grid -->
+        <div id="cycle-riders-list" style="max-height: 240px; overflow-y: auto; padding-right: 4px; display:flex; flex-direction:column; gap:8px;">
+          <div style="padding:20px; text-align:center; color:var(--text-secondary);">
+            <span class="spinner" style="width:20px; height:20px; margin-right:8px;"></span> Loading cycle compliance details...
+          </div>
+        </div>
+      </div>
+
+      <!-- Date picker and Search Row -->
+      <div style="display:flex; flex-direction:row; gap:16px; margin-bottom:24px; align-items:center; flex-wrap:wrap; animation: fadeIn var(--transition-base) both; animation-delay: 100ms;">
+        <div style="position:relative; flex:1; min-width:280px;">
+          <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:18px; height:18px; display:flex; align-items:center; pointer-events:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input type="text" id="logs-search" class="dashboard-search-input" placeholder="Search daily feed by rider name..." style="padding-left:40px; height:42px;">
+        </div>
+
+        <div style="display:flex; justify-content:center; flex-shrink:0;">
+          <div style="display:flex; align-items:center; background:var(--bg-card); border:1.5px solid var(--border-light); border-radius:12px; padding:4px; box-shadow:var(--shadow-xs);">
+            <button id="date-prev" style="width:34px; height:34px; border:none; background:transparent; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); transition:all var(--transition-fast);" onmouseover="this.style.background='var(--gray-50)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <input type="date" id="date-picker" value="${this.currentDate}" max="${Utils.today()}" style="border:none; background:transparent; font-size:16px; font-weight:600; color:#0F0F0F; outline:none; text-align:center; cursor:pointer; padding:0 8px;">
-            <button id="date-next" ${this.currentDate === Utils.today() ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} style="width:32px; height:32px; border:none; background:transparent; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6B7280; transition:all 0.2s;" onmouseover="this.style.background='#E5E7EB'" onmouseout="this.style.background='transparent'">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
+            <input type="date" id="date-picker" value="${this.currentDate}" max="${Utils.today()}" style="border:none; background:transparent; font-size:14px; font-weight:700; color:var(--text-primary); outline:none; text-align:center; cursor:pointer; padding:0 12px; font-family:inherit;">
+            <button id="date-next" ${this.currentDate === Utils.today() ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} style="width:34px; height:34px; border:none; background:transparent; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); transition:all var(--transition-fast);" onmouseover="this.style.background='var(--gray-50)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Audit Workspace (Two Columns) -->
+      <div style="display: grid; grid-template-columns: 380px 1fr; gap: 24px; animation: slideUp 400ms ease both; animation-delay:150ms;">
+        
+        <!-- Left Column: Missing Submissions -->
+        <div class="glass-card" style="border-radius:16px; overflow:hidden; border: 1px solid var(--border-light); height: fit-content;">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border-light); background:rgba(248,250,252,0.85);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:var(--danger-500); box-shadow: 0 0 8px var(--danger-400);"></div>
+              <h2 style="font-size:14px; font-weight:800; color:var(--text-primary); margin:0; text-transform:uppercase; letter-spacing:0.5px;">Missing Submissions</h2>
+            </div>
+            <span id="missing-count" style="background:var(--danger-50); color:var(--danger-600); border: 1px solid var(--danger-100); padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700;">0 riders</span>
+          </div>
+          <div id="missing-grid" style="display:flex; flex-direction:column; max-height:600px; overflow-y:auto; background:white;">
+            <div style="padding:20px; text-align:center;">
+              <span class="spinner" style="width:24px; height:24px;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Auditing & Verification Feed -->
+        <div class="glass-card" style="border-radius:16px; overflow:hidden; border: 1px solid var(--border-light);">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--border-light); background:rgba(248,250,252,0.85); flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:var(--success-500); box-shadow: 0 0 8px var(--success-400);"></div>
+              <h2 style="font-size:14px; font-weight:800; color:var(--text-primary); margin:0; text-transform:uppercase; letter-spacing:0.5px;">Verification & Audit Feed</h2>
+            </div>
+            
+            <!-- Filter Tabs inside Audit feed -->
+            <div style="display:flex; background:var(--gray-100); padding:3px; border-radius:8px; gap:2px; font-size:11px;">
+              <button class="feed-tab-btn active" data-tab="all" style="border:none; padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer; background:var(--bg-card); color:var(--primary-600); transition:all var(--transition-fast);">All (<span id="feed-count-all">0</span>)</button>
+              <button class="feed-tab-btn" data-tab="pending" style="border:none; padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer; background:transparent; color:var(--text-secondary); transition:all var(--transition-fast);">Pending (<span id="feed-count-pending">0</span>)</button>
+              <button class="feed-tab-btn" data-tab="verified" style="border:none; padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer; background:transparent; color:var(--text-secondary); transition:all var(--transition-fast);">Verified (<span id="feed-count-verified">0</span>)</button>
+            </div>
+          </div>
+          
+          <div id="logged-grid" style="display:flex; flex-direction:column; background:white; min-height: 300px;">
+            <div style="padding:20px; text-align:center;">
+              <span class="spinner" style="width:24px; height:24px;"></span>
+            </div>
+          </div>
+          <div id="logged-pagination"></div>
         </div>
       </div>
 
       <style>
-        .log-row-item {
-          display: flex;
-          align-items: center;
-          height: 48px;
-          padding: 0 16px;
-          border-bottom: 1px solid #F3F4F6;
-          transition: background 0.2s;
+        .compliance-tooltip {
+          position: relative;
+        }
+        .compliance-dot-btn {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          border: none;
+          padding: 0;
           cursor: pointer;
+          transition: all var(--transition-fast);
         }
-        .log-row-item:hover {
-          background: #F9FAFB;
+        .compliance-dot-btn:hover {
+          transform: scale(1.4);
+          z-index: 2;
+          box-shadow: 0 0 6px rgba(0,0,0,0.2);
         }
-        .log-row-item:last-child {
+        .audit-card {
+          border-bottom: 1px solid var(--border-light);
+          padding: 16px 20px;
+          transition: all var(--transition-fast);
+        }
+        .audit-card:hover {
+          background: var(--gray-25);
+        }
+        .audit-card:last-child {
           border-bottom: none;
         }
+        .audit-metric-pill {
+          background: var(--gray-100);
+          color: var(--text-primary);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .nudge-btn {
+          border: 1px solid #25D366;
+          background: rgba(37, 211, 102, 0.05);
+          color: #25D366;
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all var(--transition-fast);
+        }
+        .nudge-btn:hover {
+          background: #25D366;
+          color: white;
+          box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);
+        }
+        .verify-btn {
+          border: 1px solid var(--primary-600);
+          background: rgba(37, 99, 235, 0.05);
+          color: var(--primary-600);
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all var(--transition-fast);
+        }
+        .verify-btn:hover {
+          background: var(--primary-600);
+          color: white;
+          box-shadow: var(--shadow-glow-primary);
+        }
+        .action-icon-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-fast);
+        }
+        .cycle-rider-row {
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          padding: 10px 14px; 
+          border-radius: 12px; 
+          background: rgba(255,255,255,0.7); 
+          border: 1px solid rgba(15,23,42,0.04); 
+          transition: all var(--transition-fast);
+        }
+        .cycle-rider-row:hover {
+          background: white;
+          box-shadow: var(--shadow-sm);
+          border-color: rgba(59,130,246,0.15);
+        }
       </style>
-
-      <!-- Not Logged Section -->
-      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden; margin-bottom:24px;">
-        <div style="display:flex; align-items:center; gap:8px; padding:16px; border-bottom:1px solid #E5E7EB; background:#F9FAFB;">
-          <div style="width:8px; height:8px; border-radius:50%; background:#F59E0B;"></div>
-          <h2 style="font-size:16px; font-weight:600; color:#0F0F0F; margin:0;">Not Yet Logged</h2>
-          <span id="missing-count" style="background:#FEF3C7; color:#D97706; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">0 pending</span>
-        </div>
-        <div id="missing-grid" style="display:flex; flex-direction:column;"></div>
-      </div>
-
-      <!-- Already Logged Section -->
-      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden; margin-bottom:24px;">
-        <div style="display:flex; align-items:center; gap:8px; padding:16px; border-bottom:1px solid #E5E7EB; background:#F9FAFB;">
-          <div style="width:8px; height:8px; border-radius:50%; background:#10B981;"></div>
-          <h2 style="font-size:16px; font-weight:600; color:#0F0F0F; margin:0;">Logged Today</h2>
-          <span id="logged-count" style="background:#D1FAE5; color:#059669; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">0 done</span>
-        </div>
-        <div id="logged-grid" style="display:flex; flex-direction:column;"></div>
-        <div id="logged-pagination"></div>
-      </div>
     `;
+  },
+
+  async loadCycleTracker() {
+    const trackerContainer = document.getElementById('cycle-riders-list');
+    if (!trackerContainer) return;
+
+    try {
+      const cycle = Utils.getNoonCyclePeriod(this.currentDate);
+      const dates = [];
+      const cur = new Date(cycle.start + 'T00:00:00');
+      const endD = new Date(cycle.end + 'T00:00:00');
+      
+      const todayDateStr = Utils.today();
+      const todayLimit = new Date(todayDateStr + 'T00:00:00');
+      const elapsedLimit = new Date(Math.min(endD, todayLimit));
+      
+      let totalExpectedDays = 0;
+      let countCur = new Date(cycle.start + 'T00:00:00');
+      while (countCur <= elapsedLimit) {
+        totalExpectedDays++;
+        countCur.setDate(countCur.getDate() + 1);
+      }
+
+      while (cur <= endD) {
+        dates.push(Utils.toLocalDateStr(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      // Format cycle dates sublabel
+      const subEl = document.getElementById('cycle-dates-sub');
+      if (subEl) {
+        subEl.innerText = `Cycle: ${Utils.formatDate(cycle.start)} to ${Utils.formatDate(cycle.end)} (${dates.length} days total, ${totalExpectedDays} elapsed)`;
+      }
+
+      // Fetch active riders, bikes, and cycle logs
+      const [riders, bikes, cycleLogs] = await Promise.all([
+        API.getRiders('active'),
+        API.getBikes(),
+        API.request(`/daily-logs?start=${cycle.start}&end=${cycle.end}`)
+      ]);
+
+      this.activeCycleRiders = riders || [];
+      this.activeCycleLogs = cycleLogs || [];
+      this.bikesList = bikes || [];
+
+      // Create bike mapping for quick plate number lookup
+      this.bikeMap = {};
+      this.bikesList.forEach(b => {
+        if (b.assigned_rider_id) {
+          this.bikeMap[b.assigned_rider_id] = b;
+        }
+      });
+
+      this.renderCycleRidersList();
+    } catch(err) {
+      console.error(err);
+      trackerContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger)">Error loading tracker: ${err.message}</div>`;
+    }
+  },
+
+  renderCycleRidersList() {
+    const trackerContainer = document.getElementById('cycle-riders-list');
+    if (!trackerContainer) return;
+
+    const cycle = Utils.getNoonCyclePeriod(this.currentDate);
+    const dates = [];
+    const cur = new Date(cycle.start + 'T00:00:00');
+    const endD = new Date(cycle.end + 'T00:00:00');
+    while (cur <= endD) {
+      dates.push(Utils.toLocalDateStr(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    const todayDateStr = Utils.today();
+    const todayLimit = new Date(todayDateStr + 'T00:00:00');
+    const elapsedLimit = new Date(Math.min(endD, todayLimit));
+    
+    let totalExpectedDays = 0;
+    let countCur = new Date(cycle.start + 'T00:00:00');
+    while (countCur <= elapsedLimit) {
+      totalExpectedDays++;
+      countCur.setDate(countCur.getDate() + 1);
+    }
+
+    // Filter riders in tracker based on search query
+    const filteredRiders = this.activeCycleRiders.filter(r => {
+      const q = this.cycleSearchQuery.toLowerCase().trim();
+      return !q || r.name.toLowerCase().includes(q) || (r.noon_id && r.noon_id.toLowerCase().includes(q));
+    });
+
+    if (filteredRiders.length === 0) {
+      trackerContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-secondary);">No riders matching search query</div>`;
+      return;
+    }
+
+    let grandTotalLogged = 0;
+    let grandTotalVerified = 0;
+    let grandTotalPending = 0;
+
+    const ridersHTML = filteredRiders.map(rider => {
+      const riderLogs = this.activeCycleLogs.filter(l => String(l.rider_id) === String(rider.id));
+      let submittedCount = 0;
+      let verifiedCount = 0;
+
+      const dotsHTML = dates.map(dateStr => {
+        const log = riderLogs.find(l => l.log_date === dateStr);
+        const logDateObj = new Date(dateStr + 'T00:00:00');
+        
+        let color = '#E2E8F0'; // Default gray for future days
+        let tooltipText = `${Utils.formatDate(dateStr)}: Future`;
+        let cursorStyle = 'default';
+
+        if (log) {
+          submittedCount++;
+          grandTotalLogged++;
+          const isVerified = log.notes && log.notes.includes('[Verified]');
+          if (isVerified) {
+            verifiedCount++;
+            grandTotalVerified++;
+            color = '#10B981'; // Green for verified
+            tooltipText = `${Utils.formatDate(dateStr)}: Verified (${log.attendance_status})`;
+          } else {
+            grandTotalPending++;
+            color = '#F59E0B'; // Orange for pending verification
+            tooltipText = `${Utils.formatDate(dateStr)}: Pending Audit (${log.attendance_status})`;
+          }
+          cursorStyle = 'pointer';
+        } else if (logDateObj <= elapsedLimit) {
+          color = '#FCA5A5'; // Soft red for past days with missing logs
+          tooltipText = `${Utils.formatDate(dateStr)}: Missing Submission`;
+          cursorStyle = 'pointer';
+        }
+
+        return `<button class="compliance-dot-btn" style="background:${color}; cursor:${cursorStyle};" title="${tooltipText}" onclick="DailyLogs.selectDateAndRider('${dateStr}', '${Utils.escapeHtml(rider.name)}')"></button>`;
+      }).join('');
+
+      const pct = totalExpectedDays > 0 ? (submittedCount / totalExpectedDays) * 100 : 0;
+      const ratioColor = pct >= 90 ? 'var(--success-600)' : (pct >= 75 ? 'var(--warning-600)' : 'var(--danger-600)');
+      
+      const assignedBike = this.bikeMap[rider.id];
+      const bikeText = assignedBike ? `• Bike ${assignedBike.plate_number}` : '• No Bike';
+
+      return `
+        <div class="cycle-rider-row">
+          <div style="display:flex; flex-direction:column; gap:2px; min-width:200px; flex-shrink:0;">
+            <div style="font-weight:700; font-size:13px; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="DailyLogs.filterByRider('${Utils.escapeHtml(rider.name)}')">
+              ${Utils.escapeHtml(rider.name)}
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-600)" stroke-width="2.5" style="width:12px;height:12px;opacity:0;transition:opacity var(--transition-fast);" class="rider-hover-icon"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div style="font-size:11px; color:var(--text-secondary);">ID: ${rider.noon_id || 'N/A'} • ${rider.store_warehouse || 'No Store'} ${bikeText}</div>
+          </div>
+          <div style="display:flex; gap:3px; flex-wrap:wrap; max-width:500px; justify-content:flex-start; flex:1; padding:0 12px;">
+            ${dotsHTML}
+          </div>
+          <div style="font-weight:800; font-size:12px; color:${ratioColor}; min-width:80px; text-align:right; flex-shrink:0;">
+            ${submittedCount}/${totalExpectedDays} days (${Math.round(pct)}%)
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    trackerContainer.innerHTML = ridersHTML;
+
+    // Attach styling hover behavior for rider names
+    trackerContainer.querySelectorAll('.cycle-rider-row').forEach(row => {
+      row.addEventListener('mouseenter', () => {
+        const icon = row.querySelector('.rider-hover-icon');
+        if (icon) icon.style.opacity = '1';
+      });
+      row.addEventListener('mouseleave', () => {
+        const icon = row.querySelector('.rider-hover-icon');
+        if (icon) icon.style.opacity = '0';
+      });
+    });
+
+    // Update global cycle stats
+    const totalExpectedSubmissions = this.activeCycleRiders.length * totalExpectedDays;
+    const globalRate = totalExpectedSubmissions > 0 ? (this.activeCycleLogs.length / totalExpectedSubmissions) * 100 : 0;
+    const missingSubmissionsCount = Math.max(0, totalExpectedSubmissions - this.activeCycleLogs.length);
+
+    const statRate = document.getElementById('cycle-stat-rate');
+    const statVerified = document.getElementById('cycle-stat-verified');
+    const statPending = document.getElementById('cycle-stat-pending');
+    const statMissing = document.getElementById('cycle-stat-missing');
+
+    if (statRate) statRate.innerText = `${Math.round(globalRate)}%`;
+    if (statVerified) statVerified.innerText = grandTotalVerified;
+    if (statPending) statPending.innerText = grandTotalPending;
+    if (statMissing) statMissing.innerText = missingSubmissionsCount;
+  },
+
+  selectDateAndRider(dateStr, riderName) {
+    this.currentDate = dateStr;
+    this.currentPage = 1;
+    this.searchQuery = riderName;
+
+    // Update controls visually
+    const picker = document.getElementById('date-picker');
+    if (picker) picker.value = dateStr;
+    const label = document.getElementById('date-label');
+    if (label) label.innerText = Utils.formatDate(dateStr);
+    const searchInput = document.getElementById('logs-search');
+    if (searchInput) searchInput.value = riderName;
+
+    this.loadGridData();
+  },
+
+  filterByRider(riderName) {
+    this.searchQuery = riderName;
+    const searchInput = document.getElementById('logs-search');
+    if (searchInput) searchInput.value = riderName;
+    this.currentPage = 1;
+    this.loadGridData();
   },
 
   async loadGridData() {
@@ -105,77 +506,107 @@ const DailyLogs = {
     if (!missingGrid || !loggedGrid) return;
 
     missingGrid.innerHTML = `
-      <div style="padding:20px; text-align:center;">
+      <div style="padding:30px; text-align:center;">
         <span class="spinner" style="width:24px; height:24px;"></span>
       </div>
     `;
     loggedGrid.innerHTML = `
-      <div style="padding:20px; text-align:center;">
+      <div style="padding:30px; text-align:center;">
         <span class="spinner" style="width:24px; height:24px;"></span>
       </div>
     `;
     if (loggedPagination) loggedPagination.innerHTML = '';
 
     try {
+      // Fetch missing and logged for selected date
       const [res, missing] = await Promise.all([
-        API.getDailyLogs(this.currentDate, this.currentPage, this.limit, this.searchQuery),
+        API.getDailyLogs(this.currentDate, 1, 1000, ''), // Fetch all daily logs first for local tabs filtering
         API.getMissingLogs(this.currentDate)
       ]);
 
-      const logged = res.logs || [];
-      const total = res.total || 0;
+      const allLoggedLogs = res.logs || [];
+      const totalLoggedCount = res.total || 0;
 
       // Filter missing list client-side based on search query
       const filteredMissing = missing.filter(r => {
         const q = this.searchQuery.toLowerCase().trim();
-        return !q || (r.name && r.name.toLowerCase().includes(q));
+        return !q || (r.name && r.name.toLowerCase().includes(q)) || (r.noon_id && r.noon_id.toLowerCase().includes(q));
       });
 
       // Update counters
       const missingCountEl = document.getElementById('missing-count');
-      if (missingCountEl) missingCountEl.innerText = `${filteredMissing.length} pending`;
+      if (missingCountEl) missingCountEl.innerText = `${filteredMissing.length} riders`;
 
-      const loggedCountEl = document.getElementById('logged-count');
-      if (loggedCountEl) loggedCountEl.innerText = `${total} done`;
+      // Filter logged logs based on search query AND active verification tab
+      const searchFilteredLogged = allLoggedLogs.filter(l => {
+        const q = this.searchQuery.toLowerCase().trim();
+        const matchesSearch = !q || (l.rider_name && l.rider_name.toLowerCase().includes(q));
+        
+        const isVerified = l.notes && l.notes.includes('[Verified]');
+        if (this.activeTab === 'verified') {
+          return matchesSearch && isVerified;
+        } else if (this.activeTab === 'pending') {
+          return matchesSearch && !isVerified;
+        }
+        return matchesSearch;
+      });
 
-      // Render missing
+      // Calculate totals for verification filter tabs
+      const countAll = allLoggedLogs.filter(l => !this.searchQuery || l.rider_name.toLowerCase().includes(this.searchQuery.toLowerCase().trim())).length;
+      const countVerified = allLoggedLogs.filter(l => (l.notes && l.notes.includes('[Verified]')) && (!this.searchQuery || l.rider_name.toLowerCase().includes(this.searchQuery.toLowerCase().trim()))).length;
+      const countPending = countAll - countVerified;
+
+      document.getElementById('feed-count-all').innerText = countAll;
+      document.getElementById('feed-count-verified').innerText = countVerified;
+      document.getElementById('feed-count-pending').innerText = countPending;
+
+      // Implement client-side pagination for searchFilteredLogged
+      const totalFiltered = searchFilteredLogged.length;
+      const totalPages = Math.ceil(totalFiltered / this.limit) || 1;
+      if (this.currentPage > totalPages) this.currentPage = totalPages;
+
+      const offset = (this.currentPage - 1) * this.limit;
+      const paginatedLogged = searchFilteredLogged.slice(offset, offset + this.limit);
+
+      // Render missing list
       if (filteredMissing.length === 0) {
         missingGrid.innerHTML = `
           <div style="padding:40px 20px; text-align:center;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <div style="font-size:15px; font-weight:500; color:#0F0F0F;">All riders logged for this date! 🎉</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--success-500)" stroke-width="1.8" style="width:40px;height:40px;margin:0 auto 12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div style="font-size:13px; font-weight:700; color:var(--text-primary);">All riders have submitted! 🎉</div>
+            <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">No missing daily logs for today.</div>
           </div>
         `;
       } else {
         missingGrid.innerHTML = filteredMissing.map(r => this.buildMissingCard(r)).join('');
       }
 
-      // Render logged
-      if (logged.length === 0) {
+      // Render logged list
+      if (paginatedLogged.length === 0) {
         loggedGrid.innerHTML = `
-          <div style="padding:40px 20px; text-align:center;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <div style="font-size:15px; font-weight:500; color:#0F0F0F;">No data logged yet for this date</div>
+          <div style="padding:40px 20px; text-align:center; color:var(--text-secondary);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.8" style="width:40px;height:40px;margin:0 auto 12px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div style="font-size:13px; font-weight:700; color:var(--text-primary);">No submissions match filters</div>
+            <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Check your search query or filters.</div>
           </div>
         `;
       } else {
-        loggedGrid.innerHTML = logged.map(l => this.buildLoggedCard(l)).join('');
+        loggedGrid.innerHTML = paginatedLogged.map(l => this.buildLoggedCard(l)).join('');
       }
 
       // Render pagination controls
-      const totalPages = Math.ceil(total / this.limit) || 1;
       if (totalPages > 1 && loggedPagination) {
         loggedPagination.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid #E5E7EB; background:#F9FAFB;">
-            <div style="font-size:13px; color:#6B7280;">
-              Showing <span style="font-weight:600; color:#111827;">${(this.currentPage - 1) * this.limit + 1}</span> to <span style="font-weight:600; color:#111827;">${Math.min(this.currentPage * this.limit, total)}</span> of <span style="font-weight:600; color:#111827;">${total}</span> logs
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-top:1px solid #E5E7EB; background:#F9FAFB; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+            <div style="font-size:12px; color:#6B7280;">
+              Showing <span style="font-weight:700; color:#111827;">${offset + 1}</span> to <span style="font-weight:700; color:#111827;">${Math.min(offset + this.limit, totalFiltered)}</span> of <span style="font-weight:700; color:#111827;">${totalFiltered}</span> submissions
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
-              <button id="page-prev" ${this.currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:500; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+              <button id="page-prev" ${this.currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
                 Previous
               </button>
-              <span style="font-size:13px; color:#374151;">Page <span style="font-weight:600;">${this.currentPage}</span> of ${totalPages}</span>
-              <button id="page-next" ${this.currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:500; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+              <span style="font-size:12px; color:#374151;">Page <span style="font-weight:700;">${this.currentPage}</span> of ${totalPages}</span>
+              <button id="page-next" ${this.currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; color:#374151; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
                 Next
               </button>
             </div>
@@ -183,9 +614,10 @@ const DailyLogs = {
         `;
       }
 
-      this.attachGridEvents(logged, missing, total);
+      this.attachGridEvents(paginatedLogged, missing, totalFiltered);
     } catch (err) {
-      loggedGrid.innerHTML = `<div class="empty-state"><p>Failed to load logs: ${err.message}</p></div>`;
+      console.error(err);
+      loggedGrid.innerHTML = `<div class="empty-state" style="padding:20px; text-align:center; color:var(--danger)"><p>Failed to load logs: ${err.message}</p></div>`;
       missingGrid.innerHTML = '';
     }
   },
@@ -199,6 +631,7 @@ const DailyLogs = {
       if (label) label.innerText = Utils.formatDate(this.currentDate);
       const picker = document.getElementById('date-picker');
       if (picker) picker.value = this.currentDate;
+      this.loadCycleTracker();
       this.loadGridData();
     });
 
@@ -210,6 +643,7 @@ const DailyLogs = {
       if (label) label.innerText = Utils.formatDate(this.currentDate);
       const picker = document.getElementById('date-picker');
       if (picker) picker.value = this.currentDate;
+      this.loadCycleTracker();
       this.loadGridData();
     });
 
@@ -221,10 +655,11 @@ const DailyLogs = {
       if (label) label.innerText = Utils.formatDate(this.currentDate);
       const picker = document.getElementById('date-picker');
       if (picker) picker.value = this.currentDate;
+      this.loadCycleTracker();
       this.loadGridData();
     });
 
-    // Search input (Debounced server-side + client-side filter)
+    // Search input (Daily logs feed filter)
     const searchInput = document.getElementById('logs-search');
     searchInput?.addEventListener('input', Utils.debounce((e) => {
       this.searchQuery = e.target.value;
@@ -232,9 +667,34 @@ const DailyLogs = {
       this.loadGridData();
     }, 200));
 
-    // Bulk lodge button
+    // Cycle compliance search input
+    const cycleSearchInput = document.getElementById('cycle-search');
+    cycleSearchInput?.addEventListener('input', Utils.debounce((e) => {
+      this.cycleSearchQuery = e.target.value;
+      this.renderCycleRidersList();
+    }, 150));
+
+    // Bulk override button
     document.getElementById('bulk-lodge-btn')?.addEventListener('click', () => {
       this.openBulkLodgeModal();
+    });
+
+    // Feed tabs filter event delegation
+    document.querySelectorAll('.feed-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.feed-tab-btn').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = 'transparent';
+          b.style.color = 'var(--text-secondary)';
+        });
+        btn.classList.add('active');
+        btn.style.background = 'var(--bg-card)';
+        btn.style.color = 'var(--primary-600)';
+        
+        this.activeTab = btn.dataset.tab;
+        this.currentPage = 1;
+        this.loadGridData();
+      });
     });
   },
 
@@ -256,8 +716,41 @@ const DailyLogs = {
       }
     });
 
-    // Log buttons for missing riders
-    document.querySelectorAll('.log-now-btn').forEach(btn => {
+    // Verify Submission clicks
+    document.querySelectorAll('.verify-now-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const logId = btn.dataset.logId;
+        const notes = btn.dataset.logNotes || '';
+        await this.verifyLog(logId, notes);
+      });
+    });
+
+    // WhatsApp quick nudge clicks (Missing lists)
+    document.querySelectorAll('.whatsapp-nudge-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const phone = btn.dataset.phone;
+        const name = btn.dataset.name;
+        this.nudgeRiderWhatsApp(phone, name);
+      });
+    });
+
+    // WhatsApp audit chat clicks (Logged list)
+    document.querySelectorAll('.whatsapp-audit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const phone = btn.dataset.phone;
+        const name = btn.dataset.name;
+        const dateStr = btn.dataset.date;
+        const orders = btn.dataset.orders;
+        const hours = btn.dataset.hours;
+        this.auditRiderWhatsApp(phone, name, dateStr, orders, hours);
+      });
+    });
+
+    // Override manual log click
+    document.querySelectorAll('.override-log-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const riderId = parseInt(btn.dataset.riderId);
@@ -266,23 +759,11 @@ const DailyLogs = {
       });
     });
 
-    // Clicking missing card also opens log form
-    document.querySelectorAll('[data-action="log"]').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (App.isViewer()) return;
-        if (e.target.closest('.log-now-btn')) return;
-        const riderId = parseInt(card.dataset.riderId);
-        const rider = missing.find(r => r.id === riderId);
-        if (rider) this.openLogForm(riderId, rider.name);
-      });
-    });
-
     // Edit logged entries
-    document.querySelectorAll('[data-action="edit"]').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (App.isViewer()) return;
-        if (e.target.closest('.view-proof-btn') || e.target.closest('.delete-log-btn')) return;
-        const logId = card.dataset.logId;
+    document.querySelectorAll('.edit-log-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const logId = btn.dataset.logId;
         const log = logged.find(l => String(l.id) === logId);
         if (log) this.openEditForm(log);
       });
@@ -295,7 +776,7 @@ const DailyLogs = {
         const logId = btn.dataset.logId;
         const log = logged.find(l => String(l.id) === logId);
         if (log && log.screenshot) {
-          Utils.openModal('Screenshot Proof', `<div style="text-align:center;"><img src="${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>`);
+          Utils.openModal('Screenshot Proof', `<div style="text-align:center; padding:10px;"><img src="${log.screenshot}" style="max-width:100%;max-height:70vh;border-radius:12px;box-shadow:var(--shadow-lg);"></div>`);
         }
       });
     });
@@ -312,7 +793,8 @@ const DailyLogs = {
             Utils.showLoading('Deleting log');
             await API.deleteDailyLog(logId);
             Utils.showToast('Log deleted successfully', 'success');
-            this.loadGridData();
+            await this.loadGridData();
+            await this.loadCycleTracker();
           } catch (err) {
             Utils.showToast(err.message, 'error');
           } finally {
@@ -323,12 +805,66 @@ const DailyLogs = {
     });
   },
 
+  // ── Verification Action ──
+  async verifyLog(logId, currentNotes) {
+    try {
+      Utils.showLoading('Verifying submission');
+      let newNotes = currentNotes || '';
+      if (!newNotes.includes('[Verified]')) {
+        newNotes = (newNotes.trim() + ' [Verified]').trim();
+      }
+      
+      await API.updateDailyLog(logId, { notes: newNotes });
+      Utils.showToast('Log verified successfully', 'success');
+      await this.loadGridData();
+      await this.loadCycleTracker();
+    } catch(err) {
+      Utils.showToast(err.message, 'error');
+    } finally {
+      Utils.hideLoading();
+    }
+  },
+
+  // ── WhatsApp Messaging Helpers ──
+  formatWhatsAppPhone(phone) {
+    if (!phone) return '';
+    let clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('00')) clean = clean.substring(2);
+    if (clean.startsWith('0')) clean = '966' + clean.substring(1);
+    if (clean.length === 9 && clean.startsWith('5')) clean = '966' + clean;
+    return clean;
+  },
+
+  nudgeRiderWhatsApp(phone, name) {
+    const cleanPhone = this.formatWhatsAppPhone(phone);
+    if (!cleanPhone) {
+      Utils.showToast('No valid phone number found for this rider', 'error');
+      return;
+    }
+    const dateFormatted = Utils.formatDate(this.currentDate);
+    const msg = `*Inspiring Roads Logistics*\n\nDear *${name}*,\n\nWe noticed that you have *not submitted* your daily log for *${dateFormatted}* yet.\n\nPlease open the *IRL Rider App* and submit your orders and check-in hours urgently to avoid any payroll issues.\n\nThank you!`;
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
+  auditRiderWhatsApp(phone, name, dateStr, orders, hours) {
+    const cleanPhone = this.formatWhatsAppPhone(phone);
+    if (!cleanPhone) {
+      Utils.showToast('No valid phone number found for this rider', 'error');
+      return;
+    }
+    const dateFormatted = Utils.formatDate(dateStr);
+    const msg = `*Inspiring Roads Logistics - Audit Check*\n\nDear *${name}*,\n\nWe are auditing your daily submission for *${dateFormatted}*.\n\n*Logged details:*\n- Total Orders: *${orders}*\n- Check-in Hours: *${hours}*\n\nPlease confirm if these numbers match your dashboard. If there is a mistake, reply to this chat.\n\nThank you!`;
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
   // ── Log entry form ──
   openLogForm(riderId, riderName) {
     const html = `
       <form id="log-form">
         <div style="margin-bottom:20px">
-          <p class="text-sm text-muted">Recording data for <strong>${Utils.escapeHtml(riderName)}</strong> on <strong>${Utils.formatDate(this.currentDate)}</strong></p>
+          <p class="text-sm text-muted">Overriding data for <strong>${Utils.escapeHtml(riderName)}</strong> on <strong>${Utils.formatDate(this.currentDate)}</strong></p>
         </div>
         <div class="form-grid">
           <div class="form-group" style="grid-column: 1/-1">
@@ -360,7 +896,7 @@ const DailyLogs = {
             </div>
             <div class="form-group">
               <label class="form-label">Notes (Optional)</label>
-              <input type="text" class="form-input" name="notes" placeholder="Any notes...">
+              <input type="text" class="form-input" name="notes" placeholder="e.g. Admin Override, [Verified] ...">
             </div>
           </div>
           <div id="absent-reason-container" class="form-group" style="grid-column: 1/-1; display:none; animation: slideUp 200ms ease;">
@@ -370,7 +906,6 @@ const DailyLogs = {
           <div class="form-actions" style="grid-column: 1/-1">
             <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
             <button type="submit" class="btn btn-success" id="btn-save-log">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               Save Log
             </button>
           </div>
@@ -378,7 +913,7 @@ const DailyLogs = {
       </form>
     `;
 
-    Utils.openModal(`Log Data — ${riderName}`, html);
+    Utils.openModal(`Override Log — ${riderName}`, html);
 
     // Toggle inputs
     const statusRadios = document.querySelectorAll('input[name="attendance_status"]');
@@ -426,7 +961,7 @@ const DailyLogs = {
       const submitBtn = document.getElementById('btn-save-log');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:white;margin-right:8px;"></span> Saving...';
+        submitBtn.innerHTML = 'Saving...';
       }
 
       const fd = new FormData(e.target);
@@ -444,22 +979,15 @@ const DailyLogs = {
 
       try {
         await API.createDailyLog(data);
-        const totalMin = Utils.toMinutes(data.checkin_hours, data.checkin_minutes);
-        if (totalMin < 660) {
-          Utils.showToast(`⚠️ ${riderName}: Check-in below 11 hours!`, 'warning');
-        } else {
-          Utils.showToast(`Log saved for ${riderName}`, 'success');
-        }
+        Utils.showToast(`Override saved for ${riderName}`, 'success');
         Utils.closeModal();
-        this.render();
+        await this.loadCycleTracker();
+        await this.loadGridData();
       } catch (err) {
         Utils.showToast(err.message, 'error');
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Save Log
-          `;
+          submitBtn.innerHTML = `Save Log`;
         }
       }
     });
@@ -511,12 +1039,10 @@ const DailyLogs = {
           </div>
           <div class="form-actions" style="grid-column: 1/-1">
             <button type="button" class="btn btn-danger" id="btn-delete-log" style="margin-right:auto;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               Delete Log
             </button>
             <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btn-update-log">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               Update Log
             </button>
           </div>
@@ -531,7 +1057,6 @@ const DailyLogs = {
     const editAbsentContainer = document.getElementById('edit-absent-reason-container');
     const editAbsentInput = document.getElementById('edit_absent_reason_input');
     
-    // Set initial required state
     if (log.attendance_status !== 'Present' && log.attendance_status) editAbsentInput.required = true;
 
     editStatusRadios.forEach(r => r.addEventListener('change', () => {
@@ -547,24 +1072,20 @@ const DailyLogs = {
         editAbsentContainer.style.display = 'block';
         editAbsentInput.required = true;
         
-        // Zero them out automatically
         document.querySelector('#edit-log-form input[name="primary_orders"]').value = 0;
         document.querySelector('#edit-log-form input[name="associate_orders"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_hours"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_minutes"]').value = 0;
       } else {
-        // Week Off or Leave
         editStatsInputs.style.opacity = '0.5';
         editStatsInputs.style.pointerEvents = 'none';
         editAbsentContainer.style.display = 'none';
         editAbsentInput.required = false;
         editAbsentInput.value = '';
         
-        // Zero them out automatically
         document.querySelector('#edit-log-form input[name="primary_orders"]').value = 0;
         document.querySelector('#edit-log-form input[name="associate_orders"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_hours"]').value = 0;
-        document.querySelector('#edit-log-form input[name="checkin_minutes"]').value = 0;
         document.querySelector('#edit-log-form input[name="checkin_minutes"]').value = 0;
       }
     }));
@@ -578,7 +1099,8 @@ const DailyLogs = {
           await API.deleteDailyLog(log.id);
           Utils.showToast('Log deleted successfully', 'success');
           Utils.closeModal();
-          this.render();
+          await this.loadCycleTracker();
+          await this.loadGridData();
         } catch (err) {
           Utils.showToast(err.message, 'error');
         } finally {
@@ -593,7 +1115,7 @@ const DailyLogs = {
       const submitBtn = document.getElementById('btn-update-log');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:white;margin-right:8px;"></span> Updating...';
+        submitBtn.innerHTML = 'Updating...';
       }
 
       const fd = new FormData(e.target);
@@ -611,15 +1133,13 @@ const DailyLogs = {
         await API.updateDailyLog(log.id, data);
         Utils.showToast('Log updated successfully', 'success');
         Utils.closeModal();
-        this.render();
+        await this.loadCycleTracker();
+        await this.loadGridData();
       } catch (err) {
         Utils.showToast(err.message, 'error');
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Update Log
-          `;
+          submitBtn.innerHTML = `Update Log`;
         }
       }
     });
@@ -629,7 +1149,7 @@ const DailyLogs = {
   async openBulkLodgeModal() {
     Utils.showLoading('Loading riders');
     try {
-      const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const cycle = Utils.getNoonCyclePeriod(this.currentDate);
       const startDate = new Date(cycle.start + 'T00:00:00');
       const todayDate = new Date(); todayDate.setHours(0,0,0,0);
       const cycleEndDate = new Date(cycle.end + 'T00:00:00');
@@ -649,7 +1169,6 @@ const DailyLogs = {
         const stats = payroll.find(p => String(p.rider_id) === String(r.id));
         if (stats) {
           const loggedDays = stats.present_days + stats.absent_days + stats.weekoff_days;
-          // Only show riders whose logged days are strictly less than the expected days up to today
           if (loggedDays >= expectedDays) return false;
         }
         return true;
@@ -672,7 +1191,7 @@ const DailyLogs = {
         </div>
       `;
 
-      Utils.openModal('Bulk Lodge Data', html, 'modal-xl');
+      Utils.openModal('Bulk Override Data', html, 'modal-xl');
 
       document.getElementById('bulk-rider-select')?.addEventListener('change', async (e) => {
         const riderId = parseInt(e.target.value);
@@ -691,8 +1210,7 @@ const DailyLogs = {
     area.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div></div>';
 
     try {
-      // Get all dates from the current Noon cycle up to today
-      const cycle = Utils.getNoonCyclePeriod(Utils.getActiveDate());
+      const cycle = Utils.getNoonCyclePeriod(this.currentDate);
       const startDate = new Date(cycle.start + 'T00:00:00');
       
       const todayDate = new Date();
@@ -777,7 +1295,6 @@ const DailyLogs = {
           <div class="form-actions mt-24">
             <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
             <button type="submit" class="btn btn-primary">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               Submit All Selected
             </button>
           </div>
@@ -785,8 +1302,6 @@ const DailyLogs = {
       `;
 
       const bulkForm = document.getElementById('bulk-lodge-form');
-      
-      // Prevent accidental Enter key submission
       bulkForm?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
           e.preventDefault();
@@ -815,7 +1330,6 @@ const DailyLogs = {
     let failed = 0;
     let emptyDays = [];
 
-    // Preliminary validation
     for (const cb of checkedBoxes) {
       const date = cb.dataset.date;
       const att = document.querySelector(`[name="att_${date}"]`)?.value || 'Present';
@@ -849,7 +1363,7 @@ const DailyLogs = {
           associate_orders: asc,
           checkin_hours: hrs,
           checkin_minutes: min,
-          notes: 'Bulk lodged'
+          notes: 'Bulk Override [Verified]'
         });
         success++;
       } catch (err) {
@@ -859,7 +1373,8 @@ const DailyLogs = {
 
     Utils.hideLoading();
     Utils.closeModal();
-    Utils.showToast(`Bulk lodge complete: ${success} saved, ${failed} failed`, success > 0 ? 'success' : 'error');
-    this.render();
+    Utils.showToast(`Bulk override complete: ${success} saved, ${failed} failed`, success > 0 ? 'success' : 'error');
+    await this.loadCycleTracker();
+    await this.loadGridData();
   }
 };

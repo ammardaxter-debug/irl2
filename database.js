@@ -663,7 +663,7 @@ async function deleteFund(id) {
 
 async function getDailyLogs(periodStart, periodEnd) {
   const data = await fetchPaginated(() => {
-    let q = supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, submitted_at, created_at, updated_at');
+    let q = supabase.from('daily_logs').select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, screenshot, submitted_at, created_at, updated_at');
     if (periodStart && periodEnd) {
       q = q.gte('log_date', periodStart).lte('log_date', periodEnd);
     }
@@ -675,7 +675,7 @@ async function getDailyLogs(periodStart, periodEnd) {
 async function getDailyLogsPaginated(date, limit, offset, search = '') {
   let query = supabase
     .from('daily_logs')
-    .select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, submitted_at, created_at, updated_at', { count: 'exact' })
+    .select('id, rider_id, rider_name, log_date, attendance_status, primary_orders, associate_orders, checkin_hours, checkin_minutes, notes, screenshot, submitted_at, created_at, updated_at', { count: 'exact' })
     .eq('log_date', date);
 
   if (search) {

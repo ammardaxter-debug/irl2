@@ -185,124 +185,128 @@ const Dashboard = {
     return `
       <!-- Smart Greeting -->
       ${this.buildGreeting(stats, period)}
-
+ 
       <!-- Rider Bike Authorizations & Expiries -->
       ${this.buildBikeAuthorizations(bikes, riders)}
-
+ 
       <!-- Rider Uniform & Safety Kit Tracker -->
       ${this.buildUniformSafetyTracker(riders)}
-
+ 
       <!-- Stats Cards -->
-      <div class="stats-grid">
-        <div class="card stat-card" style="border-top: 3px solid #2563EB; animation: slideUp 300ms ease both; animation-delay: 0ms">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Total Riders</span>
-            <div class="stat-card-icon" style="color: #2563EB;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        <div class="stats-card-premium primary" style="animation: slideUp 300ms ease both; animation-delay: 0ms">
+          <div class="stat-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span class="stat-card-label" style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Total Riders</span>
+            <div class="stat-card-icon" style="color: var(--primary-500); width:20px; height:20px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
           </div>
-          <div class="stat-card-value">${stats.total_active}</div>
-          <div class="stat-card-sub">${stats.total_company} Company · ${stats.total_freelancer} Freelancer</div>
+          <div class="stat-card-value" style="font-size:28px; font-weight:800; color:var(--text-primary); line-height:1.2;">${stats.total_active}</div>
+          <div class="stat-card-sub" style="font-size:12px; color:var(--text-tertiary); margin-top:8px; font-weight:500;">${stats.total_company} Company · ${stats.total_freelancer} Freelancer</div>
         </div>
-
-        <div class="card stat-card" style="border-top: 3px solid #16A34A; animation: slideUp 300ms ease both; animation-delay: 80ms">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Logged Today</span>
-            <div class="stat-card-icon" style="color: #16A34A;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+ 
+        <div class="stats-card-premium success" style="animation: slideUp 300ms ease both; animation-delay: 80ms">
+          <div class="stat-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span class="stat-card-label" style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Logged Today</span>
+            <div class="stat-card-icon" style="color: var(--success-500); width:20px; height:20px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
           </div>
-          <div class="stat-card-value" style="color: ${stats.logged_today === 0 ? '#DC2626' : 'var(--text-primary)'};">${stats.logged_today}</div>
-          <div class="stat-card-sub" style="color: ${stats.logged_today === 0 ? '#DC2626' : 'var(--text-tertiary)'};">out of ${stats.total_active} riders</div>
+          <div class="stat-card-value" style="font-size:28px; font-weight:800; color: ${stats.logged_today === 0 ? 'var(--danger-500)' : 'var(--text-primary)'}; line-height:1.2;">${stats.logged_today}</div>
+          <div class="stat-card-sub" style="font-size:12px; color: ${stats.logged_today === 0 ? 'var(--danger-500)' : 'var(--text-tertiary)'}; margin-top:8px; font-weight:500;">out of ${stats.total_active} active DAs</div>
         </div>
-
-        <div class="card stat-card" style="border-top: 3px solid #D97706; animation: slideUp 300ms ease both; animation-delay: 160ms">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Pending Today</span>
-            <div class="stat-card-icon" style="color: #D97706;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+ 
+        <div class="stats-card-premium warning" style="animation: slideUp 300ms ease both; animation-delay: 160ms">
+          <div class="stat-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span class="stat-card-label" style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Pending Today</span>
+            <div class="stat-card-icon" style="color: var(--warning-500); width:20px; height:20px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </div>
           </div>
-          <div class="stat-card-value">${stats.pending_today}</div>
-          <div class="stat-card-sub">data not yet recorded</div>
+          <div class="stat-card-value" style="font-size:28px; font-weight:800; color:var(--text-primary); line-height:1.2;">${stats.pending_today}</div>
+          <div class="stat-card-sub" style="font-size:12px; color:var(--text-tertiary); margin-top:8px; font-weight:500;">daily logs outstanding</div>
         </div>
-
-        <div class="card stat-card" style="border-top: 3px solid #DC2626; animation: slideUp 300ms ease both; animation-delay: 240ms">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Low Check-in</span>
-            <div class="stat-card-icon" style="color: #DC2626;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+ 
+        <div class="stats-card-premium danger" style="animation: slideUp 300ms ease both; animation-delay: 240ms">
+          <div class="stat-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span class="stat-card-label" style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Low Check-in</span>
+            <div class="stat-card-icon" style="color: var(--danger-500); width:20px; height:20px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
           </div>
-          <div class="stat-card-value">${stats.low_checkins_today.length}</div>
-          <div class="stat-card-sub">riders below 11 hrs today</div>
+          <div class="stat-card-value" style="font-size:28px; font-weight:800; color:var(--text-primary); line-height:1.2;">${stats.low_checkins_today.length}</div>
+          <div class="stat-card-sub" style="font-size:12px; color:var(--text-tertiary); margin-top:8px; font-weight:500;">riders below 11 hrs today</div>
         </div>
-
-        <div class="card stat-card" style="border-top: 3px solid #7C3AED; animation: slideUp 300ms ease both; animation-delay: 300ms">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Period Orders</span>
-            <div class="stat-card-icon" style="color: #7C3AED;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+ 
+        <div class="stats-card-premium purple" style="animation: slideUp 300ms ease both; animation-delay: 300ms">
+          <div class="stat-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span class="stat-card-label" style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Period Orders</span>
+            <div class="stat-card-icon" style="color: var(--accent-500); width:20px; height:20px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
             </div>
           </div>
-          <div class="stat-card-value">${stats.period_total_orders}</div>
-          <div class="stat-card-sub">
-            <span style="color:var(--slate-500)">Primary:</span> <strong>${stats.period_primary_orders}</strong>
-            <span style="color:var(--slate-300); margin:0 4px">|</span>
-            <span style="color:var(--slate-500)">Associate:</span> <strong>${stats.period_associate_orders}</strong>
+          <div class="stat-card-value" style="font-size:28px; font-weight:800; color:var(--text-primary); line-height:1.2;">${stats.period_total_orders}</div>
+          <div class="stat-card-sub" style="font-size:12px; color:var(--text-secondary); margin-top:8px; font-weight:500;">
+            Primary: <strong>${stats.period_primary_orders}</strong> · Assoc: <strong>${stats.period_associate_orders}</strong>
           </div>
         </div>
       </div>
-
+ 
       <!-- Quick Actions -->
-      <div class="mb-24" style="animation: slideUp 300ms ease both; animation-delay: 320ms">
+      <div style="margin-bottom: 28px; animation: slideUp 300ms ease both; animation-delay: 320ms">
         <div style="margin-bottom: 16px;">
-          <h2 style="font-size: 16px; font-weight: 600; color: #0F0F0F;">
+          <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;">
             Quick Actions
           </h2>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
-          <button id="qa-log-today" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #2563EB; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+          <button id="qa-log-today" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--primary-600); background: var(--primary-50);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">Log Today's Data</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Log Today's Data</span>
           </button>
-          <button id="qa-add-rider" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #16A34A; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          
+          <button id="qa-add-rider" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--success-600); background: var(--success-50);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">Add New Rider</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Add New Rider</span>
           </button>
-          <button id="qa-view-payroll" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #7C3AED; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+ 
+          <button id="qa-view-payroll" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--accent-600); background: rgba(124, 58, 237, 0.08);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">View Payroll</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">View Payroll</span>
           </button>
-          <button id="qa-monthly-report" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #DB2777; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+ 
+          <button id="qa-monthly-report" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: #db2777; background: #fdf2f8;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">Monthly PDF</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Monthly PDF</span>
           </button>
-          <button id="qa-view-riders" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #F97316; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+ 
+          <button id="qa-view-riders" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--orange-500); background: var(--orange-50);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">All Riders</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">All Riders</span>
           </button>
-          <button id="qa-backup" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #6B7280; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+ 
+          <button id="qa-backup" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--gray-600); background: var(--gray-100);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">Download Backup</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Backup Data</span>
           </button>
-          <button id="qa-force-offline" style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.2s;">
-            <div style="color: #dc2626; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+ 
+          <button id="qa-force-offline" class="quick-action-btn-premium">
+            <div class="icon-wrapper" style="color: var(--danger-600); background: var(--danger-50);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
             </div>
-            <span style="font-size: 13px; font-weight: 500; color: #374151;">Force Offline Rider</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Force Offline</span>
           </button>
         </div>
       </div>
@@ -450,32 +454,34 @@ const Dashboard = {
       </div>
 
       <!-- 1-Click Communications Hub -->
-      <div class="card section-card mt-24" style="animation: slideUp 300ms ease both; animation-delay: 800ms; border: 1px solid rgba(59,130,246,0.15); background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);">
-        <div class="section-header">
-          <h2 class="section-title" style="display:flex; align-items:center; gap:10px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-            <span>Communications Hub</span>
+      <div class="glass-card mt-24 animate-slide-up" style="animation-delay: 800ms; padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(240,244,248,0.5) 100%);">
+        <div class="section-header" style="margin-bottom: 20px;">
+          <h2 class="section-title" style="display:flex; align-items:center; gap:10px; margin:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:var(--primary-500);"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <span style="font-size:16px; font-weight:700;">Communications Hub</span>
             <span style="background:linear-gradient(135deg,#25D366,#128C7E); color:white; font-size:10px; padding:3px 10px; border-radius:20px; font-weight:700; letter-spacing:0.5px;">WhatsApp Enabled</span>
           </h2>
           <span class="badge ${actionItems.length > 0 ? 'badge-danger' : 'badge-active'}" style="font-size:13px; padding:5px 14px;">${actionItems.length > 0 ? actionItems.length + ' Action(s) Required' : '✓ All Clear'}</span>
         </div>
-        <div id="action-center-list" style="display:flex; flex-direction:column; gap:8px; max-height: 400px; overflow-y:auto; padding-right:4px;">
+        <div id="action-center-list" style="display:flex; flex-direction:column; gap:10px; max-height: 400px; overflow-y:auto; padding-right:4px;">
           ${actionItems.length === 0
             ? '<div class="empty-state" style="padding:40px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p style="margin-top:12px; font-size:15px; font-weight:600;">No pending actions — all systems healthy</p></div>'
             : actionItems.map((item, i) => `
-              <div class="action-hub-item ${item.type}" style="display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; background:${item.type === 'danger' ? 'var(--danger-50)' : 'var(--warning-50)'}; border:1px solid ${item.type === 'danger' ? 'var(--danger-100)' : 'var(--warning-100)'}; animation: slideIn 200ms ease both; animation-delay:${i * 40}ms;">
-                <div style="width:32px; height:32px; flex-shrink:0; border-radius:8px; background:${item.type === 'danger' ? 'var(--danger-100)' : 'var(--warning-100)'}; display:flex; align-items:center; justify-content:center; color:${item.type === 'danger' ? 'var(--danger-600)' : 'var(--warning-600)'};">
-                  <div style="width:18px; height:18px;">${item.icon}</div>
-                </div>
-                <div style="flex:1; min-width:0;">
-                  <div style="font-size:13px; font-weight:500; color:var(--text-primary); line-height:1.4;">${item.label}</div>
-                  <span style="display:inline-block; margin-top:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; padding:2px 8px; border-radius:4px; background:${item.type === 'danger' ? 'var(--danger-100)' : 'var(--warning-100)'}; color:${item.type === 'danger' ? 'var(--danger-600)' : 'var(--warning-600)'}">${item.tag}</span>
+              <div class="action-hub-item ${item.type}" style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; border-radius:12px; background:#ffffff; border:1px solid var(--border-light); box-shadow: var(--shadow-sm); transition: all 0.2s ease; animation: slideIn 200ms ease both; animation-delay:${i * 40}ms;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='var(--shadow-md)';" onmouseout="this.style.transform='none'; this.style.boxShadow='var(--shadow-sm)';">
+                <div style="display:flex; align-items:center; gap:14px; flex:1; min-width:0;">
+                  <div style="width:36px; height:36px; flex-shrink:0; border-radius:10px; background:${item.type === 'danger' ? 'var(--danger-50)' : 'var(--warning-50)'}; display:flex; align-items:center; justify-content:center; color:${item.type === 'danger' ? 'var(--danger-600)' : 'var(--warning-600)'}; border:1px solid ${item.type === 'danger' ? 'var(--danger-100)' : 'var(--warning-100)'};">
+                    <div style="width:18px; height:18px;">${item.icon}</div>
+                  </div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:600; color:var(--text-primary); line-height:1.4;">${item.label}</div>
+                    <span style="display:inline-block; margin-top:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; padding:2px 8px; border-radius:4px; background:${item.type === 'danger' ? 'var(--danger-50)' : 'var(--warning-50)'}; color:${item.type === 'danger' ? 'var(--danger-600)' : 'var(--warning-600)'}; border:1px solid ${item.type === 'danger' ? 'var(--danger-100)' : 'var(--warning-100)'};">${item.tag}</span>
+                  </div>
                 </div>
                 ${item.phone
-                  ? `<a href="https://wa.me/${item.phone}?text=${item.msg}" target="_blank" class="wa-action-btn" title="Send WhatsApp Message" style="flex-shrink:0; width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(37,211,102,0.3); transition:all var(--transition-fast); cursor:pointer;">
-                      <svg viewBox="0 0 24 24" fill="white" style="width:20px; height:20px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  ? `<a href="https://wa.me/${item.phone}?text=${item.msg}" target="_blank" class="wa-action-btn" title="Send WhatsApp Message" style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(37,211,102,0.25); transition:all var(--transition-fast); cursor:pointer;">
+                      <svg viewBox="0 0 24 24" fill="white" style="width:16px; height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                     </a>`
-                  : `<div style="flex-shrink:0; width:40px; height:40px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; color:var(--gray-400); font-size:10px; font-weight:600;" title="No phone number on file">N/A</div>`
+                  : `<div style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; color:var(--gray-400); font-size:10px; font-weight:600;" title="No phone number on file">N/A</div>`
                 }
               </div>
             `).join('')
@@ -484,19 +490,19 @@ const Dashboard = {
       </div>
 
       <!-- Unsettled Rider Deductions -->
-      <div class="card section-card mt-24" style="animation: slideUp 300ms ease both; animation-delay: 860ms;">
-        <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-end;">
+      <div class="card section-card mt-24 animate-slide-up" style="animation-delay: 860ms; border: 1px solid var(--border-light); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); padding: 24px;">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 20px;">
           <div>
-            <h2 class="section-title" style="color:#0F0F0F; font-weight:700;">Unsettled Rider Deductions</h2>
-            <div style="font-size:13px; color:#6B7280; margin-top:4px;">Amounts pending deduction from rider salaries</div>
+            <h2 class="section-title" style="color:var(--text-primary); font-weight:700; margin:0; font-size:16px;">Unsettled Rider Deductions</h2>
+            <div style="font-size:13px; color:var(--text-secondary); margin-top:4px;">Amounts pending deduction from rider salaries</div>
           </div>
           ${(function() {
             const unsettled = expenses.filter(e => !e.deductionSettled && e.rider_id && (e.is_deductible === 1 || e.is_deductible === true))
             const total = unsettled.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-            return `<div style="font-size:16px; font-weight:700; color:#DC2626;">Total: SAR ${total.toLocaleString()}</div>`;
+            return `<div style="font-size:16px; font-weight:800; color:var(--danger-600);">Total: SAR ${total.toLocaleString()}</div>`;
           })()}
         </div>
-        <div class="table-container pt-8" style="overflow-x:auto;">
+        <div class="table-container pt-8" style="overflow-x:auto; border: 1px solid var(--border-light); border-radius: 12px;">
           ${(function() {
             const unsettled = expenses.filter(e => !e.deductionSettled && e.rider_id && (e.is_deductible === 1 || e.is_deductible === true))
               .sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at)); // oldest first
@@ -560,25 +566,26 @@ const Dashboard = {
               });
 
               // Subtotal row
-              html += `<tr style="background-color:#E0F2FE; border-bottom:2px solid #BAE6FD;">
-                <td colspan="3" style="padding:10px 16px; font-weight:700; text-align:right; color:#0284C7; font-size:13px;">Subtotal for ${Utils.escapeHtml(group.name)}:</td>
-                <td colspan="2" style="padding:10px 16px; font-weight:700; color:#0284C7; font-size:14px;">SR ${group.total.toLocaleString()}</td>
+              html += `<tr style="background-color: rgba(37, 99, 235, 0.05); border-bottom: 2px solid rgba(37, 99, 235, 0.1);">
+                <td colspan="3" style="padding:12px 16px; font-weight:700; text-align:right; color:var(--primary-700); font-size:13px;">Subtotal for ${Utils.escapeHtml(group.name)}:</td>
+                <td colspan="2" style="padding:12px 16px; font-weight:700; color:var(--primary-700); font-size:14px;">SR ${group.total.toLocaleString()}</td>
               </tr>`;
             });
 
             html += `</tbody></table>
-              <div style="display:flex; gap:16px; margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB; flex-wrap:wrap;">
-                <div style="background:#FEF2F2; border:1px solid #FECACA; padding:12px 16px; border-radius:8px; flex:1; min-width:180px;">
-                  <div style="font-size:12px; color:#991B1B; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Total Unsettled</div>
-                  <div style="font-size:18px; font-weight:800; color:#DC2626;">SAR ${totalUnsettled.toLocaleString()}</div>
+              </div>
+              <div style="display:flex; gap:16px; margin-top:20px; padding-top:16px; border-top:1px solid var(--gray-200); flex-wrap:wrap;">
+                <div style="background:var(--danger-50); border:1px solid var(--danger-100); padding:14px 16px; border-radius:12px; flex:1; min-width:180px; box-shadow: var(--shadow-sm);">
+                  <div style="font-size:11px; color:var(--danger-600); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Total Unsettled</div>
+                  <div style="font-size:20px; font-weight:800; color:var(--danger-600);">SAR ${totalUnsettled.toLocaleString()}</div>
                 </div>
-                <div style="background:#FFFBEB; border:1px solid #FDE68A; padding:12px 16px; border-radius:8px; flex:1; min-width:180px;">
-                  <div style="font-size:12px; color:#B45309; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Riders w/ Pending Deductions</div>
-                  <div style="font-size:18px; font-weight:800; color:#D97706;">${ridersCount}</div>
+                <div style="background:var(--warning-50); border:1px solid var(--warning-100); padding:14px 16px; border-radius:12px; flex:1; min-width:180px; box-shadow: var(--shadow-sm);">
+                  <div style="font-size:11px; color:var(--warning-600); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Riders w/ Pending Deductions</div>
+                  <div style="font-size:20px; font-weight:800; color:var(--warning-600);">${ridersCount}</div>
                 </div>
-                <div style="background:${oldestDays >= 31 ? '#FEF2F2' : '#F3F4F6'}; border:1px solid ${oldestDays >= 31 ? '#FECACA' : '#E5E7EB'}; padding:12px 16px; border-radius:8px; flex:1; min-width:180px;">
-                  <div style="font-size:12px; color:${oldestDays >= 31 ? '#991B1B' : '#4B5563'}; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Oldest Unresolved</div>
-                  <div style="font-size:18px; font-weight:800; color:${oldestDays >= 31 ? '#DC2626' : '#111827'};">${oldestDays} days ago</div>
+                <div style="background:${oldestDays >= 31 ? 'var(--danger-50)' : 'var(--gray-50)'}; border:1px solid ${oldestDays >= 31 ? 'var(--danger-100)' : 'var(--gray-200)'}; padding:14px 16px; border-radius:12px; flex:1; min-width:180px; box-shadow: var(--shadow-sm);">
+                  <div style="font-size:11px; color:${oldestDays >= 31 ? 'var(--danger-600)' : 'var(--gray-600)'}; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Oldest Unresolved</div>
+                  <div style="font-size:20px; font-weight:800; color:${oldestDays >= 31 ? 'var(--danger-600)' : 'var(--gray-800)'};">${oldestDays} days ago</div>
                 </div>
               </div>`;
             return html;
@@ -832,16 +839,16 @@ const Dashboard = {
       : '<span style="color:#16A34A; font-weight:600;">All systems healthy</span> — no alerts.';
 
     return `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; animation: fadeIn 500ms ease both;">
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; margin-top:2px;">
+      <div class="glass-card" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; padding: 20px 24px; border-radius: 16px; animation: fadeIn 500ms ease both;">
+        <div style="display:flex; gap:16px; align-items:center;">
+          <div style="width:40px; height:40px; border-radius: 12px; background: rgba(255,255,255,0.8); display:flex; align-items:center; justify-content:center; box-shadow: var(--shadow-sm);">
             ${icon}
           </div>
           <div>
-            <div style="font-size:22px; font-weight:bold; color:#0F0F0F; margin-bottom:4px;">
+            <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-bottom:4px; letter-spacing: -0.015em;">
               ${greeting}, Abdullah
             </div>
-            <div style="font-size:14px; color:#6B7280; line-height:1.6;">
+            <div style="font-size:14px; color:var(--text-secondary); line-height:1.5; font-weight: 500;">
               ${orderText} ${alertText}
             </div>
           </div>
@@ -1179,7 +1186,7 @@ const Dashboard = {
               <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:16px; height:16px; display:flex; align-items:center;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </span>
-              <input type="text" id="bike-search" placeholder="Search plate, model, rider or status..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border-medium); border-radius:10px; font-size:13px; outline:none; transition:border-color 0.15s;" value="${Utils.escapeHtml(this.bikeSearchQuery || '')}">
+              <input type="text" id="bike-search" class="dashboard-search-input" placeholder="Search plate, model, rider or status..." value="${Utils.escapeHtml(this.bikeSearchQuery || '')}">
             </div>
             <div class="filters" style="display:flex; gap:8px;">
               <button class="filter-chip ${this.bikeFilter === 'all' ? 'active' : ''}" data-bike-filter="all" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">All</button>
@@ -1512,7 +1519,7 @@ const Dashboard = {
               <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:16px; height:16px; display:flex; align-items:center;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </span>
-              <input type="text" id="uniform-search" placeholder="Search DA name, Noon ID, store or status..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border-medium); border-radius:10px; font-size:13px; outline:none; transition:border-color 0.15s;" value="${Utils.escapeHtml(this.uniformSearchQuery || '')}">
+              <input type="text" id="uniform-search" class="dashboard-search-input" placeholder="Search DA name, Noon ID, store or status..." value="${Utils.escapeHtml(this.uniformSearchQuery || '')}">
             </div>
             <div class="filters" style="display:flex; gap:8px;">
               <button class="filter-chip ${this.uniformFilter === 'all' ? 'active' : ''}" data-uniform-filter="all" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">All</button>
@@ -1593,10 +1600,10 @@ const Dashboard = {
         
         const progressBar = `
           <div style="width: 100%; min-width: 100px; max-width: 150px; margin-top: 4px;">
-            <div style="background:#E2E8F0; height:6px; border-radius:3px; overflow:hidden; width:100%;">
-              <div style="background:${colorClass}; width:${pct}%; height:100%; border-radius:3px;"></div>
+            <div style="background:var(--gray-200); height:8px; border-radius:4px; overflow:hidden; width:100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+              <div style="background: linear-gradient(90deg, ${colorClass}, ${colorClass}dd); width:${pct}%; height:100%; border-radius:4px; box-shadow: 0 1px 4px -1px ${colorClass}; transition: width 0.3s ease;"></div>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:10px; color:#64748B; margin-top: 2px; font-weight: 500;">
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-secondary); margin-top: 4px; font-weight: 600; letter-spacing:0.2px;">
               <span>${days < 0 ? 'Expired' : `${days}d left`}</span>
               <span>${Math.round(pct)}%</span>
             </div>
