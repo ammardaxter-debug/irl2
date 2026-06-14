@@ -1317,8 +1317,6 @@ const Dashboard = {
           }
         }
       }
-        }
-      }
 
       return `
         <tr data-rider-name="${Utils.escapeHtml(rider ? rider.name : '')}" 
