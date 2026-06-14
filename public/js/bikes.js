@@ -1326,117 +1326,128 @@ const Bikes = {
     const hc = healthColors[healthStatus];
 
     const html = `
-      <div class="fleet-dialog" style="min-width:0;">
+      <div class="fleet-dialog" style="min-width:0; display: flex; flex-direction: column; gap: 24px;">
         <!-- Header banner -->
         ${isEdit ? `
-        <div class="fleet-dialog-header" style="background: linear-gradient(135deg, ${hc}15, ${hc}05); border: 1px solid ${hc}30; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="fleet-dialog-header" style="background: linear-gradient(135deg, ${hc}15, ${hc}05); border: 1px solid ${hc}30; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px -2px ${hc}10;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between;">
             <div>
-              <div style="font-family:'JetBrains Mono','Fira Code',monospace; font-size:22px; font-weight:700; color:var(--text-primary); letter-spacing:1px;">${Utils.escapeHtml(bike.plate_number)}</div>
-              <div style="display:flex; gap:8px; margin-top:8px;">
-                <span class="fleet-badge ${this.getStatusInfo(bike.status).badgeClass}">${this.getStatusInfo(bike.status).label}</span>
-                <span class="fleet-badge ${this.getAuthInfo(bike).badgeClass}">${this.getAuthInfo(bike).label}</span>
-                ${bike.model ? `<span class="fleet-badge fleet-badge-gray">${Utils.escapeHtml(bike.model)}</span>` : ''}
+              <div style="font-family:'JetBrains Mono','Fira Code',monospace; font-size:26px; font-weight:800; color:var(--text-primary); letter-spacing:1px; margin-bottom: 8px;">${Utils.escapeHtml(bike.plate_number)}</div>
+              <div style="display:flex; gap:8px; flex-wrap: wrap;">
+                <span class="fleet-badge ${this.getStatusInfo(bike.status).badgeClass}" style="padding: 4px 10px; font-size: 12px;">${this.getStatusInfo(bike.status).label}</span>
+                <span class="fleet-badge ${this.getAuthInfo(bike).badgeClass}" style="padding: 4px 10px; font-size: 12px;">${this.getAuthInfo(bike).label}</span>
+                ${bike.model ? `<span class="fleet-badge fleet-badge-gray" style="padding: 4px 10px; font-size: 12px;">${Utils.escapeHtml(bike.model)}</span>` : ''}
               </div>
             </div>
-            <div style="text-align:center;">
-              <div style="width:48px; height:48px; border-radius:50%; border:3px solid ${hc}; display:flex; align-items:center; justify-content:center; background:#fff;">
-                <span style="font-size:14px; font-weight:700; color:${hc};">${worstExpiry === Infinity ? '✓' : (worstExpiry < 0 ? '!' : worstExpiry)}</span>
-              </div>
-              <div style="font-size:10px; color:${hc}; font-weight:600; margin-top:4px;">${worstExpiry === Infinity ? 'NO DOCS' : (worstExpiry < 0 ? 'EXPIRED' : 'DAYS')}</div>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; background: #fff; padding: 12px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); border: 1px solid ${hc}20;">
+              <div style="font-size:22px; font-weight:800; color:${hc}; line-height: 1;">${worstExpiry === Infinity ? '✓' : (worstExpiry < 0 ? '!' : worstExpiry)}</div>
+              <div style="font-size:10px; color:var(--text-secondary); font-weight:700; margin-top:4px; letter-spacing: 0.5px; text-transform: uppercase;">${worstExpiry === Infinity ? 'NO DOCS' : (worstExpiry < 0 ? 'EXPIRED' : 'DAYS LEFT')}</div>
             </div>
           </div>
           ${bike.assigned_rider_name ? `
-          <div style="margin-top:12px; padding-top:10px; border-top:1px solid ${hc}20; display:flex; align-items:center; gap:10px;">
-            <div style="width:28px; height:28px; border-radius:6px; background:var(--primary-100); color:var(--primary-600); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">${Utils.getInitials(bike.assigned_rider_name)}</div>
+          <div style="margin-top:16px; padding-top:16px; border-top:1px dashed ${hc}30; display:flex; align-items:center; gap:12px;">
+            <div style="width:32px; height:32px; border-radius:8px; background:var(--primary-100); color:var(--primary-700); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">${Utils.getInitials(bike.assigned_rider_name)}</div>
             <div>
-              <div style="font-size:11px; color:var(--text-tertiary);">Assigned to <span style="font-weight:600; color:var(--text-primary);">${Utils.escapeHtml(bike.assigned_rider_name)}</span></div>
+              <div style="font-size:12px; color:var(--text-tertiary); margin-bottom: 2px;">Assigned Rider</div>
+              <div style="font-size:14px; font-weight:600; color:var(--text-primary);">${Utils.escapeHtml(bike.assigned_rider_name)}</div>
             </div>
           </div>
           ` : ''}
         </div>
         ` : ''}
 
-        <!-- Tab Buttons (Modal header area) -->
-        <div class="fleet-modal-tabs">
-          <button type="button" class="fleet-modal-tab-btn active" id="tab-btn-info">Info & Expiry</button>
-          <button type="button" class="fleet-modal-tab-btn" id="tab-btn-logs">Service Logs (${this._currentLogs.length})</button>
+        <!-- Tab Buttons -->
+        <div class="fleet-modal-tabs" style="border-bottom: 2px solid var(--gray-100); display: flex; gap: 24px; padding-bottom: 0;">
+          <button type="button" class="fleet-modal-tab-btn active" id="tab-btn-info" style="padding: 12px 0; background: transparent; border: none; font-weight: 600; font-size: 14px; color: var(--primary-600); border-bottom: 2px solid var(--primary-600); cursor: pointer; transition: all 0.2s;">Information & Expiry</button>
+          <button type="button" class="fleet-modal-tab-btn" id="tab-btn-logs" style="padding: 12px 0; background: transparent; border: none; font-weight: 500; font-size: 14px; color: var(--text-tertiary); border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">Service Logs <span style="background: var(--gray-100); color: var(--text-secondary); padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px;">${this._currentLogs.length}</span></button>
         </div>
 
         <form id="bike-form">
           <!-- TAB 1: Info & Expiry -->
-          <div id="tab-content-info" class="tab-content">
-            <div class="fleet-dialog-section">
-              <div class="fleet-dialog-section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                Bike Information
+          <div id="tab-content-info" class="tab-content" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <!-- Information Section -->
+            <div class="fleet-dialog-section" style="background: #ffffff; border: 1px solid var(--gray-200); border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+              <div class="fleet-dialog-section-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 20px; border-bottom: 1px solid var(--gray-100); padding-bottom: 12px;">
+                <div style="background: var(--primary-50); color: var(--primary-600); padding: 6px; border-radius: 8px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                Bike Details
               </div>
-              <div class="form-grid" style="gap:16px;">
-                <div class="form-group">
-                  <label>Plate Number <span class="required">*</span></label>
-                  <input type="text" id="bf-plate" class="form-control" ${isViewer ? 'disabled' : ''} required value="${isEdit ? Utils.escapeHtml(bike.plate_number) : ''}" placeholder="e.g. AH 5246" style="font-family:'JetBrains Mono',monospace; letter-spacing:1px;">
+              <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Plate Number <span style="color: var(--danger-500);">*</span></label>
+                  <input type="text" id="bf-plate" class="form-control" ${isViewer ? 'disabled' : ''} required value="${isEdit ? Utils.escapeHtml(bike.plate_number) : ''}" placeholder="e.g. AH 5246" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-family: 'JetBrains Mono', monospace; font-size: 15px; letter-spacing: 0.5px; background: var(--gray-50); transition: all 0.2s;">
                 </div>
-                <div class="form-group">
-                  <label>Bike Model</label>
-                  <input type="text" id="bf-model" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit ? Utils.escapeHtml(bike.model || '') : ''}" placeholder="e.g. Honda CG 125">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Bike Model</label>
+                  <input type="text" id="bf-model" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit ? Utils.escapeHtml(bike.model || '') : ''}" placeholder="e.g. Honda CG 125" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50); transition: all 0.2s;">
                 </div>
-                <div class="form-group">
-                  <label>Status</label>
-                  <select id="bf-status" class="form-select" ${isViewer ? 'disabled' : ''}>
-                    <option value="active" ${isEdit && (bike.status === 'active' || bike.status === 'available') ? 'selected' : ''}>Active (On Road)</option>
-                    <option value="maintenance" ${isEdit && bike.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
-                    <option value="retired" ${isEdit && bike.status === 'retired' ? 'selected' : ''}>Retired / Sold</option>
-                  </select>
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; grid-column: span 2;">
+                  <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Status</label>
+                  <div style="position: relative;">
+                    <select id="bf-status" class="form-select" ${isViewer ? 'disabled' : ''} style="width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50) url('data:image/svg+xml;utf8,<svg fill=\\'none\\' stroke=\\'%236B7280\\' stroke-width=\\'2\\' viewBox=\\'0 0 24 24\\' xmlns=\\'http://www.w3.org/2000/svg\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' d=\\'M19 9l-7 7-7-7\\'></path></svg>') no-repeat right 12px center / 16px; appearance: none; transition: all 0.2s;">
+                      <option value="active" ${isEdit && (bike.status === 'active' || bike.status === 'available') ? 'selected' : ''}>Active (On Road)</option>
+                      <option value="maintenance" ${isEdit && bike.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
+                      <option value="retired" ${isEdit && bike.status === 'retired' ? 'selected' : ''}>Retired / Sold</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="fleet-dialog-section" style="margin-top:16px;">
-              <div class="fleet-dialog-section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <!-- Documents Section -->
+            <div class="fleet-dialog-section" style="background: #ffffff; border: 1px solid var(--gray-200); border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+              <div class="fleet-dialog-section-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 20px; border-bottom: 1px solid var(--gray-100); padding-bottom: 12px;">
+                <div style="background: var(--warning-50); color: var(--warning-600); padding: 6px; border-radius: 8px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
                 Documents & Expiry
               </div>
-              <div class="form-grid" style="gap:16px; ${(!isEdit || !bike.assigned_rider_id) ? 'grid-template-columns: 1fr;' : ''}">
+              <div class="form-grid" style="display: grid; gap: 20px; ${(!isEdit || !bike.assigned_rider_id) ? 'grid-template-columns: 1fr;' : 'grid-template-columns: 1fr 1fr;'}">
                 ${(isEdit && bike.assigned_rider_id) ? `
-                <div class="form-group">
-                  <label>Authorization Expiry (Istimara)</label>
-                  <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${bike.authorization_expiry ? bike.authorization_expiry : ''}">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Authorization Expiry (Istimara)</label>
+                  <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${bike.authorization_expiry ? bike.authorization_expiry : ''}" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50); transition: all 0.2s;">
                 </div>
                 ` : ''}
-                <div class="form-group">
-                  <label>Insurance Expiry</label>
-                  <input type="date" id="bf-ins-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Insurance Expiry</label>
+                  <input type="date" id="bf-ins-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50); transition: all 0.2s;">
                 </div>
               </div>
             </div>
           </div>
 
           <!-- TAB 2: Service Logs -->
-          <div id="tab-content-logs" class="tab-content" style="display:none;">
+          <div id="tab-content-logs" class="tab-content" style="display:none; padding: 12px 0;">
             <!-- Service Logs loaded dynamically -->
           </div>
 
           <!-- Action Buttons -->
-          <div class="fleet-dialog-actions" style="margin-top:24px;">
+          <div class="fleet-dialog-actions" style="margin-top: 32px; display: flex; align-items: center; justify-content: space-between; padding-top: 20px; border-top: 1px solid var(--gray-100);">
             ${isEdit && !isViewer ? `
-            <button type="button" class="btn" id="bf-delete" style="background:var(--danger-50); color:var(--danger-600); border:1px solid var(--danger-200); height:40px; padding:0 16px; font-size:13px; display:flex; align-items:center; gap:6px; margin-right:auto;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Delete
+            <button type="button" class="btn" id="bf-delete" style="background: var(--danger-50); color: var(--danger-600); border: 1px solid var(--danger-200); border-radius: 10px; height: 44px; padding: 0 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Delete Bike
             </button>
             ` : '<div></div>'}
-            <button type="button" class="btn btn-outline" onclick="Utils.closeModal()" style="height:40px; padding:0 20px; font-size:13px;">Cancel</button>
-            ${isViewer ? '' : `
-            <button type="submit" class="btn btn-primary" style="height:40px; padding:0 24px; font-size:13px; gap:6px; display:flex; align-items:center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              ${isEdit ? 'Save Changes' : 'Register Bike'}
-            </button>
-            `}
+            
+            <div style="display: flex; gap: 12px; margin-left: auto;">
+              <button type="button" class="btn btn-outline" onclick="Utils.closeModal()" style="height: 44px; padding: 0 24px; font-size: 14px; font-weight: 600; border-radius: 10px; border: 1px solid var(--gray-300); color: var(--text-secondary); background: transparent; transition: all 0.2s;">Cancel</button>
+              ${isViewer ? '' : `
+              <button type="submit" class="btn btn-primary" style="height: 44px; padding: 0 28px; font-size: 14px; font-weight: 600; border-radius: 10px; background: linear-gradient(135deg, var(--primary-600), var(--primary-700)); color: white; border: none; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                ${isEdit ? 'Save Changes' : 'Register Bike'}
+              </button>
+              `}
+            </div>
           </div>
         </form>
       </div>
     `;
 
-    Utils.openModal(isEdit ? `Edit Details — ${bike.plate_number}` : 'Register New Bike', html);
+    Utils.openModal(isEdit ? `Edit Details — <span style="color: var(--primary-600);">${bike.plate_number}</span>` : 'Register New Bike', html);
 
     // Tab switcher events
     const tabInfo = document.getElementById('tab-btn-info');
