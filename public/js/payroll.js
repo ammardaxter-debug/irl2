@@ -41,10 +41,11 @@ const Payroll = {
   buildHTML(data) {
     this._currentPayrollData = data;
     // Calculate totals
-    const totalSalary = data.reduce((sum, r) => sum + r.calculated_salary, 0);
-    const totalOrders = data.reduce((sum, r) => sum + r.total_orders, 0);
-    const companyRiders = data.filter(r => r.rider_type === 'company');
-    const freelancers = data.filter(r => r.rider_type === 'freelancer');
+    const totalSalary = data.filter(r => (r.rider_type || '').toLowerCase() !== 'commission_partner').reduce((sum, r) => sum + r.calculated_salary, 0);
+    const totalOrders = data.filter(r => (r.rider_type || '').toLowerCase() !== 'commission_partner').reduce((sum, r) => sum + r.total_orders, 0);
+    const companyRiders = data.filter(r => (r.rider_type || '').toLowerCase() === 'company');
+    const freelancers = data.filter(r => (r.rider_type || '').toLowerCase() === 'freelancer');
+    const commissionPartners = data.filter(r => (r.rider_type || '').toLowerCase() === 'commission_partner');
     const ridersWithWarnings = data.filter(r => r.warnings && r.warnings.length > 0);
     const hasAnyWarnings = ridersWithWarnings.length > 0;
 
@@ -210,7 +211,7 @@ const Payroll = {
         </div>
         <div class="stat-card-new" style="border-top: 4px solid #16A34A;">
           <div class="stat-card-new-title">Active Riders</div>
-          <div class="stat-card-new-value">${data.length}</div>
+          <div class="stat-card-new-value">${data.filter(r => (r.rider_type || '').toLowerCase() !== 'commission_partner').length}</div>
         </div>
         <div class="stat-card-new" id="warnings-stat-card" style="border-top: 4px solid #DC2626; ${hasAnyWarnings ? 'animation: subtlePulse 2s infinite; background:#FEF2F2;' : ''} cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;" onclick="Payroll.toggleWarningsPanel()" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)';" onmouseout="this.style.transform=''; this.style.boxShadow='';" title="Click to view warning details">
           <div class="stat-card-new-title" style="${hasAnyWarnings ? 'color:#DC2626; font-weight:600;' : ''}">Warnings</div>
@@ -433,6 +434,7 @@ const Payroll = {
                 <th class="col-right">Days</th>
                 <th class="col-right">Bonus</th>
                 <th class="col-right">Deductions</th>
+                <th class="col-right">LA Commission</th>
                 <th class="col-right">Net Salary</th>
                 <th class="col-center">Status</th>
                 <th class="col-center" style="width:80px">Action</th>
@@ -456,8 +458,9 @@ const Payroll = {
                     </td>
                     `}
                     <td class="col-left">
-                      <div style="display:flex; align-items:center; gap:6px;">
+                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <span style="font-weight:600; color:#0F0F0F; font-size:14px;">${Utils.escapeHtml(r.rider_name)}</span>
+                        ${r.referred_by_name ? `<span style="background:#F5F3FF; color:#7C3AED; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px;" title="Referred by ${Utils.escapeHtml(r.referred_by_name)}">LA: ${Utils.escapeHtml(r.referred_by_name)}</span>` : ''}
                         ${hasWarnings ? `<span title="${warningTooltip}" style="color:#D97706; cursor:help; font-size:14px;">⚠️</span>` : ''}
                       </div>
                     </td>
@@ -482,6 +485,11 @@ const Payroll = {
                       ` : `
                         <span style="color:${dedColor}; font-size:14px;">${(r.deductions || 0) > 0 ? '-' : ''}${Utils.formatCurrency(r.deductions || 0)}</span>
                       `}
+                    </td>
+                    <td class="col-right" style="text-align:right;">
+                      ${r.la_commission > 0 
+                        ? `<span style="color:#7C3AED; font-weight:600; font-size:14px;" title="${r.payment_status === 'paid' ? 'Locked Commission' : 'Expected Commission'}">-${Utils.formatCurrency(r.la_commission)}</span>` 
+                        : '<span style="color:#9CA3AF; font-size:14px;">-</span>'}
                     </td>
                     <td class="col-right" style="text-align:right;">
                       ${r.payment_status === 'paid' ? `
@@ -539,6 +547,80 @@ const Payroll = {
           </table>
         </div>
       </div>` : ''}
+
+      ${commissionPartners.length > 0 ? `
+      <!-- Commission Partners Section -->
+      <div style="background:#FFFFFF; border-radius:16px; border:1px solid #E5E7EB; box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow:hidden; margin-top:24px;">
+        <div style="padding:20px; border-bottom:1px solid #F3F4F6; display:flex; justify-content:space-between; align-items:center; background:#FAF5FF;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h2 style="font-size:16px; font-weight:600; color:#0f0f0f; margin:0;">Commission Partners (LAs)</h2>
+            <span style="background:#F5F3FF; color:#7C3AED; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">${commissionPartners.length} partners</span>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="payroll-table">
+            <thead>
+              <tr>
+                <th class="col-left">Partner Name</th>
+                <th class="col-right">Referred DAs (Active)</th>
+                <th class="col-right">Total Commission</th>
+                <th class="col-center">Status</th>
+                <th class="col-center" style="width:80px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${commissionPartners.map(r => {
+                const referredCount = r.referred_das ? r.referred_das.length : 0;
+                const referredActiveList = r.referred_das ? r.referred_das.map(d => `${Utils.escapeHtml(d.da_rider_name)} (${Utils.formatCurrency(d.commission_amount)})`).join(', ') : '';
+                
+                let netColor = '#16A34A';
+                if (r.payment_status !== 'paid') netColor = '#9CA3AF';
+
+                return `
+                  <tr class="payroll-row" data-name="${Utils.escapeHtml(r.rider_name).toLowerCase()}">
+                    <td class="col-left">
+                      <span style="font-weight:600; color:#0F0F0F; font-size:14px;">${Utils.escapeHtml(r.rider_name)}</span>
+                    </td>
+                    <td class="col-right">
+                      <span style="font-weight:600; color:#374151; font-size:14px; cursor:help;" title="${Utils.escapeHtml(referredActiveList || 'None')}">${referredCount} DAs</span>
+                    </td>
+                    <td class="col-right" style="text-align:right;">
+                      <span style="color:#059669; font-weight:700; font-size:14px;">${Utils.formatCurrency(r.calculated_salary)}</span>
+                    </td>
+                    <td class="col-center">
+                      ${App.isViewer() ? `
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                      ` : `
+                        <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Click to update status">
+                        ${r.payment_status === 'paid' 
+                          ? '<span style="background:#DCFCE7; color:#16A34A; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Paid</span>'
+                          : r.payment_status === 'on-hold'
+                            ? '<span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Hold</span>'
+                            : '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Pending</span>'}
+                        </button>
+                      `}
+                    </td>
+                    <td class="col-center">
+                      <div style="display:flex; justify-content:center; gap:4px;">
+                        ${App.isViewer() ? '' : `
+                        <button onclick="Payroll.openPaymentModal(${r.rider_id})" style="background:transparent; border:none; cursor:pointer; color:#6B7280; padding:4px;" title="Edit Payment Status">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        `}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ` : ''}
 
       ${data.length === 0 ? `
         <div style="text-align:center; padding:80px 20px;">
@@ -629,11 +711,19 @@ const Payroll = {
     }
     Utils.hideLoading();
 
+    const isReferredFreelancer = rider.referred_by_id && (rider.rider_type || '').toLowerCase() === 'freelancer';
     const totalUnsettled = (unsettled.total_unsettled || 0) + (unsettled.total_advances || 0);
     const defaultAdvanceDeducted = rider.payment_status === 'paid' ? (rider.advance_deducted || 0) : totalUnsettled;
-    const defaultFinalPaidAmount = rider.final_paid_amount !== null && rider.final_paid_amount !== undefined
+    
+    let defaultFinalPaidAmount = rider.final_paid_amount !== null && rider.final_paid_amount !== undefined
       ? rider.final_paid_amount
       : Math.max(0, (rider.calculated_salary || 0) + (rider.manual_bonus || 0) - (rider.manual_deductions || 0) - defaultAdvanceDeducted - (rider.cod_settled || 0) - (rider.other_deductions || 0));
+
+    // If it's a referred freelancer and not paid yet, the default final paid amount is the 95% net payout
+    if (isReferredFreelancer && (rider.final_paid_amount === null || rider.final_paid_amount === undefined)) {
+      const grossIncome = Math.max(0, (rider.calculated_salary || 0) + (rider.manual_bonus || 0) - (rider.manual_deductions || 0) - defaultAdvanceDeducted - (rider.cod_settled || 0) - (rider.other_deductions || 0));
+      defaultFinalPaidAmount = grossIncome * 0.95;
+    }
 
     const html = `
       <div class="form-grid">
@@ -682,10 +772,25 @@ const Payroll = {
              <input type="text" id="payment-notes" class="form-control" value="${Utils.escapeHtml(rider.notes || '')}" placeholder="Add optional notes...">
           </div>
 
+          ${isReferredFreelancer ? `
+          <div style="margin-bottom: 16px; text-align:left; background:#FAF5FF; padding:16px; border-radius:8px; border:1px solid #E9D5FF;">
+             <label class="form-label" style="color:#6B21A8; font-size:14px; font-weight:700;">Freelancer Income (includes LA commission)</label>
+             <input type="number" id="gross-income-input" class="form-control" value="${(defaultFinalPaidAmount / 0.95).toFixed(2)}" step="any" style="font-size:16px; font-weight:700; border-color:#D8B4FE;" placeholder="Enter gross income">
+             <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:13px; color:#5B21B6; font-weight:600;">
+               <span>LA Commission (5%):</span>
+               <span id="la-commission-display">${Utils.formatCurrency(defaultFinalPaidAmount / 19)}</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:13px; color:#5B21B6; font-weight:600;">
+               <span>Net to Rider (95%):</span>
+               <span id="da-net-display">${Utils.formatCurrency(defaultFinalPaidAmount)}</span>
+             </div>
+          </div>
+          ` : ''}
+
           <div style="margin-bottom: 24px; text-align:left; background:#EFF6FF; padding:16px; border-radius:8px; border:1px solid #BFDBFE;">
              <label class="form-label" style="color:#1E3A8A; font-size:15px;">Final Paid Amount (SR)</label>
-             <input type="number" id="final-paid-amount" class="form-control" value="${defaultFinalPaidAmount.toFixed(2)}" step="any" style="font-size:20px; font-weight:800; border-color:#93C5FD;" placeholder="Enter actual paid amount">
-             <small style="color:#3B82F6; display:block; margin-top:4px;">Enter the final amount manually.</small>
+             <input type="number" id="final-paid-amount" class="form-control" value="${defaultFinalPaidAmount.toFixed(2)}" step="any" style="font-size:20px; font-weight:800; border-color:#93C5FD;" placeholder="Enter actual paid amount" ${isReferredFreelancer ? 'readonly' : ''}>
+             <small style="color:#3B82F6; display:block; margin-top:4px;">${isReferredFreelancer ? 'Automatically calculated from gross income above.' : 'Enter the final amount manually.'}</small>
           </div>
 
           <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
@@ -707,21 +812,45 @@ const Payroll = {
 
     // Live calculation listeners for the modal
     setTimeout(() => {
-      const inputs = ['manual-deductions', 'manual-bonus', 'advance-deducted', 'cod-settled', 'other-deductions'];
-      const updateNetPayout = () => {
+      const inputs = ['manual-deductions', 'manual-bonus', 'advance-deducted', 'cod-settled', 'other-deductions', 'gross-income-input'];
+      const updateNetPayout = (e) => {
         const manualDeductions = parseFloat(document.getElementById('manual-deductions')?.value) || 0;
         const manualBonus = parseFloat(document.getElementById('manual-bonus')?.value) || 0;
         const advanceDeducted = parseFloat(document.getElementById('advance-deducted')?.value) || 0;
         const codSettled = parseFloat(document.getElementById('cod-settled')?.value) || 0;
         const otherDeductions = parseFloat(document.getElementById('other-deductions')?.value) || 0;
 
-        const gross = (rider.calculated_salary || 0) + manualBonus;
-        const totalDeductions = manualDeductions + advanceDeducted + codSettled + otherDeductions;
-        const net = Math.max(0, gross - totalDeductions);
+        const baseGross = (rider.calculated_salary || 0) + manualBonus - (manualDeductions + advanceDeducted + codSettled + otherDeductions);
+        let grossNet = Math.max(0, baseGross);
+
+        const grossInput = document.getElementById('gross-income-input');
         
-        const finalInput = document.getElementById('final-paid-amount');
-        if (finalInput) {
-          finalInput.value = net.toFixed(2);
+        // If we are referred and gross input was modified, use its value, otherwise update it
+        if (isReferredFreelancer) {
+          if (grossInput) {
+            if (e && e.target && e.target.id === 'gross-income-input') {
+              grossNet = parseFloat(grossInput.value) || 0;
+            } else {
+              grossInput.value = grossNet.toFixed(2);
+            }
+          }
+          const laComm = grossNet * 0.05;
+          const daNet = grossNet - laComm;
+
+          const laDisplay = document.getElementById('la-commission-display');
+          const daDisplay = document.getElementById('da-net-display');
+          if (laDisplay) laDisplay.textContent = Utils.formatCurrency(laComm);
+          if (daDisplay) daDisplay.textContent = Utils.formatCurrency(daNet);
+
+          const finalInput = document.getElementById('final-paid-amount');
+          if (finalInput) {
+            finalInput.value = daNet.toFixed(2);
+          }
+        } else {
+          const finalInput = document.getElementById('final-paid-amount');
+          if (finalInput) {
+            finalInput.value = grossNet.toFixed(2);
+          }
         }
       };
 
@@ -1170,20 +1299,25 @@ const Payroll = {
     messageLines.push(`--------------------------------`);
     
     if (isPending) {
-      messageLines.push(`*Gross Salary:* SR ${Utils.formatCurrency(rider.calculated_salary)}`);
+      const displayGross = (rider.calculated_salary || 0) + (rider.la_commission || 0);
+      messageLines.push(`*Gross Salary:* SR ${Utils.formatCurrency(displayGross)}`);
+      if (rider.la_commission > 0) {
+        messageLines.push(`*LA Commission (5%):* -SR ${Utils.formatCurrency(rider.la_commission)}`);
+      }
       messageLines.push(`*Total Deductions:* SR ${Utils.formatCurrency(rider.deductions || 0)}`);
       messageLines.push(``);
       messageLines.push(`\u26a0\ufe0f *Status: PENDING*`);
       messageLines.push(`Your payment for this cycle is currently being processed. You will receive an updated notification once it is marked as paid.`);
     } else {
       const displayNetPayout = rider.final_paid_amount !== null ? rider.final_paid_amount : rider.calculated_salary;
-      const displayGross = displayNetPayout + (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0) - (rider.manual_bonus||0);
+      const displayGross = displayNetPayout + (rider.la_commission || 0) + (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0) - (rider.manual_bonus||0);
       
       messageLines.push(`*Base Income:* SR ${Utils.formatCurrency(displayGross)}`);
       if (rider.manual_bonus > 0) messageLines.push(`*Manual Bonus:* +SR ${Utils.formatCurrency(rider.manual_bonus)}`);
-      const totalDed = (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0);
+      const totalDed = (rider.la_commission || 0) + (rider.manual_deductions||0) + (rider.advance_deducted||0) + (rider.cod_settled||0) + (rider.deductions||0) + (rider.other_deductions||0);
       if (totalDed > 0) {
         messageLines.push(`*Deductions:* -SR ${Utils.formatCurrency(totalDed)}`);
+        if (rider.la_commission > 0) messageLines.push(`  - LA Commission (5%): -SR ${Utils.formatCurrency(rider.la_commission)}`);
         if (rider.manual_deductions > 0) messageLines.push(`  - Penalty/Absence: -SR ${Utils.formatCurrency(rider.manual_deductions)}`);
         if (rider.advance_deducted > 0) messageLines.push(`  - Advance Settlement: -SR ${Utils.formatCurrency(rider.advance_deducted)}`);
         if (rider.cod_settled > 0) messageLines.push(`  - COD Settled: -SR ${Utils.formatCurrency(rider.cod_settled)}`);

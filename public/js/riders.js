@@ -69,6 +69,7 @@ const Riders = {
             <button class="filter-tab ${this.currentFilter === 'inactive' ? 'active' : ''}" data-filter="inactive">Inactive</button>
             <button class="filter-tab ${this.currentFilter === 'company' ? 'active' : ''}" data-filter="company">Company</button>
             <button class="filter-tab ${this.currentFilter === 'freelancer' ? 'active' : ''}" data-filter="freelancer">Freelancer</button>
+            <button class="filter-tab ${this.currentFilter === 'commission_partner' ? 'active' : ''}" data-filter="commission_partner">Partners</button>
           </div>
           <button id="btn-add-rider" style="background:#2563EB; color:white; font-size:14px; font-weight:500; height:36px; padding:0 16px; border-radius:12px; box-shadow:0 2px 4px rgba(37,99,235,0.2); cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:6px; transition:all 0.2s;">
             + Add Rider
@@ -163,13 +164,22 @@ const Riders = {
     return filtered.map((r, i) => {
       const typeBadge = r.rider_type === 'company' 
          ? `<span style="background:#EFF6FF; color:#2563EB; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Company</span>`
-         : `<span style="background:#F5F3FF; color:#7C3AED; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Freelancer</span>`;
+         : r.rider_type === 'commission_partner'
+           ? `<span style="background:#ECFDF5; color:#059669; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Partner</span>`
+           : `<span style="background:#F5F3FF; color:#7C3AED; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Freelancer</span>`;
       
       const branchBadge = r.store_warehouse 
          ? `<span style="background:#F3F4F6; color:#6B7280; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">${Utils.escapeHtml(r.store_warehouse)}</span>` 
          : '';
 
-      const avatarBg = r.rider_type === 'company' ? '#2563EB' : '#7C3AED';
+      const referrer = r.referred_by_id ? riders.find(x => x.id === r.referred_by_id) : null;
+      const referrerHtml = referrer 
+         ? `<div style="font-size:11px; color:#4B5563; font-weight:500; display:flex; align-items:center; gap:3px; margin-top:4px;">
+              <span>👤 Ref: ${Utils.escapeHtml(referrer.name)}</span>
+            </div>`
+         : '';
+
+      const avatarBg = r.rider_type === 'company' ? '#2563EB' : r.rider_type === 'commission_partner' ? '#059669' : '#7C3AED';
       const avatarHtml = r.profile_photo 
          ? `<img src="${r.profile_photo}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`
          : `<div style="width:40px;height:40px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;">${Utils.getInitials(r.name)}</div>`;
@@ -196,10 +206,11 @@ const Riders = {
             ${avatarHtml}
             <div>
               <div style="font-size:15px; font-weight:600; color:#0F0F0F; margin-bottom:4px;">${Utils.escapeHtml(r.name)}</div>
-              <div style="display:flex; gap:6px;">
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                 ${typeBadge}
                 ${branchBadge}
               </div>
+              ${referrerHtml}
             </div>
           </div>
           
@@ -698,7 +709,6 @@ const Riders = {
     });
   },
 
-  // ── Add/Edit Rider Modal ──
   openAddRider() {
     this.openRiderForm(null);
   },
@@ -715,13 +725,16 @@ const Riders = {
 
     Utils.showLoading('Loading');
     let bikes = [];
+    let ridersList = [];
     try {
       bikes = await API.getBikes();
+      ridersList = await API.getRiders('all');
     } catch (e) {
-      console.error("Failed to load bikes", e);
+      console.error("Failed to load modal data", e);
     }
     Utils.hideLoading();
 
+    const laPartners = (ridersList || []).filter(r => r.rider_type === 'commission_partner' && r.status === 'active' && (!isEdit || r.id !== rider.id));
     const nationalities = ['Saudi', 'Pakistani', 'Indian', 'Bangladeshi', 'Egyptian', 'Yemeni', 'Filipino', 'Other'];
     const companies = ['Noon Minutes'];
     const warehouses = ['Dhahrat Laban', 'Mahdiyah', 'Muhammadiyah', 'Laban 2', 'Laban 3', 'Irqah 2', 'Hittin'];
@@ -865,12 +878,12 @@ const Riders = {
 
         <div class="rider-form-group">
           <label class="rider-form-label">Full Name <span class="rider-form-required">*</span></label>
-          <input type="text" class="rider-form-input" name="name" value="${isEdit ? Utils.escapeHtml(rider.name) : ''}" required placeholder="Enter full name">
+          <input type="text" class="rider-form-input" name="name" value="${isEdit ? Utils.escapeHtml(rider.name) : ''}" placeholder="Enter full name" required>
         </div>
 
         <div class="rider-form-group">
-          <label class="rider-form-label">Phone Number</label>
-          <input type="text" class="rider-form-input" name="phone" value="${isEdit ? Utils.escapeHtml(rider.phone || '') : ''}" placeholder="+966 5X XXX XXXX">
+          <label class="rider-form-label">Phone Number <span class="rider-form-required">*</span></label>
+          <input type="text" class="rider-form-input" name="phone" value="${isEdit ? Utils.escapeHtml(rider.phone || '') : ''}" placeholder="e.g. 05xxxxxxxx" required>
         </div>
 
         <div class="rider-form-group">
@@ -896,6 +909,15 @@ const Riders = {
           <select class="rider-form-select" name="rider_type" id="rider-type-select">
             <option value="company" ${isEdit && rider.rider_type === 'company' ? 'selected' : ''}>Company Rider</option>
             <option value="freelancer" ${isEdit && rider.rider_type === 'freelancer' ? 'selected' : ''}>Freelancer</option>
+            <option value="commission_partner" ${isEdit && rider.rider_type === 'commission_partner' ? 'selected' : ''}>Commission Partner</option>
+          </select>
+        </div>
+
+        <div class="rider-form-group" id="referred-by-field" style="display: ${isEdit && rider.rider_type === 'commission_partner' ? 'none' : 'flex'}">
+          <label class="rider-form-label">Referred By (LA / Partner)</label>
+          <select class="rider-form-select" name="referred_by_id">
+            <option value="">Direct / No Referral</option>
+            ${laPartners.map(la => `<option value="${la.id}" ${isEdit && parseInt(rider.referred_by_id) === la.id ? 'selected' : ''}>${Utils.escapeHtml(la.name)}</option>`).join('')}
           </select>
         </div>
 
@@ -940,7 +962,7 @@ const Riders = {
           </select>
         </div>
 
-        <div class="rider-form-group" id="salary-field">
+        <div class="rider-form-group" id="salary-field" style="display: ${isEdit && rider.rider_type === 'commission_partner' ? 'none' : 'flex'}">
           <label class="rider-form-label" id="salary-label">${isEdit && rider.rider_type === 'freelancer' ? 'Per Order Rate (SAR)' : 'Base Salary (SAR)'}</label>
           <input type="number" class="rider-form-input" name="salary_value" id="salary-input"
             value="${isEdit ? (rider.rider_type === 'freelancer' ? rider.per_order_rate : rider.base_salary) : ''}"
@@ -1036,17 +1058,32 @@ const Riders = {
     typeSelect?.addEventListener('change', (e) => {
       const label = document.getElementById('salary-label');
       const input = document.getElementById('salary-input');
-      if (e.target.value === 'freelancer') {
-        label.textContent = 'Per Order Rate (﷼)';
-        input.placeholder = '8';
-        if (input.value === '1950' || input.value === '0' || !input.value.trim()) {
-          input.value = '8';
-        }
+      const salaryField = document.getElementById('salary-field');
+      const referredField = document.getElementById('referred-by-field');
+      
+      if (e.target.value === 'commission_partner') {
+        if (salaryField) salaryField.style.display = 'none';
+        if (referredField) referredField.style.display = 'none';
       } else {
-        label.textContent = 'Base Salary (﷼)';
-        input.placeholder = '1950';
-        if (input.value === '8' || input.value === '0' || !input.value.trim()) {
-          input.value = '1950';
+        if (salaryField) salaryField.style.display = 'flex';
+        if (referredField) referredField.style.display = 'flex';
+        
+        if (e.target.value === 'freelancer') {
+          if (label) label.textContent = 'Per Order Rate (﷼)';
+          if (input) {
+            input.placeholder = '8';
+            if (input.value === '1950' || input.value === '0' || !input.value.trim()) {
+              input.value = '8';
+            }
+          }
+        } else {
+          if (label) label.textContent = 'Base Salary (﷼)';
+          if (input) {
+            input.placeholder = '1950';
+            if (input.value === '8' || input.value === '0' || !input.value.trim()) {
+              input.value = '1950';
+            }
+          }
         }
       }
     });
@@ -1087,8 +1124,15 @@ const Riders = {
         const cropper = new Cropper(imageToCrop, {
           aspectRatio: 1,
           viewMode: 1,
+          dragMode: 'move',
           autoCropArea: 1,
-          background: false,
+          restore: false,
+          guides: false,
+          center: false,
+          highlight: false,
+          cropBoxMovable: false,
+          cropBoxResizable: false,
+          toggleDragModeOnDblclick: false,
         });
 
         const closeModal = () => {
@@ -1153,6 +1197,7 @@ const Riders = {
         date_of_birth: formData.get('date_of_birth') || null,
         nationality: formData.get('nationality'),
         rider_type: riderType,
+        referred_by_id: (riderType === 'commission_partner' || !formData.get('referred_by_id')) ? null : parseInt(formData.get('referred_by_id')),
         iqama_number: formData.get('iqama_number'),
         iqama_expiry: formData.get('iqama_expiry'),
         client_company: formData.get('client_company'),

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -539,6 +540,26 @@ app.post('/api/payroll/delete-rider-cycle', verifyAdminToken, requireAdmin, asyn
     );
 
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== LA REFERRAL COMMISSION ROUTES ==========
+
+app.get('/api/la/commissions', async (req, res) => {
+  try {
+    const { cycle_key } = req.query;
+    if (!cycle_key) return res.status(400).json({ error: 'cycle_key is required' });
+    res.json(await db.getLACommissions(cycle_key));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/la/summary', async (req, res) => {
+  try {
+    res.json(await db.getLASummary());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

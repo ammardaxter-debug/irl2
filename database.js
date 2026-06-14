@@ -2,6 +2,7 @@
 //  Database Operations - Supabase (PostgreSQL)
 // ========================================
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
 
@@ -768,6 +769,17 @@ async function calculatePayroll(periodStart, periodEnd) {
       .lte('log_date', periodEnd)
   );
 
+  const laCommissions = await fetchPaginated(() => 
+    supabase.from('la_commissions')
+      .select('*')
+      .eq('cycle_key', `${periodStart}_${periodEnd}`)
+  );
+
+  const commissionsByDa = {};
+  laCommissions.forEach(c => {
+    commissionsByDa[c.da_rider_id] = c;
+  });
+
   const allPayStatuses = {};
   payStatuses.forEach(p => {
     allPayStatuses[p.rider_id] = p;
@@ -780,14 +792,28 @@ async function calculatePayroll(periodStart, periodEnd) {
     logsByRider[rid].push(log);
   });
 
+  const ridersMap = {};
+  riders.forEach(r => {
+    ridersMap[r.id] = r;
+  });
+
+  const computedCommissionsByLA = {};
+  const referredDAsByLA = {};
   const results = [];
   
+  // First pass: process all non-commission-partner riders
   for (const rider of riders) {
     try {
       const riderId = String(rider.id);
       const riderLogs = logsByRider[riderId] || [];
       
       if (rider.status !== 'active' && riderLogs.length === 0) continue;
+
+      const rType = (rider.rider_type || '').toLowerCase();
+      if (rType === 'commission_partner') {
+        // Will process in the second pass
+        continue;
+      }
 
       const presentLogs = riderLogs.filter(l => (l.attendance_status || '').toLowerCase().includes('present') || l.attendance_status === 'p');
       const absentLogs = riderLogs.filter(l => (l.attendance_status || '').trim() === 'Absent' || l.attendance_status === 'Missed');
@@ -799,7 +825,7 @@ async function calculatePayroll(periodStart, periodEnd) {
       const totalOrders = totalPrimaryOrders + totalAssociateOrders;
       
       let calculatedSalary = 0;
-      if ((rider.rider_type || '').toLowerCase() === 'company') {
+      if (rType === 'company') {
         calculatedSalary = parseFloat(rider.base_salary || 1950);
       } else {
         calculatedSalary = totalOrders * (parseFloat(rider.per_order_rate) || 6.8);
@@ -817,11 +843,41 @@ async function calculatePayroll(periodStart, periodEnd) {
       advances.filter(a => String(a.rider_id) === riderId).forEach(a => { totalAdvances += a.amount || 0; });
 
       const totalDedSum = totalDeductions + totalAdvances;
-      const netPay = (calculatedSalary + totalBonuses) - totalDedSum;
+      const rawNetPay = (calculatedSalary + totalBonuses) - totalDedSum;
+
+      // Handle referral commission logic
+      let laCommission = 0;
+      let daNetPay = rawNetPay;
+      const referrer = rider.referred_by_id ? ridersMap[rider.referred_by_id] : null;
+      const referredByName = referrer ? referrer.name : null;
+
+      if (rider.referred_by_id && rType === 'freelancer') {
+        const savedComm = commissionsByDa[rider.id];
+        if (savedComm) {
+          laCommission = parseFloat(savedComm.commission_amount) || 0;
+          daNetPay = parseFloat(savedComm.da_final_net) || 0;
+        } else {
+          laCommission = Math.max(0, rawNetPay * 0.05);
+          daNetPay = Math.max(0, rawNetPay - laCommission);
+        }
+
+        // Accumulate for LA
+        const laIdStr = String(rider.referred_by_id);
+        computedCommissionsByLA[laIdStr] = (computedCommissionsByLA[laIdStr] || 0) + laCommission;
+        
+        if (!referredDAsByLA[laIdStr]) referredDAsByLA[laIdStr] = [];
+        referredDAsByLA[laIdStr].push({
+          da_rider_id: rider.id,
+          da_rider_name: rider.name,
+          da_entered_net: savedComm ? parseFloat(savedComm.da_entered_net) : rawNetPay,
+          commission_amount: laCommission,
+          da_final_net: daNetPay,
+          status: allPayStatuses[rider.id]?.status || 'pending'
+        });
+      }
 
       const avgCheckinMinutes = presentLogs.length > 0 ? presentLogs.reduce((sum, l) => sum + ((l.checkin_hours || 0) * 60 + (l.checkin_minutes || 0)), 0) / presentLogs.length : 0;
       const warnings = [];
-      const rType = (rider.rider_type || '').toLowerCase();
       
       if (absentLogs.length > 0) warnings.push({ type: 'attendance', message: `Missed ${absentLogs.length} day(s)` });
       else if (rType === 'company' && presentLogs.length < 26 && presentLogs.length > 0) warnings.push({ type: 'attendance', message: `Short attendance — Logged only ${presentLogs.length} of 26 required days` });
@@ -846,12 +902,64 @@ async function calculatePayroll(periodStart, periodEnd) {
         avg_checkin: `${Math.floor(avgCheckinMinutes/60)}:${String(Math.round(avgCheckinMinutes%60)).padStart(2, '0')}`,
         deductions: totalDedSum,
         total_bonuses: totalBonuses,
-        net_pay: netPay,
+        net_pay: daNetPay,
+        la_commission: laCommission,
+        referred_by_id: rider.referred_by_id,
+        referred_by_name: referredByName,
         payment_status: allPayStatuses[rider.id] || { status: 'pending' },
         warnings: warnings
       });
     } catch (err) { console.error(`Calc error for rider ${rider.id}:`, err); }
   }
+
+  // Second pass: process commission partners
+  for (const rider of riders) {
+    try {
+      const rType = (rider.rider_type || '').toLowerCase();
+      if (rType !== 'commission_partner') continue;
+
+      const riderId = String(rider.id);
+      const totalCommSum = computedCommissionsByLA[riderId] || 0;
+      const referredList = referredDAsByLA[riderId] || [];
+
+      // Bonuses
+      let totalBonuses = 0;
+      bonuses.filter(b => String(b.rider_id) === riderId).forEach(b => { totalBonuses += b.amount || 0; });
+
+      // Deductions
+      let totalDeductions = 0;
+      expenses.filter(e => String(e.rider_id) === riderId).forEach(e => { totalDeductions += e.amount || 0; });
+      
+      let totalAdvances = 0;
+      advances.filter(a => String(a.rider_id) === riderId).forEach(a => { totalAdvances += a.amount || 0; });
+
+      const totalDedSum = totalDeductions + totalAdvances;
+      const netPay = (totalCommSum + totalBonuses) - totalDedSum;
+
+      results.push({
+        rider_id: rider.id,
+        rider_name: rider.name,
+        rider_type: rider.rider_type,
+        client_company: rider.client_company,
+        base_salary: 0,
+        calculated_salary: totalCommSum,
+        total_primary_orders: 0,
+        total_associate_orders: 0,
+        total_orders: 0,
+        present_days: 0,
+        absent_days: 0,
+        weekoff_days: 0,
+        avg_checkin: '0:00',
+        deductions: totalDedSum,
+        total_bonuses: totalBonuses,
+        net_pay: netPay,
+        referred_das: referredList,
+        payment_status: allPayStatuses[rider.id] || { status: 'pending' },
+        warnings: []
+      });
+    } catch (err) { console.error(`Calc error for LA partner ${rider.id}:`, err); }
+  }
+
   return results;
 }
 
@@ -877,6 +985,41 @@ async function setPaymentStatus(riderId, cycleKey, status, final_paid_amount, no
     advance_deducted, cod_settled, other_deductions,
     updated_at: nowISO()
   }, { onConflict: 'cycle_key, rider_id' });
+
+  // Handle LA commissions records
+  const rider = await getRiderById(riderId);
+  if (rider && (rider.rider_type || '').toLowerCase() === 'freelancer' && rider.referred_by_id) {
+    if (final_paid_amount !== null && final_paid_amount !== undefined) {
+      // The frontend sends final_paid_amount which is 95% of gross.
+      // commission = final_paid_amount / 19.
+      // gross = final_paid_amount + commission.
+      const commissionAmount = parseFloat(final_paid_amount) / 19;
+      const enteredNet = parseFloat(final_paid_amount) + commissionAmount;
+      
+      const referrer = await getRiderById(rider.referred_by_id);
+      const referrerName = referrer ? referrer.name : null;
+
+      await supabase.from('la_commissions').upsert({
+        cycle_key: cycleKey,
+        la_rider_id: rider.referred_by_id,
+        la_rider_name: referrerName,
+        da_rider_id: rider.id,
+        da_rider_name: rider.name,
+        da_entered_net: enteredNet,
+        commission_amount: commissionAmount,
+        da_final_net: final_paid_amount,
+        status: status,
+        updated_at: nowISO()
+      }, { onConflict: 'cycle_key, la_rider_id, da_rider_id' });
+    } else {
+      // If payment is pending/hold and has no final_paid_amount, delete the commission record
+      // so that it gets dynamically calculated from live orders/logs in calculatePayroll.
+      await supabase.from('la_commissions')
+        .delete()
+        .eq('cycle_key', cycleKey)
+        .eq('da_rider_id', rider.id);
+    }
+  }
 
   // Auto-settlement logic for advances
   if (status === 'paid' && parseFloat(advance_deducted) > 0) {
@@ -1577,7 +1720,9 @@ module.exports = {
   // App Version
   getAppVersion, setAppVersion,
   // Tracking Shutdown
-  isTrackingShutdown, setTrackingShutdown
+  isTrackingShutdown, setTrackingShutdown,
+  // LA Commission Partner System
+  getLACommissions, getLASummary
 };
 
 // ========== CYCLE TRANSFERS ==========
@@ -1665,5 +1810,50 @@ async function upsertAuthUser(userData) {
   });
   if (error) throw error;
   return { success: true };
+}
+
+// ========== LA COMMISSION PARTNER OPERATIONS ==========
+
+async function getLACommissions(cycleKey) {
+  const { data, error } = await supabase
+    .from('la_commissions')
+    .select('*')
+    .eq('cycle_key', cycleKey);
+  if (error) throw error;
+  return data || [];
+}
+
+async function getLASummary() {
+  const { data: las, error: lasError } = await supabase
+    .from('riders')
+    .select('*')
+    .eq('rider_type', 'commission_partner');
+  if (lasError) throw lasError;
+
+  const { data: allRiders, error: ridersError } = await supabase
+    .from('riders')
+    .select('id, name, referred_by_id');
+  if (ridersError) throw ridersError;
+
+  const { data: allComms, error: commsError } = await supabase
+    .from('la_commissions')
+    .select('*');
+  if (commsError) throw commsError;
+
+  return las.map(la => {
+    const referredDAs = allRiders.filter(r => r.referred_by_id === la.id);
+    const comms = allComms.filter(c => c.la_rider_id === la.id);
+    const totalEarned = comms.reduce((sum, c) => sum + (parseFloat(c.commission_amount) || 0), 0);
+
+    return {
+      id: la.id,
+      name: la.name,
+      phone: la.phone,
+      status: la.status,
+      referred_count: referredDAs.length,
+      referred_das: referredDAs.map(d => ({ id: d.id, name: d.name })),
+      total_earned: totalEarned
+    };
+  });
 }
 

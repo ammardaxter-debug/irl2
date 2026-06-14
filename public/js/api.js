@@ -389,5 +389,14 @@ const API = {
       method: 'POST',
       body: JSON.stringify({ rider_ids: riderIds, title, message })
     });
+  },
+
+  // ── LA Commission Partner ──
+  getLACommissions(cycleKey) {
+    return this.request(`/la/commissions?cycle_key=${cycleKey}`);
+  },
+
+  getLASummary() {
+    return this.request('/la/summary');
   }
 };
