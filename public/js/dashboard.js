@@ -1111,10 +1111,10 @@ const Dashboard = {
           let msg = '';
           if (rowStatusVal === 'expired') {
             const days = Math.abs(Utils.daysUntil(bike.istimara_expiry));
-            msg = `Dear ${rider.name}, your bike ${bikePlate} authorization (Istimara) expired ${days} day(s) ago on ${expiryText}. Please coordinate renewal urgently. — Inspiring Roads Logistics`;
+            msg = `Dear *${rider.name}*\n\nYour bike *${bikePlate}* authorization (Istimara) expired *${days} days ago* on *${expiryText}*.\n\nPlease coordinate renewal urgently.\n\n*If already authorized* please send a screenshot of the expiry date from your *Absher*:\n1 Open Absher\n2 Go to My Vehicles\n3 Select the bike\n4 Under Vehicle Details click Authorization Details\n5 Take screenshot and send it here\n\nInspiring Roads Logistics`;
           } else if (rowStatusVal === 'warning') {
             const days = Utils.daysUntil(bike.istimara_expiry);
-            msg = `Dear ${rider.name}, your bike ${bikePlate} authorization (Istimara) expires in ${days} day(s) on ${expiryText}. Please arrange for renewal. — Inspiring Roads Logistics`;
+            msg = `Dear *${rider.name}*\n\nYour bike *${bikePlate}* authorization (Istimara) will expire in *${days} days* on *${expiryText}*.\n\nPlease arrange renewal as soon as possible.\n\n*If already authorized* please send a screenshot of the expiry date from your *Absher*:\n1 Open Absher\n2 Go to My Vehicles\n3 Select the bike\n4 Under Vehicle Details click Authorization Details\n5 Take screenshot and send it here\n\nInspiring Roads Logistics`;
           }
           
           if (msg) {
