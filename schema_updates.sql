@@ -27,3 +27,12 @@ CREATE TABLE IF NOT EXISTS la_commissions (
 ALTER TABLE la_commissions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Service role full access" ON la_commissions;
 CREATE POLICY "Service role full access" ON la_commissions FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. Add safety kit asset date columns to riders table
+ALTER TABLE riders 
+ADD COLUMN IF NOT EXISTS helmet_date TEXT,
+ADD COLUMN IF NOT EXISTS gloves_date TEXT,
+ADD COLUMN IF NOT EXISTS chest_safety_date TEXT,
+ADD COLUMN IF NOT EXISTS foot_safety_date TEXT,
+ADD COLUMN IF NOT EXISTS asset_history JSONB DEFAULT '[]'::jsonb;
+

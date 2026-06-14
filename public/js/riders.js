@@ -997,14 +997,69 @@ const Riders = {
         </div>
 
         <div class="rider-form-group">
-          <label class="rider-form-label">Safety Kit Provided On</label>
+          <label class="rider-form-label">Safety Kit Overall Date</label>
           <input type="date" class="rider-form-input" name="safety_kit_date" value="${isEdit ? rider.safety_kit_date || '' : ''}">
+        </div>
+
+        <div class="rider-form-group">
+          <label class="rider-form-label">Helmet Issued On</label>
+          <input type="date" class="rider-form-input" name="helmet_date" value="${isEdit ? rider.helmet_date || '' : ''}">
+        </div>
+
+        <div class="rider-form-group">
+          <label class="rider-form-label">Hand Gloves Issued On</label>
+          <input type="date" class="rider-form-input" name="gloves_date" value="${isEdit ? rider.gloves_date || '' : ''}">
+        </div>
+
+        <div class="rider-form-group">
+          <label class="rider-form-label">Chest Safety (Vest) Issued On</label>
+          <input type="date" class="rider-form-input" name="chest_safety_date" value="${isEdit ? rider.chest_safety_date || '' : ''}">
+        </div>
+
+        <div class="rider-form-group">
+          <label class="rider-form-label">Foot Safety (Boots/Guards) Issued</label>
+          <input type="date" class="rider-form-input" name="foot_safety_date" value="${isEdit ? rider.foot_safety_date || '' : ''}">
         </div>
 
         <div class="rider-form-group full-width">
           <label class="rider-form-label">Kit Notes</label>
           <input type="text" class="rider-form-input" name="kit_notes" value="${isEdit ? Utils.escapeHtml(rider.kit_notes || '') : ''}" placeholder="e.g. Helmet, Vest, Jacket, Shoes — sizes or conditions">
         </div>
+
+        <div class="rider-form-section" style="grid-column: 1 / -1; margin-top: 16px;">ASSET ISSUANCE HISTORY</div>
+
+        <div class="rider-form-group full-width" style="grid-column: 1 / -1; background:#F8FAFC; padding:16px; border-radius:12px; border:1px solid #E2E8F0;">
+          <input type="hidden" name="asset_history" id="asset-history-hidden" value='${isEdit ? Utils.escapeHtml(JSON.stringify(rider.asset_history || [])) : '[]'}'>
+          
+          <div id="asset-history-list" style="max-height:180px; overflow-y:auto; margin-bottom:16px; display:flex; flex-direction:column; gap:8px;">
+            <!-- Timeline items rendered dynamically by JS -->
+          </div>
+
+          <div style="background:white; border:1px solid #E2E8F0; padding:12px; border-radius:8px;">
+            <div style="font-weight:600; font-size:13px; margin-bottom:8px; color:#1E293B;">Log New Equipment Issue</div>
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr auto; gap:8px; align-items:end;">
+              <div>
+                <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">Equipment Type</label>
+                <select id="new-asset-type" class="rider-form-select" style="padding: 6px 12px; font-size:13px; height:36px; min-width: 120px;">
+                  <option value="uniform">Uniform 👕</option>
+                  <option value="helmet">Helmet 🪖</option>
+                  <option value="gloves">Gloves 🧤</option>
+                  <option value="chest_safety">Chest Vest 🦺</option>
+                  <option value="foot_safety">Safety Shoes 🥾</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">Date Issued</label>
+                <input type="date" id="new-asset-date" class="rider-form-input" style="padding: 6px 12px; font-size:13px; height:36px;" value="${new Date().toISOString().split('T')[0]}">
+              </div>
+              <button type="button" id="btn-add-asset-history" style="height:36px; padding:0 14px; font-weight:600; font-size:12px; background:#2563EB; color:white; border:none; border-radius:6px; cursor:pointer; transition:background 0.2s;">Log Issue</button>
+            </div>
+            <div style="margin-top: 8px;">
+              <input type="text" id="new-asset-notes" class="rider-form-input" style="padding: 6px 12px; font-size:13px; height:32px; width: 100%; box-sizing: border-box;" placeholder="Add optional notes (e.g. size, condition, reason)...">
+            </div>
+          </div>
+        </div>
+
 
         <div class="rider-form-section">🔐 RIDER PORTAL ACCESS</div>
 
@@ -1087,6 +1142,102 @@ const Riders = {
         }
       }
     });
+
+    // Asset History Logic
+    const historyHidden = document.getElementById('asset-history-hidden');
+    const historyList = document.getElementById('asset-history-list');
+    const btnAddHistory = document.getElementById('btn-add-asset-history');
+    
+    let historyData = [];
+    try {
+      historyData = JSON.parse(historyHidden.value || '[]');
+    } catch(err) {
+      historyData = [];
+    }
+    
+    const renderHistoryList = () => {
+      if (!historyList) return;
+      if (historyData.length === 0) {
+        historyList.innerHTML = `<div style="font-size:12px; color:#94A3B8; text-align:center; padding:12px 0;">No past issuances logged.</div>`;
+        return;
+      }
+      
+      // Sort history chronologically descending
+      const sorted = [...historyData].sort((a,b) => new Date(b.date) - new Date(a.date));
+      
+      historyList.innerHTML = sorted.map((item, idx) => {
+        const typeLabels = {
+          uniform: 'Uniform 👕',
+          helmet: 'Helmet 🪖',
+          gloves: 'Gloves 🧤',
+          chest_safety: 'Chest Vest 🦺',
+          foot_safety: 'Safety Shoes 🥾'
+        };
+        const label = typeLabels[item.type] || item.type;
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:6px; border:1px solid #E2E8F0; font-size:12px;">
+            <div>
+              <span style="font-weight:700; color:#1E293B; text-transform:capitalize;">${label}</span>
+              <span style="color:#64748B; margin-left:8px;">Issued on ${Utils.formatDateShort(item.date)}</span>
+              ${item.notes ? `<div style="font-size:11px; color:#64748B; margin-top:2px; font-style:italic;">Notes: ${Utils.escapeHtml(item.notes)}</div>` : ''}
+            </div>
+            <button type="button" class="btn-delete-history" data-idx="${idx}" style="background:none; border:none; color:#DC2626; cursor:pointer; font-size:11px; font-weight:600; padding:2px 6px;">Remove</button>
+          </div>
+        `;
+      }).join('');
+      
+      // Hook up delete buttons
+      historyList.querySelectorAll('.btn-delete-history').forEach(btn => {
+        btn.onclick = (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          historyData.splice(idx, 1);
+          historyHidden.value = JSON.stringify(historyData);
+          renderHistoryList();
+        };
+      });
+    };
+    
+    renderHistoryList();
+    
+    btnAddHistory?.addEventListener('click', () => {
+      const type = document.getElementById('new-asset-type').value;
+      const date = document.getElementById('new-asset-date').value;
+      const notes = document.getElementById('new-asset-notes').value || '';
+      
+      if (!date) {
+        Utils.showToast('Please select a valid date', 'error');
+        return;
+      }
+      
+      // Add to list
+      historyData.push({ type, date, notes, recorded_at: new Date().toISOString() });
+      historyHidden.value = JSON.stringify(historyData);
+      
+      // Update form dates automatically
+      if (type === 'uniform') {
+        const input = document.querySelector('input[name="uniform_date"]');
+        if (input) input.value = date;
+      } else if (type === 'helmet') {
+        const input = document.querySelector('input[name="helmet_date"]');
+        if (input) input.value = date;
+      } else if (type === 'gloves') {
+        const input = document.querySelector('input[name="gloves_date"]');
+        if (input) input.value = date;
+      } else if (type === 'chest_safety') {
+        const input = document.querySelector('input[name="chest_safety_date"]');
+        if (input) input.value = date;
+      } else if (type === 'foot_safety') {
+        const input = document.querySelector('input[name="foot_safety_date"]');
+        if (input) input.value = date;
+      }
+      
+      // Reset inputs
+      document.getElementById('new-asset-notes').value = '';
+      
+      renderHistoryList();
+      Utils.showToast('Logged new asset issue and updated form date!', 'success');
+    });
+
 
     // Handle Image Upload & Compression
     const fileInput = document.getElementById('profile-upload');
@@ -1211,6 +1362,11 @@ const Riders = {
         bike_id: bikeIdVal ? parseInt(bikeIdVal) : null,
         uniform_date: formData.get('uniform_date') || null,
         safety_kit_date: formData.get('safety_kit_date') || null,
+        helmet_date: formData.get('helmet_date') || null,
+        gloves_date: formData.get('gloves_date') || null,
+        chest_safety_date: formData.get('chest_safety_date') || null,
+        foot_safety_date: formData.get('foot_safety_date') || null,
+        asset_history: formData.get('asset_history') ? JSON.parse(formData.get('asset_history')) : [],
         kit_notes: formData.get('kit_notes') || null
       };
 

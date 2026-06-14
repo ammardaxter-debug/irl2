@@ -7,6 +7,9 @@ const Dashboard = {
   bikeSearchQuery: '',
   bikeAuthCollapsed: false,
   bikeFilter: 'all',
+  uniformSearchQuery: '',
+  uniformTrackerCollapsed: false,
+  uniformFilter: 'all',
 
   async render() {
     if (!this._initialized) {
@@ -39,6 +42,8 @@ const Dashboard = {
         API.getRiders(),
         API.getExpenses()
       ]);
+      this.bikes = bikes;
+      this.riders = riders;
       container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses);
       this.attachEvents();
     } catch (err) {
@@ -64,6 +69,8 @@ const Dashboard = {
       if (searchInput) {
         this.bikeSearchQuery = searchVal;
       }
+      this.bikes = bikes;
+      this.riders = riders;
       container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses);
       this.attachEvents();
       if (isSearchFocused) {
@@ -181,6 +188,9 @@ const Dashboard = {
 
       <!-- Rider Bike Authorizations & Expiries -->
       ${this.buildBikeAuthorizations(bikes, riders)}
+
+      <!-- Rider Uniform & Safety Kit Tracker -->
+      ${this.buildUniformSafetyTracker(riders)}
 
       <!-- Stats Cards -->
       <div class="stats-grid">
@@ -621,6 +631,173 @@ const Dashboard = {
       });
     });
     this.applyBikeFilters();
+
+    // Uniform & Safety Kit tracker events
+    document.getElementById('uniform-tracker-toggle')?.addEventListener('click', () => this.toggleUniformPanel());
+    document.getElementById('uniform-search')?.addEventListener('input', (e) => {
+      this.handleUniformSearch(e);
+      // Reset checkboxes on search
+      const selectAllCheckbox = document.getElementById('uniform-select-all');
+      if (selectAllCheckbox) selectAllCheckbox.checked = false;
+      document.querySelectorAll('.uniform-select-row').forEach(chk => {
+        chk.checked = false;
+        const row = chk.closest('tr');
+        if (row) {
+          row.classList.remove('selected-row');
+          row.style.backgroundColor = '';
+        }
+      });
+      const bulkToolbar = document.getElementById('uniform-bulk-actions');
+      if (bulkToolbar) bulkToolbar.style.display = 'none';
+    });
+
+    document.querySelectorAll('[data-uniform-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        this.uniformFilter = chip.dataset.uniformFilter;
+        this.applyUniformFilters();
+        // Reset checkboxes on filter change
+        const selectAllCheckbox = document.getElementById('uniform-select-all');
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        document.querySelectorAll('.uniform-select-row').forEach(chk => {
+          chk.checked = false;
+          const row = chk.closest('tr');
+          if (row) {
+            row.classList.remove('selected-row');
+            row.style.backgroundColor = '';
+          }
+        });
+        const bulkToolbar = document.getElementById('uniform-bulk-actions');
+        if (bulkToolbar) bulkToolbar.style.display = 'none';
+      });
+    });
+    this.applyUniformFilters();
+
+    // Selection and bulk actions
+    const selectAllCheckbox = document.getElementById('uniform-select-all');
+    const bulkToolbar = document.getElementById('uniform-bulk-actions');
+    const selectedCountSpan = document.getElementById('uniform-selected-count');
+    
+    const updateBulkToolbar = () => {
+      const checkedRows = document.querySelectorAll('.uniform-select-row:checked');
+      if (checkedRows.length > 0) {
+        if (bulkToolbar) bulkToolbar.style.display = 'flex';
+        if (selectedCountSpan) selectedCountSpan.textContent = checkedRows.length;
+      } else {
+        if (bulkToolbar) bulkToolbar.style.display = 'none';
+      }
+    };
+
+    selectAllCheckbox?.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      const rows = document.querySelectorAll('#uniform-table-body tr');
+      rows.forEach(row => {
+        if (row.style.display !== 'none') {
+          const chk = row.querySelector('.uniform-select-row');
+          if (chk) {
+            chk.checked = isChecked;
+            row.classList.toggle('selected-row', isChecked);
+            row.style.backgroundColor = isChecked ? '#EFF6FF' : '';
+          }
+        }
+      });
+      updateBulkToolbar();
+    });
+
+    document.getElementById('uniform-table-body')?.addEventListener('change', (e) => {
+      if (e.target.classList.contains('uniform-select-row')) {
+        const row = e.target.closest('tr');
+        if (row) {
+          row.classList.toggle('selected-row', e.target.checked);
+          row.style.backgroundColor = e.target.checked ? '#EFF6FF' : '';
+        }
+        updateBulkToolbar();
+        
+        if (!e.target.checked && selectAllCheckbox) {
+          selectAllCheckbox.checked = false;
+        }
+      }
+    });
+
+    document.getElementById('btn-bulk-copy-noon')?.addEventListener('click', () => {
+      const checkedRows = document.querySelectorAll('.uniform-select-row:checked');
+      const dataRows = [];
+      
+      checkedRows.forEach(chk => {
+        const rId = parseInt(chk.dataset.riderId);
+        const rider = this.riders?.find(r => r.id === rId);
+        if (rider) {
+          const noonId = rider.noon_id || rider.company_id || rider.rider_company_id || '';
+          const store = rider.store_warehouse || '';
+          dataRows.push(`${noonId}\t${rider.name}\t${rider.phone || ''}\t${rider.iqama_number || ''}\t${store}`);
+        }
+      });
+      
+      if (dataRows.length === 0) return;
+      
+      const tsvContent = `Noon ID\tName\tPhone Number\tIqama Number\tStore/Station\n` + dataRows.join('\n');
+      navigator.clipboard.writeText(tsvContent).then(() => {
+        Utils.showToast(`Copied Noon submission data for ${dataRows.length} riders!`, 'success');
+      }).catch(err => {
+        Utils.showToast('Failed to copy data', 'error');
+      });
+    });
+
+    document.getElementById('btn-bulk-mark-uniform')?.addEventListener('click', async () => {
+      const checkedRows = document.querySelectorAll('.uniform-select-row:checked');
+      if (checkedRows.length === 0) return;
+      
+      const confirmed = await Utils.confirm(
+        'Confirm Batch Uniform Update',
+        `Are you sure you want to mark the ${checkedRows.length} selected riders as having received their uniform today? This will update their uniform expiry cycle for the next 6 months.`
+      );
+      
+      if (!confirmed) return;
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      const btnMark = document.getElementById('btn-bulk-mark-uniform');
+      const btnCopy = document.getElementById('btn-bulk-copy-noon');
+      if (btnMark) btnMark.disabled = true;
+      if (btnCopy) btnCopy.disabled = true;
+      
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const chk of checkedRows) {
+        const rId = parseInt(chk.dataset.riderId);
+        const rider = this.riders?.find(r => r.id === rId);
+        if (rider) {
+          try {
+            const history = [...(rider.asset_history || [])];
+            history.push({
+              type: 'uniform',
+              date: todayStr,
+              notes: 'Batch update via Dashboard',
+              recorded_at: new Date().toISOString()
+            });
+            
+            await API.updateRider(rId, {
+              uniform_date: todayStr,
+              asset_history: history
+            });
+            successCount++;
+          } catch(err) {
+            console.error(`Failed to update rider ${rId}:`, err);
+            failCount++;
+          }
+        }
+      }
+      
+      if (btnMark) btnMark.disabled = false;
+      if (btnCopy) btnCopy.disabled = false;
+      
+      if (successCount > 0) {
+        Utils.showToast(`Successfully updated uniform dates for ${successCount} riders!`, 'success');
+        this.render();
+      }
+      if (failCount > 0) {
+        Utils.showToast(`Failed to update ${failCount} riders.`, 'error');
+      }
+    });
 
     // Load charts asynchronously
     this.loadCharts();
@@ -1122,11 +1299,24 @@ const Dashboard = {
           if (msg) {
             const encMsg = encodeURIComponent(msg);
             actionHtml = `
-              <a href="https://wa.me/${cleanPhone}?text=${encMsg}" target="_blank" class="wa-action-btn" title="Send WhatsApp Warning" style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); color:white; box-shadow:0 1px 4px rgba(37,211,102,0.25);">
-                <svg viewBox="0 0 24 24" fill="white" style="width:12px; height:12px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              </a>
+              <div style="display:inline-flex; align-items:center; gap:8px;">
+                <a href="https://wa.me/${cleanPhone}?text=${encMsg}" target="_blank" class="wa-action-btn" title="Send WhatsApp Warning" style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); color:white; box-shadow:0 1px 4px rgba(37,211,102,0.25);">
+                  <svg viewBox="0 0 24 24" fill="white" style="width:12px; height:12px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                </a>
+                <button type="button" class="btn-copy" onclick="Dashboard.openBikeAuthModal(${bike.id})" title="Copy Noon Auth Data" style="border:1px solid var(--border-medium); background:white; color:var(--text-secondary); width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition: all 0.2s;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+              </div>
+            `;
+          } else {
+            actionHtml = `
+              <button type="button" class="btn-copy" onclick="Dashboard.openBikeAuthModal(${bike.id})" title="Copy Noon Auth Data" style="border:1px solid var(--border-medium); background:white; color:var(--text-secondary); width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition: all 0.2s;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
             `;
           }
+        }
+      }
         }
       }
 
@@ -1220,5 +1410,630 @@ const Dashboard = {
       
       row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
     });
+  },
+
+  getExpiryDate(dateStr, daysToAdd = 180) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + daysToAdd);
+    return Utils.toLocalDateStr(d);
+  },
+
+  buildUniformSafetyTracker(riders) {
+    const activeRiders = riders.filter(r => r.status === 'active');
+    const totalRiders = activeRiders.length;
+    let upToDateUniforms = 0;
+    let expiredUniforms = 0;
+    let expiredKits = 0;
+
+    activeRiders.forEach(r => {
+      // Uniform status
+      if (!r.uniform_date) {
+        expiredUniforms++;
+      } else {
+        const expDate = this.getExpiryDate(r.uniform_date);
+        const days = Utils.daysUntil(expDate);
+        if (days < 0) expiredUniforms++;
+        else upToDateUniforms++;
+      }
+
+      // Safety kits status (Helmet, Gloves, Chest, Foot)
+      const assets = [r.helmet_date, r.gloves_date, r.chest_safety_date, r.foot_safety_date];
+      const hasExpiredAsset = assets.some(date => {
+        if (!date) return true; // Missing is treated as expired
+        const expDate = this.getExpiryDate(date);
+        return Utils.daysUntil(expDate) < 0;
+      });
+      if (hasExpiredAsset) expiredKits++;
+    });
+
+    const rowsHtml = this.buildUniformTableRows(activeRiders);
+
+    const summaryBadgeText = expiredUniforms > 0 
+      ? `⚠️ ${expiredUniforms} Uniforms Expired` 
+      : (expiredKits > 0 ? `⚠️ ${expiredKits} Kits Expired` : '✓ All Clear');
+      
+    const badgeColor = (expiredUniforms > 0 || expiredKits > 0)
+      ? 'background:#FDE8E8; color:#9B1C1C; border:1px solid #F87171;' 
+      : 'background:#DEF7EC; color:#03543F; border:1px solid #34D399;';
+
+    return `
+      <div class="card section-card mt-24" style="margin-bottom: 24px; animation: slideUp 300ms ease both; animation-delay: 150ms; border: 1px solid var(--border-light); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.02);">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 20px 24px;" id="uniform-tracker-toggle">
+          <h2 class="section-title" style="display:flex; align-items:center; gap:10px; margin:0; font-size: 16px; font-weight: 700;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:var(--primary-500);"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            <span>Rider Uniform & Safety Kit Tracker</span>
+          </h2>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="badge" id="uniform-summary-badge" style="font-size:12px; font-weight:600; padding:3px 10px; border-radius: 8px; ${badgeColor}">${summaryBadgeText}</span>
+            <svg id="uniform-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px; height:18px; transition: transform 0.2s; transform: ${this.uniformTrackerCollapsed ? 'rotate(-90deg)' : 'none'};"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        
+        <div id="uniform-tracker-content-panel" style="display: ${this.uniformTrackerCollapsed ? 'none' : 'block'}; padding: 0 24px 24px 24px;">
+          <!-- Internal Grid for Stats -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:12px; border-left: 4px solid var(--primary-500); cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Dashboard.setUniformFilter('all')">
+              <div style="font-size:10px; color:var(--gray-500); font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Active DAs</div>
+              <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-top:4px;">${totalRiders}</div>
+            </div>
+            <div style="background:#DEF7EC; border:1px solid #BCF0DA; padding:12px 14px; border-radius:12px; border-left: 4px solid var(--success-500); cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Dashboard.setUniformFilter('valid')">
+              <div style="font-size:10px; color:#03543F; font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Uniforms Valid</div>
+              <div style="font-size:22px; font-weight:800; color:#03543F; margin-top:4px;">${upToDateUniforms}</div>
+            </div>
+            <div style="background:#FEF2F2; border:1px solid #FCA5A5; padding:12px 14px; border-radius:12px; border-left: 4px solid var(--danger-500); cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Dashboard.setUniformFilter('expired')">
+              <div style="font-size:10px; color:#B91C1C; font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Uniforms Expired</div>
+              <div style="font-size:22px; font-weight:800; color:#991B1B; margin-top:4px;">${expiredUniforms}</div>
+            </div>
+            <div style="background:#FFFDF5; border:1px solid #FCD34D; padding:12px 14px; border-radius:12px; border-left: 4px solid var(--warning-500); cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Dashboard.setUniformFilter('expired-kits')">
+              <div style="font-size:10px; color:#B45309; font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Kits Expired</div>
+              <div style="font-size:22px; font-weight:800; color:#92400E; margin-top:4px;">${expiredKits}</div>
+            </div>
+          </div>
+
+          <!-- Bulk Actions Toolbar -->
+          <div id="uniform-bulk-actions" style="display:none; background:#EFF6FF; border:1px solid #BFDBFE; padding:12px 16px; border-radius:12px; margin-bottom:16px; align-items:center; justify-content:space-between; animation: slideDown 0.2s ease both;">
+            <div style="font-size:13px; font-weight:600; color:#1E40AF;">
+              <span id="uniform-selected-count">0</span> riders selected
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button type="button" id="btn-bulk-copy-noon" style="padding:6px 12px; font-size:12px; font-weight:600; background:#2563EB; color:white; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition: background 0.15s;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy TSV for Noon
+              </button>
+              <button type="button" id="btn-bulk-mark-uniform" style="padding:6px 12px; font-size:12px; font-weight:600; background:#10B981; color:white; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition: background 0.15s;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Mark Uniform Issued Today
+              </button>
+            </div>
+          </div>
+          
+          <!-- Search / Filter Bar -->
+          <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content: space-between;">
+            <div style="position:relative; width: 320px; min-width: 250px;">
+              <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray-400); width:16px; height:16px; display:flex; align-items:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input type="text" id="uniform-search" placeholder="Search DA name, Noon ID, store or status..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border-medium); border-radius:10px; font-size:13px; outline:none; transition:border-color 0.15s;" value="${Utils.escapeHtml(this.uniformSearchQuery || '')}">
+            </div>
+            <div class="filters" style="display:flex; gap:8px;">
+              <button class="filter-chip ${this.uniformFilter === 'all' ? 'active' : ''}" data-uniform-filter="all" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">All</button>
+              <button class="filter-chip ${this.uniformFilter === 'expired' ? 'active' : ''}" data-uniform-filter="expired" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">Expired Uniform</button>
+              <button class="filter-chip ${this.uniformFilter === 'expired-kits' ? 'active' : ''}" data-uniform-filter="expired-kits" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">Expired Kits</button>
+              <button class="filter-chip ${this.uniformFilter === 'valid' ? 'active' : ''}" data-uniform-filter="valid" style="font-size:12px; padding: 6px 14px; border-radius: 8px; font-weight: 600;">Up to Date</button>
+            </div>
+          </div>
+          
+          <!-- Table Container -->
+          <div class="table-container" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.02);">
+            <table class="data-table" style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+              <thead style="position: sticky; top: 0; background: #F8FAFC; z-index: 1; border-bottom: 2px solid var(--border-light); box-shadow: 0 1px 0 var(--border-light);">
+                <tr>
+                  <th style="padding: 12px 16px; width: 40px; text-align:center; vertical-align: middle;">
+                    <input type="checkbox" id="uniform-select-all" style="cursor:pointer; width:16px; height:16px; margin: 0; vertical-align: middle;">
+                  </th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Rider (DA Name)</th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Noon ID & Station</th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Uniform Date</th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Uniform Status</th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Safety Kit Assets (6m Expiry)</th>
+                  <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="uniform-table-body">
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  buildUniformTableRows(riders) {
+    const sortedRiders = [...riders].sort((a, b) => {
+      // Sort priority: Expired uniforms or missing uniforms first, then expired kits, then up-to-date
+      const getPriority = (rider) => {
+        if (!rider.uniform_date) return 0;
+        const uniformDays = Utils.daysUntil(this.getExpiryDate(rider.uniform_date));
+        if (uniformDays < 0) return 0;
+
+        const assets = [rider.helmet_date, rider.gloves_date, rider.chest_safety_date, rider.foot_safety_date];
+        const hasExpiredAsset = assets.some(date => {
+          if (!date) return true;
+          return Utils.daysUntil(this.getExpiryDate(date)) < 0;
+        });
+        if (hasExpiredAsset) return 1;
+        return 2;
+      };
+      return getPriority(a) - getPriority(b);
+    });
+
+    return sortedRiders.map(rider => {
+      const noonId = rider.noon_id || rider.company_id || rider.rider_company_id || '—';
+      const store = rider.store_warehouse || '—';
+      
+      // Uniform Status
+      let uniformDateText = rider.uniform_date ? Utils.formatDateShort(rider.uniform_date) : '—';
+      let uniformBadge = '';
+      let uniformRowStatus = 'valid';
+      
+      if (!rider.uniform_date) {
+        uniformRowStatus = 'expired';
+        uniformBadge = `<span class="badge" style="background:#FCE8E6; color:#C5221F; border:1px solid #F1A9A0; font-weight:700; font-size:11px; border-radius: 6px;">Not Issued</span>`;
+      } else {
+        const expDate = this.getExpiryDate(rider.uniform_date);
+        const days = Utils.daysUntil(expDate);
+        const pct = Math.max(0, Math.min(100, (days / 180) * 100)); // percentage left
+        
+        let colorClass = '#10B981'; // Green
+        if (days < 0) {
+          colorClass = '#EF4444'; // Red
+        } else if (days <= 30) {
+          colorClass = '#F59E0B'; // Orange
+        }
+        
+        const progressBar = `
+          <div style="width: 100%; min-width: 100px; max-width: 150px; margin-top: 4px;">
+            <div style="background:#E2E8F0; height:6px; border-radius:3px; overflow:hidden; width:100%;">
+              <div style="background:${colorClass}; width:${pct}%; height:100%; border-radius:3px;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#64748B; margin-top: 2px; font-weight: 500;">
+              <span>${days < 0 ? 'Expired' : `${days}d left`}</span>
+              <span>${Math.round(pct)}%</span>
+            </div>
+          </div>
+        `;
+        
+        if (days < 0) {
+          uniformRowStatus = 'expired';
+          uniformBadge = `
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span class="badge" style="background:#FCE8E6; color:#C5221F; border:1px solid #F1A9A0; font-weight:700; font-size:11px; border-radius: 6px; width:fit-content;">Expired (${Math.abs(days)}d ago)</span>
+              ${progressBar}
+            </div>
+          `;
+        } else {
+          uniformBadge = `
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span class="badge" style="background:#DEF7EC; color:#03543F; border:1px solid #34D399; font-weight:600; font-size:11px; border-radius: 6px; width:fit-content;">Valid</span>
+              ${progressBar}
+            </div>
+          `;
+        }
+      }
+
+      // Safety Kit Assets helper
+      const getAssetBadge = (date, name, icon) => {
+        if (!date) {
+          return `<span title="${name}: Not Issued" style="background:#F1F5F9; color:#94A3B8; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; opacity:0.65; border:1px solid #E2E8F0;">${icon} Missing</span>`;
+        }
+        const expDate = this.getExpiryDate(date);
+        const days = Utils.daysUntil(expDate);
+        if (days < 0) {
+          return `<span title="${name}: Expired ${Math.abs(days)}d ago" style="background:#FDF2F2; color:#B91C1C; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; border:1px solid #FEE2E2;">${icon} Expired</span>`;
+        }
+        return `<span title="${name}: ${days}d left" style="background:#F0FDF4; color:#15803D; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; border:1px solid #DCFCE7;">${icon} ${days}d</span>`;
+      };
+
+      const helmetBadge = getAssetBadge(rider.helmet_date, 'Helmet', '🪖');
+      const glovesBadge = getAssetBadge(rider.gloves_date, 'Gloves', '🧤');
+      const chestBadge = getAssetBadge(rider.chest_safety_date, 'Chest Vest', '🦺');
+      const footBadge = getAssetBadge(rider.foot_safety_date, 'Safety Shoes', '🥾');
+
+      const assetsHtml = `
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          ${helmetBadge}
+          ${glovesBadge}
+          ${chestBadge}
+          ${footBadge}
+        </div>
+      `;
+
+      // Determine kit row status
+      const kitExpired = [rider.helmet_date, rider.gloves_date, rider.chest_safety_date, rider.foot_safety_date].some(d => {
+        if (!d) return true;
+        return Utils.daysUntil(this.getExpiryDate(d)) < 0;
+      });
+      const kitStatusVal = kitExpired ? 'expired-kits' : 'valid';
+
+      // Actions
+      let actionHtml = '';
+      if (rider.phone) {
+        actionHtml = `
+          <div style="display:inline-flex; align-items:center; gap:8px; justify-content:center;">
+            <button type="button" class="wa-action-btn" title="Send WhatsApp Reminders" 
+                    onclick="Dashboard.openWhatsAppTemplateModal(${rider.id})" 
+                    style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); color:white; box-shadow:0 1px 4px rgba(37,211,102,0.25); cursor:pointer;">
+              <svg viewBox="0 0 24 24" fill="white" style="width:12px; height:12px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            </button>
+            <button type="button" class="btn-copy" onclick="Dashboard.openNoonSubmissionModal(${rider.id})" title="View Noon DA Info Modal" style="border:1px solid var(--border-medium); background:white; color:var(--text-secondary); width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition: all 0.2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </button>
+          </div>
+        `;
+      }
+
+      return `
+        <tr data-rider-id="${rider.id}"
+            data-rider-name="${Utils.escapeHtml(rider.name)}" 
+            data-noon-id="${Utils.escapeHtml(noonId)}" 
+            data-store="${Utils.escapeHtml(store)}" 
+            data-uniform-status="${uniformRowStatus}" 
+            data-kit-status="${kitStatusVal}"
+            style="border-bottom: 1px solid var(--border-light); transition: background-color 0.15s; cursor: pointer;"
+            class="hover-row"
+            onclick="App.navigate('riders'); setTimeout(() => Riders.openEditRider(${rider.id}), 200);">
+          <td style="padding: 12px 16px; vertical-align: middle; text-align:center;" onclick="event.stopPropagation();">
+            <input type="checkbox" class="uniform-select-row" data-rider-id="${rider.id}" style="cursor:pointer; width:16px; height:16px; margin: 0; vertical-align: middle;">
+          </td>
+          <td style="padding: 12px 16px; vertical-align: middle;">
+            <div style="font-weight: 600; color: var(--text-primary); font-size: 14px;">${Utils.escapeHtml(rider.name)}</div>
+          </td>
+          <td style="padding: 12px 16px; vertical-align: middle;">
+            <div style="font-weight: 700; color: var(--primary-700); font-family: monospace; font-size:13px;">${Utils.escapeHtml(noonId)}</div>
+            <div style="color:var(--text-tertiary); font-size:11px; margin-top: 2px;">Station: ${Utils.escapeHtml(store)}</div>
+          </td>
+          <td style="padding: 12px 16px; vertical-align: middle; color: var(--text-secondary);">${uniformDateText}</td>
+          <td style="padding: 12px 16px; vertical-align: middle;">${uniformBadge}</td>
+          <td style="padding: 12px 16px; vertical-align: middle;">${assetsHtml}</td>
+          <td style="padding: 12px 16px; text-align:center; vertical-align: middle;" onclick="event.stopPropagation();">${actionHtml}</td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  copyNoonData(noonId, name, phone, iqama, store) {
+    const dataStr = `Noon ID: ${noonId}\nName: ${name}\nPhone: ${phone}\nIqama: ${iqama}\nStore: ${store}`;
+    navigator.clipboard.writeText(dataStr).then(() => {
+      Utils.showToast('Copied Noon DA Submission Info to Clipboard!', 'success');
+    }).catch(err => {
+      Utils.showToast('Failed to copy info', 'error');
+    });
+  },
+
+  copyBikeAuthData(plate, iqama, phone, dob, email) {
+    const dobFormatted = dob ? Utils.formatDateShort(dob) : '—';
+    const dataStr = `Iqama Number: ${iqama}\nPhone Number: ${phone}\nBike Plate: ${plate}\nDate of Birth: ${dobFormatted}\nEmail: ${email}`;
+    navigator.clipboard.writeText(dataStr).then(() => {
+      Utils.showToast('Copied Bike Authorization Details to Clipboard!', 'success');
+    }).catch(err => {
+      Utils.showToast('Failed to copy details', 'error');
+    });
+  },
+
+  setUniformFilter(filter) {
+    this.uniformFilter = filter;
+    this.applyUniformFilters();
+  },
+
+  toggleUniformPanel() {
+    this.uniformTrackerCollapsed = !this.uniformTrackerCollapsed;
+    const panel = document.getElementById('uniform-tracker-content-panel');
+    const chevron = document.getElementById('uniform-chevron');
+    if (panel) {
+      panel.style.display = this.uniformTrackerCollapsed ? 'none' : 'block';
+    }
+    if (chevron) {
+      chevron.style.transform = this.uniformTrackerCollapsed ? 'rotate(-90deg)' : 'none';
+    }
+  },
+
+  handleUniformSearch(e) {
+    this.uniformSearchQuery = e.target.value;
+    this.applyUniformFilters();
+  },
+
+  applyUniformFilters() {
+    const query = (this.uniformSearchQuery || '').toLowerCase().trim();
+    const filter = this.uniformFilter || 'all';
+    
+    document.querySelectorAll('[data-uniform-filter]').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.uniformFilter === filter);
+    });
+    
+    const rows = document.querySelectorAll('#uniform-table-body tr');
+    rows.forEach(row => {
+      const name = row.getAttribute('data-rider-name')?.toLowerCase() || '';
+      const noonId = row.getAttribute('data-noon-id')?.toLowerCase() || '';
+      const store = row.getAttribute('data-store')?.toLowerCase() || '';
+      const uniformStatus = row.getAttribute('data-uniform-status') || '';
+      const kitStatus = row.getAttribute('data-kit-status') || '';
+      
+      const matchesSearch = !query || 
+                            name.includes(query) ||
+                            noonId.includes(query) ||
+                            store.includes(query);
+                            
+      let matchesFilter = true;
+      if (filter === 'expired') {
+        matchesFilter = (uniformStatus === 'expired');
+      } else if (filter === 'expired-kits') {
+        matchesFilter = (kitStatus === 'expired-kits');
+      } else if (filter === 'valid') {
+        matchesFilter = (uniformStatus === 'valid' && kitStatus === 'valid');
+      }
+      
+      row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+    });
+  },
+
+  openWhatsAppTemplateModal(riderId) {
+    const rider = this.riders?.find(r => r.id === riderId);
+    if (!rider) return Utils.showToast('Rider not found', 'error');
+
+    const bike = this.bikes?.find(b => parseInt(b.assigned_rider_id) === rider.id);
+    const bikePlate = bike ? bike.plate_number : 'No Bike';
+
+    // Predefined templates
+    const templates = {
+      uniform: `Dear *${rider.name}*\n\nYour Noon Uniform allowance cycle has completed and it is time for a new uniform issue.\n\n*If you already received it* please send a photo of yourself in the new uniform to the supervisor group.\n\nInspiring Roads Logistics`,
+      safety: `Dear *${rider.name}*\n\nYour Safety Kit allowance (Helmet/Vest/Shoes/Gloves) is due for renewal or verification.\n\nPlease coordinate with the office to verify and get new safety equipment.\n\nInspiring Roads Logistics`,
+      auth: `Dear *${rider.name}*\n\nYour bike *${bikePlate}* authorization (Istimara) requires urgent attention.\n\n*Please send a screenshot of the expiry date from your Absher*:\n1 Open Absher\n2 Go to My Vehicles\n3 Select the bike\n4 Under Vehicle Details click Authorization Details\n5 Take screenshot and send it here\n\nInspiring Roads Logistics`
+    };
+
+    const modalTitle = `<div style="font-size:16px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2.5" style="width:18px; height:18px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Send WhatsApp Notification
+    </div>`;
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="font-size:13px; color:#64748B;">
+          Sending reminder to <strong>${Utils.escapeHtml(rider.name)}</strong> (${rider.phone || 'No phone'}).
+        </div>
+        
+        <div>
+          <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:6px;">Select Template</label>
+          <select id="wa-template-select" class="rider-form-select" style="width:100%; height:38px; border:1px solid #CBD5E1; border-radius:8px; padding:0 12px; font-size:13px; box-sizing:border-box;">
+            <option value="uniform">Uniform Allowance Renewal</option>
+            <option value="safety">Safety Kit Assets Renewal</option>
+            <option value="auth">Bike Authorization Absher Screenshot Request</option>
+            <option value="custom">Custom Blank Message</option>
+          </select>
+        </div>
+        
+        <div>
+          <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:6px;">Message Preview</label>
+          <textarea id="wa-message-text" class="rider-form-input" style="width:100%; height:160px; border:1px solid #CBD5E1; border-radius:8px; padding:12px; font-size:13px; font-family:sans-serif; resize:vertical; box-sizing:border-box; line-height:1.5;"></textarea>
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:8px;">
+          <button type="button" onclick="Utils.closeModal()" style="height:38px; padding:0 16px; border:1px solid #CBD5E1; background:white; color:#475569; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px;">Cancel</button>
+          <button type="button" id="btn-wa-send-submit" style="height:38px; padding:0 16px; border:none; background:linear-gradient(135deg,#25D366,#128C7E); color:white; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; box-shadow: 0 4px 6px -1px rgba(37,211,102,0.2);">
+            <svg viewBox="0 0 24 24" fill="white" style="width:14px; height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            Send WhatsApp
+          </button>
+        </div>
+      </div>
+    `;
+
+    Utils.openModal(modalTitle, bodyHtml, 'modal-md');
+
+    const select = document.getElementById('wa-template-select');
+    const textarea = document.getElementById('wa-message-text');
+    const btnSend = document.getElementById('btn-wa-send-submit');
+
+    if (textarea) {
+      textarea.value = templates.uniform; // default
+    }
+
+    select?.addEventListener('change', (e) => {
+      const type = e.target.value;
+      if (textarea) {
+        textarea.value = templates[type] || '';
+      }
+    });
+
+    btnSend?.addEventListener('click', () => {
+      const msg = textarea ? textarea.value : '';
+      if (!msg.trim()) return Utils.showToast('Message cannot be empty', 'error');
+      
+      const cleanPhone = rider.phone.replace(/[^0-9]/g, '');
+      const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+      Utils.closeModal();
+    });
+  },
+
+  openNoonSubmissionModal(riderId) {
+    const rider = this.riders?.find(r => r.id === riderId);
+    if (!rider) return Utils.showToast('Rider not found', 'error');
+    
+    const noonId = rider.noon_id || rider.company_id || rider.rider_company_id || '—';
+    const store = rider.store_warehouse || '—';
+    const iqama = rider.iqama_number || '—';
+    const phone = rider.phone || '—';
+    
+    const modalTitle = `<div style="font-size:16px; font-weight:700; color:#1E293B;">Noon Submission DA Info</div>`;
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="font-size:12px; color:#64748B;">
+          Securely view and copy credentials for Noon submissions.
+        </div>
+        
+        <div style="display:grid; grid-template-columns:1fr; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; padding:16px; border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Noon ID</div>
+              <div style="font-size:14px; font-weight:700; color:#1E3A8A; font-family:monospace;">${Utils.escapeHtml(noonId)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(noonId)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Rider Name</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(rider.name)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(rider.name)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Phone Number</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(phone)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(phone)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Iqama Number</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B; font-family:monospace;">${Utils.escapeHtml(iqama)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(iqama)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:4px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Store / Station</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(store)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(store)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:12px; justify-content:space-between; margin-top:8px;">
+          <button type="button" id="btn-noon-copy-all" style="flex:1; height:38px; border:none; background:#2563EB; color:white; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2); transition: background 0.15s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px; height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy All for Noon Sheet
+          </button>
+          <button type="button" onclick="Utils.closeModal()" style="height:38px; padding:0 16px; border:1px solid #CBD5E1; background:white; color:#475569; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px;">Close</button>
+        </div>
+      </div>
+    `;
+    
+    Utils.openModal(modalTitle, bodyHtml, 'modal-md');
+    
+    document.querySelectorAll('.btn-copy-field').forEach(btn => {
+      btn.onclick = (e) => {
+        const val = e.target.dataset.value;
+        navigator.clipboard.writeText(val).then(() => {
+          Utils.showToast('Copied to clipboard!', 'success');
+        });
+      };
+    });
+    
+    document.getElementById('btn-noon-copy-all').onclick = () => {
+      const tsv = `${noonId}\t${rider.name}\t${phone}\t${iqama}\t${store}`;
+      navigator.clipboard.writeText(tsv).then(() => {
+        Utils.showToast('Copied Tab-separated DA details to Clipboard!', 'success');
+        Utils.closeModal();
+      });
+    };
+  },
+
+  openBikeAuthModal(bikeId) {
+    const bike = this.bikes?.find(b => b.id === bikeId);
+    if (!bike) return Utils.showToast('Bike not found', 'error');
+    
+    const rider = this.riders?.find(r => r.id === bike.assigned_rider_id);
+    if (!rider) return Utils.showToast('No rider assigned to this bike', 'warning');
+    
+    const plate = bike.plate_number || '—';
+    const iqama = rider.iqama_number || '—';
+    const phone = rider.phone || '—';
+    const email = rider.email || '—';
+    const dob = rider.date_of_birth ? Utils.formatDateShort(rider.date_of_birth) : '—';
+    
+    const modalTitle = `<div style="font-size:16px; font-weight:700; color:#1E293B;">Bike Authorization DA Info</div>`;
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="font-size:12px; color:#64748B;">
+          Credentials required to authorize bike <strong>${Utils.escapeHtml(plate)}</strong> to rider.
+        </div>
+        
+        <div style="display:grid; grid-template-columns:1fr; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; padding:16px; border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Bike Plate Number</div>
+              <div style="font-size:14px; font-weight:700; color:#1E3A8A; font-family:monospace;">${Utils.escapeHtml(plate)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(plate)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Iqama Number</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B; font-family:monospace;">${Utils.escapeHtml(iqama)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(iqama)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Phone Number</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(phone)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(phone)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Date of Birth</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(dob)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(dob)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:4px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Email Address</div>
+              <div style="font-size:14px; font-weight:600; color:#1E293B;">${Utils.escapeHtml(email)}</div>
+            </div>
+            <button class="btn-copy-field" data-value="${Utils.escapeHtml(email)}" style="border:1px solid #CBD5E1; background:white; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600; color:#475569; transition: all 0.15s;">Copy</button>
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:12px; justify-content:space-between; margin-top:8px;">
+          <button type="button" id="btn-bike-auth-copy-all" style="flex:1; height:38px; border:none; background:#2563EB; color:white; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2); transition: background 0.15s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px; height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy All Auth Details
+          </button>
+          <button type="button" onclick="Utils.closeModal()" style="height:38px; padding:0 16px; border:1px solid #CBD5E1; background:white; color:#475569; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px;">Close</button>
+        </div>
+      </div>
+    `;
+    
+    Utils.openModal(modalTitle, bodyHtml, 'modal-md');
+    
+    document.querySelectorAll('.btn-copy-field').forEach(btn => {
+      btn.onclick = (e) => {
+        const val = e.target.dataset.value;
+        navigator.clipboard.writeText(val).then(() => {
+          Utils.showToast('Copied to clipboard!', 'success');
+        });
+      };
+    });
+    
+    document.getElementById('btn-bike-auth-copy-all').onclick = () => {
+      const details = `Iqama Number: ${iqama}\nPhone Number: ${phone}\nBike Plate: ${plate}\nDate of Birth: ${dob}\nEmail: ${email}`;
+      navigator.clipboard.writeText(details).then(() => {
+        Utils.showToast('Copied Bike Authorization Details to Clipboard!', 'success');
+        Utils.closeModal();
+      });
+    };
   }
 };
+
