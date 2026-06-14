@@ -1308,6 +1308,18 @@ const Bikes = {
     // Set up local service logs state
     this._currentLogs = isEdit ? this.parseServiceLogs(bike.notes) : [];
 
+    let auth_day = '';
+    let auth_month = '';
+    let auth_year = '';
+    if (isEdit && bike.authorization_expiry) {
+      const parts = bike.authorization_expiry.split('-');
+      if (parts.length === 3) {
+        auth_year = parseInt(parts[0], 10);
+        auth_month = parseInt(parts[1], 10);
+        auth_day = parseInt(parts[2], 10);
+      }
+    }
+
     let healthStatus = 'ok', worstExpiry = Infinity;
     if (isEdit) {
       const daysAuth = Utils.daysUntil(bike.authorization_expiry);
@@ -1404,13 +1416,30 @@ const Bikes = {
                 </div>
                 Documents & Expiry
               </div>
-              <div class="form-grid" style="display: grid; gap: 20px; ${(!isEdit || !bike.assigned_rider_id) ? 'grid-template-columns: 1fr;' : 'grid-template-columns: 1fr 1fr;'}">
-                ${(isEdit && bike.assigned_rider_id) ? `
+              <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
                   <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Authorization Expiry (Istimara)</label>
-                  <input type="date" id="bf-auth-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${bike.authorization_expiry ? bike.authorization_expiry : ''}" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50); transition: all 0.2s;">
+                  <div style="display: flex; gap: 8px;">
+                    <select id="bf-auth-day" class="form-select" ${isViewer ? 'disabled' : ''} style="flex: 1; padding: 12px 20px 12px 10px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background-color: var(--gray-50); background-position: right 6px center; height: 46px; transition: all 0.2s;">
+                      <option value="">Day</option>
+                      ${Array.from({ length: 31 }, (_, i) => i + 1).map(d => `
+                        <option value="${d}" ${auth_day === d ? 'selected' : ''}>${d}</option>
+                      `).join('')}
+                    </select>
+                    <select id="bf-auth-month" class="form-select" ${isViewer ? 'disabled' : ''} style="flex: 1.3; padding: 12px 20px 12px 10px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background-color: var(--gray-50); background-position: right 6px center; height: 46px; transition: all 0.2s;">
+                      <option value="">Month</option>
+                      ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, idx) => `
+                        <option value="${idx + 1}" ${auth_month === idx + 1 ? 'selected' : ''}>${m}</option>
+                      `).join('')}
+                    </select>
+                    <select id="bf-auth-year" class="form-select" ${isViewer ? 'disabled' : ''} style="flex: 1.2; padding: 12px 20px 12px 10px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background-color: var(--gray-50); background-position: right 6px center; height: 46px; transition: all 0.2s;">
+                      <option value="">Year</option>
+                      ${Array.from({ length: 16 }, (_, i) => (new Date().getFullYear() - 5) + i).map(y => `
+                        <option value="${y}" ${auth_year === y ? 'selected' : ''}>${y}</option>
+                      `).join('')}
+                    </select>
+                  </div>
                 </div>
-                ` : ''}
                 <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
                   <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Insurance Expiry</label>
                   <input type="date" id="bf-ins-expiry" class="form-control" ${isViewer ? 'disabled' : ''} value="${isEdit && bike.insurance_expiry ? bike.insurance_expiry : ''}" style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--gray-200); font-size: 14px; background: var(--gray-50); transition: all 0.2s;">
@@ -1478,12 +1507,28 @@ const Bikes = {
       const submitBtn = e.target.querySelector('button[type="submit"]');
       if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span>Saving...</span>'; }
 
+      const authDay = document.getElementById('bf-auth-day')?.value;
+      const authMonth = document.getElementById('bf-auth-month')?.value;
+      const authYear = document.getElementById('bf-auth-year')?.value;
+
+      // Validate: either all are selected, or all are empty
+      if ((authDay || authMonth || authYear) && !(authDay && authMonth && authYear)) {
+        Utils.showToast('Please select Day, Month, and Year for Authorization Expiry, or leave all blank.', 'error');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = isEdit ? 'Save Changes' : 'Register Bike'; }
+        return;
+      }
+
+      let authorization_expiry = null;
+      if (authDay && authMonth && authYear) {
+        authorization_expiry = `${authYear}-${String(authMonth).padStart(2, '0')}-${String(authDay).padStart(2, '0')}`;
+      }
+
       const payload = {
         plate_number: document.getElementById('bf-plate').value.trim(),
         model: document.getElementById('bf-model').value.trim(),
         status: document.getElementById('bf-status').value,
         insurance_expiry: document.getElementById('bf-ins-expiry').value || null,
-        authorization_expiry: document.getElementById('bf-auth-expiry')?.value || (isEdit ? bike.authorization_expiry : null),
+        authorization_expiry: authorization_expiry,
         notes: JSON.stringify(this._currentLogs), // Save serialized array to notes column
       };
 
