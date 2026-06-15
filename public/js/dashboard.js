@@ -1152,6 +1152,17 @@ const Dashboard = {
               <div style="font-size:22px; font-weight:800; color:#334155; margin-top:4px;" id="bike-stat-unassigned">${unassignedCount}</div>
             </div>
           </div>
+
+          <!-- Fleet Auth Progress Bar -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 12px; margin-bottom: 20px; box-shadow: var(--shadow-xs);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:12.5px; font-weight:700; color:var(--text-secondary);">Fleet Authorization Compliance Rate</span>
+              <span style="font-size:14px; font-weight:800; color:var(--primary-600);">${totalBikes > 0 ? Math.round((authorizedCount / totalBikes) * 100) : 0}% (${authorizedCount} / ${totalBikes} Authorized)</span>
+            </div>
+            <div style="width:100%; height:8px; background:var(--gray-100); border-radius:999px; overflow:hidden; border: 1px solid var(--border-light);">
+              <div style="width:${totalBikes > 0 ? Math.round((authorizedCount / totalBikes) * 100) : 0}%; height:100%; background:linear-gradient(90deg, var(--success-400), var(--success-500)); border-radius:999px;"></div>
+            </div>
+          </div>
           
           <!-- Search / Filter Bar -->
           <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content: space-between;">
@@ -1289,6 +1300,12 @@ const Dashboard = {
             `;
           }
         }
+      } else if (bike.assigned_rider_id) {
+        actionHtml = `
+          <button type="button" class="dash-copy-btn" onclick="Dashboard.openBikeAuthModal(${bike.id})" title="Copy Noon Auth Data">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        `;
       }
 
       return `
