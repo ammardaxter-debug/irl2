@@ -426,6 +426,12 @@ const Bikes = {
             </button>
           </div>
 
+          <button class="header-action-btn" id="fleet-refresh-btn" title="Refresh Fleet Data" style="height:36px; width:36px; padding:0; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+
           <button class="btn btn-outline btn-sm" id="fleet-export-csv" title="Export CSV" style="height:36px; gap:6px; display:flex; align-items:center; padding: 0 12px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             CSV
@@ -1154,6 +1160,16 @@ const Bikes = {
   attachEvents() {
     const container = document.getElementById('page-fleet');
     if (!container) return;
+
+    // Fleet refresh button
+    document.getElementById('fleet-refresh-btn')?.addEventListener('click', () => {
+      const btn = document.getElementById('fleet-refresh-btn');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      this.render();
+    });
 
     // Search events (live typing - focus preserving)
     const searchInput = document.getElementById('fleet-search');

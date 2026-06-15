@@ -74,9 +74,8 @@ const NotificationsAdmin = {
     root.innerHTML = `
       <div class="page-header" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
         <h1 class="page-title">Rider Alerts & Notifications</h1>
-        <button class="btn btn-outline" id="refresh-compliance-btn">
+        <button class="header-action-btn" id="refresh-compliance-btn" title="Refresh Alerts" style="border-radius:12px; height:36px; width:36px; padding:0; flex-shrink:0;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          Refresh Data
         </button>
       </div>
 
@@ -392,9 +391,10 @@ const NotificationsAdmin = {
     // 1. Refresh Button
     document.getElementById('refresh-compliance-btn')?.addEventListener('click', async () => {
       const btn = document.getElementById('refresh-compliance-btn');
-      btn.disabled = true;
-      const origText = btn.innerHTML;
-      btn.innerHTML = `<div class="spinner-sm" style="margin-right:6px;"></div>Loading...`;
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('rotating');
+      }
       try {
         await this.loadData();
         this.renderUI(document.getElementById('page-notifications'));
@@ -402,8 +402,11 @@ const NotificationsAdmin = {
         Utils.showToast('Compliance checks re-calculated', 'success');
       } catch (err) {
         Utils.showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = origText;
+        const newBtn = document.getElementById('refresh-compliance-btn');
+        if (newBtn) {
+          newBtn.disabled = false;
+          newBtn.classList.remove('rotating');
+        }
       }
     });
 

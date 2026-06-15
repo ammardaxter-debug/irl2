@@ -297,6 +297,28 @@ const App = {
       `;
       toggleBtn.title = "Switch to Dark Mode";
     }
+  },
+
+  refreshCurrentPage() {
+    const page = this.currentPage;
+    const btn = document.getElementById('global-refresh-btn');
+    if (btn) {
+      btn.classList.add('rotating');
+      setTimeout(() => btn.classList.remove('rotating'), 800);
+    }
+    switch (page) {
+      case 'dashboard': Dashboard.render(); break;
+      case 'riders': Riders.render(); break;
+      case 'daily-logs': DailyLogs.render(); break;
+      case 'payroll': Payroll.render(); break;
+      case 'expenses': Expenses.render(); break;
+      case 'fleet': Bikes.render(); break;
+      case 'reports-center': ReportsCenter.render(); break;
+      case 'notifications': NotificationsAdmin.render(); break;
+      case 'live-tracking': LiveTracking.render(); break;
+      case 'backup': Backup.render(); break;
+      case 'sprints': SprintsPage.render(); break;
+    }
   }
 };
 

@@ -10,6 +10,14 @@ const Expenses = {
   riders: [],
   cyclePeriod: null,
 
+  handleRefresh(btn) {
+    if (btn) {
+      btn.classList.add('rotating');
+      setTimeout(() => btn.classList.remove('rotating'), 800);
+    }
+    this.render();
+  },
+
   getDefaultDateForCycle() {
     const today = Utils.today();
     if (this.cyclePeriod && today >= this.cyclePeriod.start && today <= this.cyclePeriod.end) {
@@ -191,12 +199,19 @@ const Expenses = {
               </button>
             </div>
           </div>
-          ${App.isViewer() ? '' : `
-          <div class="btn-group">
-            <button class="btn-group-outline" onclick="Expenses.openAddFundsModal()">Log IRL Funds</button>
-            <button class="btn-group-filled" onclick="Expenses.openAddExpenseModal()">Add Expense</button>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <button class="header-action-btn" id="expenses-refresh-btn" title="Refresh Expenses" onclick="Expenses.handleRefresh(this)" style="border-radius:10px; height:36px; width:36px; padding:0; flex-shrink:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+            </button>
+            ${App.isViewer() ? '' : `
+            <div class="btn-group">
+              <button class="btn-group-outline" onclick="Expenses.openAddFundsModal()">Log IRL Funds</button>
+              <button class="btn-group-filled" onclick="Expenses.openAddExpenseModal()">Add Expense</button>
+            </div>
+            `}
           </div>
-          `}
         </div>
         
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid #E5E7EB;">

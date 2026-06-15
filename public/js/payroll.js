@@ -165,6 +165,11 @@ const Payroll = {
         <h1 style="font-size:24px; font-weight:bold; color:#0F0F0F;">Payroll</h1>
         <div style="display:flex; align-items:center; gap:12px;">
           <span style="background:#F0FDF4; color:#16A34A; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">Noon Cycle: 21st → 20th</span>
+          <button id="payroll-refresh-btn" class="header-action-btn" title="Refresh Payroll" style="border-radius:12px; height:36px; width:36px; padding:0; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
           ${App.isViewer() ? '' : `
           <div style="position:relative; display:inline-block;">
             <button onclick="document.getElementById('finance-dropdown').classList.toggle('hidden')" style="background:#0F172A; color:#FFFFFF; border:none; border-radius:12px; padding:0 16px; height:36px; font-size:14px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
@@ -633,6 +638,16 @@ const Payroll = {
   },
 
   attachEvents() {
+    // Payroll refresh button
+    document.getElementById('payroll-refresh-btn')?.addEventListener('click', () => {
+      const btn = document.getElementById('payroll-refresh-btn');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      this.render();
+    });
+
     // Search filter
     document.getElementById('payroll-search')?.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase().trim();

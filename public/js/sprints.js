@@ -5,6 +5,14 @@ const SprintsPage = {
   searchQuery: '',
   countdownInterval: null,
 
+  handleRefresh(btn) {
+    if (btn) {
+      btn.classList.add('rotating');
+      setTimeout(() => btn.classList.remove('rotating'), 800);
+    }
+    this.render();
+  },
+
   async render() {
     const container = document.getElementById('page-sprints');
     if (!container) return;
@@ -281,6 +289,11 @@ const SprintsPage = {
             oninput="SprintsPage.handleSearch(event)"
           />
           <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="header-action-btn" id="sprints-refresh-btn" title="Refresh Sprints" onclick="SprintsPage.handleRefresh(this)" style="border-radius:8px; height:36px; width:36px; padding:0; flex-shrink:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+            </button>
             <span style="font-size: 14px; font-weight: 600; color: #475569;">Sprint Filter:</span>
             <select class="sprint-select" onchange="SprintsPage.handleSprintChange(event)">
               ${sprintOptions}

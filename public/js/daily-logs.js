@@ -41,6 +41,11 @@ const DailyLogs = {
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
           <span id="date-label" style="background:var(--warning-50); color:var(--warning-600); border: 1px solid var(--warning-100); padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:0.2px;">${Utils.formatDate(this.currentDate)}</span>
+          <button id="logs-refresh-btn" class="header-action-btn" title="Refresh Logs" style="border-radius:12px; height:38px; width:38px; padding:0; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
           <button id="bulk-lodge-btn" style="background:var(--primary-600); color:white; border:none; border-radius:12px; padding:0 18px; height:38px; font-size:13px; font-weight:700; cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:8px; transition:all var(--transition-fast); box-shadow:var(--shadow-glow-primary);" onmouseover="this.style.background='var(--primary-700)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='var(--primary-600)'; this.style.transform='none';">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             Bulk Override
@@ -622,7 +627,88 @@ const DailyLogs = {
     }
   },
 
+  buildMissingCard(rider) {
+    const avatarBg = rider.rider_type === 'company' ? '#2563EB' : '#7C3AED';
+    const typeBadge = rider.rider_type === 'company' 
+         ? `<span style="background:var(--primary-50); color:var(--primary-600); font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Company</span>`
+         : `<span style="background:var(--accent-50); color:var(--accent-600); font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600;">Freelancer</span>`;
+    const branchBadge = rider.store_warehouse ? `<span style="color:var(--text-secondary); font-size:12px;">• ${Utils.escapeHtml(rider.store_warehouse)}</span>` : '';
+
+    return `
+      <div class="log-row-item pending-log log-entry-card" data-rider-id="${rider.id}" data-action="log" data-name="${Utils.escapeHtml(rider.name).toLowerCase()}">
+        <div style="display:flex; align-items:center; gap:12px; flex:1;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">${Utils.getInitials(rider.name)}</div>
+          <div style="font-size:14px; font-weight:600; color:var(--text-primary);">${Utils.escapeHtml(rider.name)}</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${typeBadge}
+            ${branchBadge}
+          </div>
+        </div>
+        <div>
+          <button class="log-now-btn" data-rider-id="${rider.id}" data-rider-name="${Utils.escapeHtml(rider.name)}" style="background:var(--primary-600); color:white; border:none; height:28px; padding:0 12px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Log
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
+  buildLoggedCard(log) {
+    const totalMinutes = Utils.toMinutes(log.checkin_hours, log.checkin_minutes);
+    const isLowCheckin = totalMinutes < 660; // < 11 hours
+    const totalOrders = log.primary_orders + log.associate_orders;
+    
+    // Order Chip Logic (Example minimum: 20 orders is good, 15 borderline, <15 low)
+    let orderBg = 'var(--success-50)', orderColor = 'var(--success-600)';
+    if (totalOrders < 15) { orderBg = 'var(--danger-50)'; orderColor = 'var(--danger-600)'; }
+    else if (totalOrders < 20) { orderBg = 'var(--warning-50)'; orderColor = 'var(--warning-600)'; }
+
+    // Checkin Chip Logic
+    const checkinBg = isLowCheckin ? 'var(--danger-50)' : 'var(--success-50)';
+    const checkinColor = isLowCheckin ? 'var(--danger-600)' : 'var(--success-600)';
+
+    const avatarBg = log.rider_type === 'company' ? '#2563EB' : '#7C3AED';
+
+    return `
+      <div class="log-row-item logged log-entry-card" data-log-id="${log.id}" data-action="edit" data-name="${Utils.escapeHtml(log.rider_name).toLowerCase()}">
+        <div style="display:flex; align-items:center; gap:12px; flex:1;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${avatarBg};color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">${Utils.getInitials(log.rider_name)}</div>
+          <div style="font-size:14px; font-weight:600; color:var(--text-primary); ${log.attendance_status !== 'Present' ? 'opacity:0.5;' : ''}">${Utils.escapeHtml(log.rider_name)}</div>
+          ${log.attendance_status !== 'Present' ? `<span style="background:var(--warning-50); color:var(--warning-600); padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">${log.attendance_status}</span>` : ''}
+          ${log.absent_reason ? `<span style="color:var(--text-secondary); font-size:12px; font-style:italic;">• ${Utils.escapeHtml(log.absent_reason)}</span>` : ''}
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:8px; ${log.attendance_status !== 'Present' ? 'opacity:0.5;' : ''}">
+          <div style="background:${orderBg}; color:${orderColor}; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px;">
+            📦 ${totalOrders} Orders
+          </div>
+          <div style="background:${checkinBg}; color:${checkinColor}; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px;">
+            🕒 ${log.checkin_hours}:${String(log.checkin_minutes).padStart(2, '0')} Hrs
+          </div>
+          ${log.screenshot ? `
+          <button class="view-proof-btn" data-log-id="${log.id}" style="background:transparent; border:none; color:var(--primary-600); cursor:pointer; padding:4px;" title="View Screenshot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </button>` : ''}
+          <button style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding:4px;" title="Edit Log">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
   attachShellEvents() {
+    // Logs refresh button
+    document.getElementById('logs-refresh-btn')?.addEventListener('click', () => {
+      const btn = document.getElementById('logs-refresh-btn');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      this.render();
+    });
+
     // Date navigation
     document.getElementById('date-prev')?.addEventListener('click', () => {
       this.currentDate = Utils.shiftDate(this.currentDate, -1);

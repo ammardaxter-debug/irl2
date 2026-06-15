@@ -186,22 +186,29 @@ const Dashboard = {
 
     // Premium navigation tab selectors
     const tabSelectorHTML = `
-      <div class="dash-tab-bar">
-        <button class="dash-tab-btn ${this.activeDashboardTab === 'overview' ? 'active' : ''}" data-dash-tab="overview">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          Overview & Operations
-        </button>
-        <button class="dash-tab-btn ${this.activeDashboardTab === 'fleet' ? 'active' : ''}" data-dash-tab="fleet">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H8a2 2 0 0 0-2 2v7.5"/><circle cx="8" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
-          Fleet & Bike Authorizations
-        </button>
-        <button class="dash-tab-btn ${this.activeDashboardTab === 'assets' ? 'active' : ''}" data-dash-tab="assets">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          Uniforms & Safety Kits
-        </button>
-        <button class="dash-tab-btn ${this.activeDashboardTab === 'deductions' ? 'active' : ''}" data-dash-tab="deductions">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-          Unsettled Deductions
+      <div class="dash-tab-bar-container" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; border-bottom:1.5px solid var(--border-light); padding-bottom:12px; flex-wrap:wrap; gap:12px;">
+        <div class="dash-tab-bar" style="border-bottom:none; padding-bottom:0; margin-bottom:0; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="dash-tab-btn ${this.activeDashboardTab === 'overview' ? 'active' : ''}" data-dash-tab="overview">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Overview & Operations
+          </button>
+          <button class="dash-tab-btn ${this.activeDashboardTab === 'fleet' ? 'active' : ''}" data-dash-tab="fleet">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H8a2 2 0 0 0-2 2v7.5"/><circle cx="8" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+            Fleet & Bike Authorizations
+          </button>
+          <button class="dash-tab-btn ${this.activeDashboardTab === 'assets' ? 'active' : ''}" data-dash-tab="assets">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            Uniforms & Safety Kits
+          </button>
+          <button class="dash-tab-btn ${this.activeDashboardTab === 'deductions' ? 'active' : ''}" data-dash-tab="deductions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+            Unsettled Deductions
+          </button>
+        </div>
+        <button id="dash-refresh-btn" class="header-action-btn" title="Refresh Dashboard" style="border-radius:10px; flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
         </button>
       </div>
       
@@ -635,6 +642,16 @@ const Dashboard = {
         this.activeDashboardTab = tab;
         this.render();
       });
+    });
+
+    // Dashboard refresh button
+    document.getElementById('dash-refresh-btn')?.addEventListener('click', () => {
+      const btn = document.getElementById('dash-refresh-btn');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      this.render();
     });
 
     // 2. Chart Tab switching inside Overview

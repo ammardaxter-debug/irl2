@@ -121,6 +121,11 @@
         <h1 class="page-title" id="page-title">Dashboard</h1>
       </div>
       <div class="header-right" style="display:flex; align-items:center; gap:16px;">
+        <button id="global-refresh-btn" class="header-action-btn" aria-label="Refresh Data" onclick="App.refreshCurrentPage()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+        </button>
         <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle Theme">
           <!-- Icon injected by JS -->
         </button>

@@ -65,7 +65,12 @@ const Riders = {
           <h1 style="font-size:24px; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em; margin-bottom:4px;">Riders</h1>
           <div style="font-size:13px; color:var(--text-secondary); font-weight:500;">Manage delivery logistics team and system profiles</div>
         </div>
-        <div style="display:flex; gap:16px; align-items:center;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <button id="riders-refresh-btn" class="header-action-btn" title="Refresh Riders Data" style="border-radius:12px; height:38px; width:38px; padding:0; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
           <button id="btn-add-rider" style="background:var(--primary-600); color:white; font-size:13px; font-weight:700; height:38px; padding:0 18px; border-radius:12px; box-shadow:var(--shadow-glow-primary); cursor:pointer; display:${App.isViewer() ? 'none' : 'flex'}; align-items:center; gap:8px; transition:all var(--transition-fast);" onmouseover="this.style.background='var(--primary-700)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='var(--primary-600)'; this.style.transform='none';">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add New Rider
@@ -252,6 +257,16 @@ const Riders = {
   },
 
   attachEvents(riders) {
+    // Riders refresh button
+    document.getElementById('riders-refresh-btn')?.addEventListener('click', () => {
+      const btn = document.getElementById('riders-refresh-btn');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      this.render();
+    });
+
     // Search
     const searchInput = document.getElementById('rider-search');
     searchInput?.addEventListener('input', Utils.debounce((e) => {
