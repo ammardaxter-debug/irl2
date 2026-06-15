@@ -777,6 +777,8 @@ const Dashboard = {
           }
         });
         updateBulkToolbar();
+      });
+    }
     this.loadActivityTimeline();
   },
 
