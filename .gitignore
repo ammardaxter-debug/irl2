@@ -4,3 +4,5 @@ data/backups/
 *.db
 .env
 .DS_Store
+
+.vercel
