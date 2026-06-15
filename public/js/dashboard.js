@@ -629,7 +629,7 @@ const Dashboard = {
 
   attachEvents() {
     // 1. Dashboard Tab switching
-    document.querySelectorAll('.dashboard-tab-btn').forEach(btn => {
+    document.querySelectorAll('.dash-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const tab = btn.dataset.dashTab;
         this.activeDashboardTab = tab;
