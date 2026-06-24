@@ -2147,7 +2147,7 @@ app.post('/api/auth/login', async (req, res) => {
 // ========== OTP AUTHENTICATION ==========
 
 const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_DhLpFRrU_8vLGY2aeXD8VRDwMRSfBeLfc');
 
 // Generate 6-digit OTP
 function generateOTP() {
