@@ -655,6 +655,26 @@ const Expenses = {
         try {
           this.showProcessingOverlay(category, amount, false);
 
+          let matchedFundId = null;
+          try {
+            const funds = await API.getFunds();
+            let matchedFund = null;
+            for (const fund of funds) {
+              if (fund.receive_date && fund.receive_date <= date) {
+                matchedFund = fund;
+                break; // funds are returned descending by date
+              }
+            }
+            if (!matchedFund && funds.length > 0) {
+              matchedFund = funds[0];
+            }
+            if (matchedFund) {
+              matchedFundId = matchedFund.id;
+            }
+          } catch (e) {
+            console.warn('Failed to resolve fund for Quick Add:', e);
+          }
+
           // Send to API
           const payload = {
              expense_date: date,
@@ -665,6 +685,7 @@ const Expenses = {
              rider_id: null,
              notes: desc,
              receipt_base64: null,
+             fund_id: matchedFundId,
              created_at: new Date().toISOString()
           };
           
@@ -691,7 +712,10 @@ const Expenses = {
         if (e.key === 'Enter') handleQuickAdd();
       });
     } else if (this.currentTab === 'funds') {
-      const funds = await API.getFunds(this.cyclePeriod.start, this.cyclePeriod.end);
+      const [funds, allExpenses] = await Promise.all([
+        API.getFunds(this.cyclePeriod.start, this.cyclePeriod.end),
+        API.getExpenses()
+      ]);
       let html = `
         <div style="width:100%; overflow-x:auto; border-radius:12px; border:1px solid #E5E7EB; background:#FFFFFF;">
           <table class="table-clean">
@@ -699,22 +723,36 @@ const Expenses = {
               <tr>
                 <th>Date</th>
                 <th>Description</th>
-                <th style="text-align:right">Amount</th>
+                <th style="text-align:right">Total Amount</th>
+                <th style="text-align:right">Spent (Utilized)</th>
+                <th style="text-align:right">Remaining</th>
+                <th style="width:180px;">Progress</th>
                 <th>Receipt</th>
-                ${App.isViewer() ? '' : '<th>Actions</th>'}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
       `;
       
       if (funds.length === 0) {
-        html += `<tr><td colspan="5" style="text-align:center; padding:64px 20px;">
+        html += `<tr><td colspan="8" style="text-align:center; padding:64px 20px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" style="width:48px;height:48px; margin:0 auto 16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
           <div style="font-size:16px; font-weight:500; color:#0F0F0F;">No company funds logged yet</div>
         </td></tr>`;
       } else {
         funds.forEach(f => {
           const dateStr = Utils.formatDate(f.receive_date);
+          
+          // Calculate utilization stats
+          const linkedExps = allExpenses.filter(e => String(e.fund_id) === String(f.id) && e.category !== 'Manual Deduction' && e.category !== 'Advance Installment');
+          const spent = linkedExps.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+          const remaining = parseFloat(f.amount) - spent;
+          const percentSpent = Math.min(100, Math.max(0, (spent / parseFloat(f.amount)) * 100));
+          
+          let progressColor = '#10B981'; // Green
+          if (percentSpent >= 90) progressColor = '#EF4444'; // Red
+          else if (percentSpent >= 75) progressColor = '#F59E0B'; // Orange
+          else if (percentSpent >= 50) progressColor = '#3B82F6'; // Blue
           
           html += `
             <tr style="transition:background 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
@@ -724,17 +762,28 @@ const Expenses = {
                 <div style="color:#6B7280; font-size:13px; margin-top:2px;">${Utils.escapeHtml(f.notes || '')}</div>
               </td>
               <td style="font-weight:600; color:#16A34A; text-align:right;">+${Utils.formatCurrency(f.amount)}</td>
+              <td style="font-weight:600; color:#DC2626; text-align:right;">-${Utils.formatCurrency(spent)}</td>
+              <td style="font-weight:600; color:${remaining >= 0 ? '#16A34A' : '#DC2626'}; text-align:right;">${Utils.formatCurrency(remaining)}</td>
+              <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="flex:1; height:6px; background:#E5E7EB; border-radius:3px; overflow:hidden;">
+                    <div style="width:${percentSpent}%; height:100%; background:${progressColor}; border-radius:3px;"></div>
+                  </div>
+                  <span style="font-size:11px; font-weight:600; color:#4B5563; min-width:30px; text-align:right;">${Math.round(percentSpent)}%</span>
+                </div>
+              </td>
               <td>
                 ${this.renderThumbnail(f.receipt_base64, `Expenses.viewFundReceipt(${f.id})`)}
               </td>
-              ${App.isViewer() ? '' : `
               <td>
-                <div style="display:flex; gap:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button class="btn btn-sm" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;" onclick="Expenses.generateFundExcelReport(${f.id})">📥 Report</button>
+                  ${App.isViewer() ? '' : `
                   <button class="btn btn-sm" style="background:#F3F4F6; color:#4B5563; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.openEditFundModal(${f.id})">Edit</button>
                   <button class="btn btn-sm" style="background:#FEF2F2; color:#DC2626; border:none; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;" onclick="Expenses.deleteFund(${f.id})">Delete</button>
+                  `}
                 </div>
               </td>
-              `}
             </tr>
           `;
         });
@@ -2049,7 +2098,7 @@ const Expenses = {
     });
   },
 
-  openAddExpenseModal() {
+  async openAddExpenseModal() {
     if (App.isViewer()) return;
     const today = new Date().toISOString().split('T')[0];
     const defaultDate = this.getDefaultDateForCycle();
@@ -2061,6 +2110,22 @@ const Expenses = {
     this.riders.forEach(r => {
       riderOptions += `<option value="${r.id}">${r.name} (${r.client_company || 'Active'})</option>`;
     });
+
+    let fundOptions = '';
+    try {
+      const funds = await API.getFunds();
+      funds.forEach((f, idx) => {
+        const fDate = f.receive_date || f.created_at.slice(0, 10);
+        const fDesc = f.description || 'IRL Transfer';
+        const isSelected = idx === 0 ? 'selected' : '';
+        fundOptions += `<option value="${f.id}" ${isSelected}>${Utils.formatDate(fDate)} - ${fDesc} (${Utils.formatCurrency(f.amount)})</option>`;
+      });
+    } catch (e) {
+      console.warn('Failed to load funds for dropdown:', e);
+    }
+    if (!fundOptions) {
+      fundOptions = '<option value="">-- General Funds / Default --</option>';
+    }
 
     const pillsHtml = categories.map(c => `
       <div class="expense-cat-pill" data-cat="${c}" onclick="document.getElementById('expense-cat').value='${c}'; document.querySelectorAll('.expense-cat-pill').forEach(p=>p.classList.remove('active')); this.classList.add('active'); document.getElementById('expense-cat').dispatchEvent(new Event('change'));">
@@ -2093,6 +2158,13 @@ const Expenses = {
             <option value="supervisor">Non-Rider Deductible (person will repay)</option>
           </select>
           <div id="medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
+        </div>
+
+        <div>
+          <label class="expense-form-label">Paid From Fund (Batch)</label>
+          <select class="expense-form-input" name="fund_id" id="expense-fund">
+            ${fundOptions}
+          </select>
         </div>
 
         <div style="display:flex; gap:16px;">
@@ -2167,7 +2239,7 @@ const Expenses = {
           submitBtn.style.opacity = '0.5';
           submitBtn.style.cursor = 'not-allowed';
        }
-    };
+     };
 
     const updateVisibility = () => {
       const cat = catSelect.value;
@@ -2221,12 +2293,14 @@ const Expenses = {
       const deductType = document.getElementById('expense-deductible').value;
       const isDeductible = deductType !== 'company';
       
+      const fundIdVal = fd.get('fund_id');
       const data = {
         expense_date: fd.get('expense_date'),
         category: category,
         amount: parseFloat(fd.get('amount')) || 0,
         is_deductible: isDeductible,
         notes: fd.get('notes'),
+        fund_id: fundIdVal ? parseInt(fundIdVal) : null,
         receipt_base64: document.getElementById('receipt-base64-hidden').value || null
       };
       
@@ -2384,6 +2458,15 @@ const Expenses = {
         riderOptions += `<option value="${r.id}" ${r.id === exp.rider_id ? 'selected' : ''}>${r.name} (${r.client_company || 'Active'})</option>`;
       });
 
+      const funds = await API.getFunds();
+      let fundOptions = '<option value="">-- General Funds / Default --</option>';
+      funds.forEach(f => {
+        const fDate = f.receive_date || f.created_at.slice(0, 10);
+        const fDesc = f.description || 'IRL Transfer';
+        const isSelected = String(f.id) === String(exp.fund_id) ? 'selected' : '';
+        fundOptions += `<option value="${f.id}" ${isSelected}>${Utils.formatDate(fDate)} - ${fDesc} (${Utils.formatCurrency(f.amount)})</option>`;
+      });
+
       const pillsHtml = categories.map(c => `
         <div class="expense-cat-pill ${c === exp.category ? 'active' : ''}" data-cat="${c}" onclick="document.getElementById('edit-expense-cat').value='${c}'; document.querySelectorAll('#edit-expense-form .expense-cat-pill').forEach(p=>p.classList.remove('active')); this.classList.add('active'); document.getElementById('edit-expense-cat').dispatchEvent(new Event('change'));">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -2423,6 +2506,13 @@ const Expenses = {
               <option value="supervisor" ${initialDeductType === 'supervisor' ? 'selected' : ''}>Non-Rider Deductible (person will repay)</option>
             </select>
             <div id="edit-medical-hint" style="color:#2563EB; font-size:12px; font-weight:500; margin-top:6px; display:none;">Medical expenses are always covered by the company</div>
+          </div>
+
+          <div>
+            <label class="expense-form-label">Paid From Fund (Batch)</label>
+            <select class="expense-form-input" name="fund_id" id="edit-expense-fund">
+              ${fundOptions}
+            </select>
           </div>
 
           <div style="display:flex; gap:16px;">
@@ -2473,95 +2563,97 @@ const Expenses = {
           </div>
         </form>
       `;
-
-      Utils.hideLoading();
-      Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#0F0F0F;">Edit Expense</div><div style="font-size:13px;color:#6B7280;font-weight:normal;margin-top:2px;">Modify logged expense details</div>', html, 'modal-expense');
-      
-      // Inject base64 directly to avoid massive HTML parsing freezes
-      if (exp.receipt_base64) {
-        document.getElementById('edit-receipt-base64-hidden').value = exp.receipt_base64;
-      }
-
-      const catSelect = document.getElementById('edit-expense-cat');
-      const riderSelect = document.getElementById('edit-expense-rider');
-      const vendorGroup = document.getElementById('edit-vendor-group');
-      const vendorInput = document.getElementById('edit-vendor-input');
-      const submitBtn = document.getElementById('edit-expense-submit-btn');
-      const amountInput = document.getElementById('edit-expense-amount');
-
-      const checkSubmitBtn = () => {
-         const amt = parseFloat(amountInput.value) || 0;
-         if (amt > 0 && catSelect.value) {
-            submitBtn.disabled = false;
-            submitBtn.style.opacity = '1';
-            submitBtn.style.cursor = 'pointer';
+ 
+       Utils.hideLoading();
+       Utils.openModal('<div style="font-size:18px;font-weight:bold;color:#0F0F0F;">Edit Expense</div><div style="font-size:13px;color:#6B7280;font-weight:normal;margin-top:2px;">Modify logged expense details</div>', html, 'modal-expense');
+       
+       // Inject base64 directly to avoid massive HTML parsing freezes
+       if (exp.receipt_base64) {
+         document.getElementById('edit-receipt-base64-hidden').value = exp.receipt_base64;
+       }
+ 
+       const catSelect = document.getElementById('edit-expense-cat');
+       const riderSelect = document.getElementById('edit-expense-rider');
+       const vendorGroup = document.getElementById('edit-vendor-group');
+       const vendorInput = document.getElementById('edit-vendor-input');
+       const submitBtn = document.getElementById('edit-expense-submit-btn');
+       const amountInput = document.getElementById('edit-expense-amount');
+ 
+       const checkSubmitBtn = () => {
+          const amt = parseFloat(amountInput.value) || 0;
+          if (amt > 0 && catSelect.value) {
+             submitBtn.disabled = false;
+             submitBtn.style.opacity = '1';
+             submitBtn.style.cursor = 'pointer';
+          } else {
+             submitBtn.disabled = true;
+             submitBtn.style.opacity = '0.5';
+             submitBtn.style.cursor = 'not-allowed';
+          }
+       };
+ 
+       const updateEditVisibility = () => {
+         const cat = catSelect.value;
+         const deductibleSelect = document.getElementById('edit-expense-deductible');
+         const medHint = document.getElementById('edit-medical-hint');
+         
+         if (cat === 'Health / Medical') {
+            deductibleSelect.value = 'company';
+            deductibleSelect.disabled = true;
+            medHint.style.display = 'block';
          } else {
-            submitBtn.disabled = true;
-            submitBtn.style.opacity = '0.5';
-            submitBtn.style.cursor = 'not-allowed';
+            deductibleSelect.disabled = false;
+            medHint.style.display = 'none';
+            if (['Advance', 'Food', 'Cash Relay'].includes(cat)) {
+               if (riderSelect.value) {
+                  deductibleSelect.value = 'deductible';
+               } else {
+                  deductibleSelect.value = 'supervisor';
+               }
+            } else if (deductibleSelect.value === 'false' || deductibleSelect.value === 'true') {
+               deductibleSelect.value = 'company';
+            }
          }
-      };
-
-      const updateEditVisibility = () => {
-        const cat = catSelect.value;
-        const deductibleSelect = document.getElementById('edit-expense-deductible');
-        const medHint = document.getElementById('edit-medical-hint');
-        
-        if (cat === 'Health / Medical') {
-           deductibleSelect.value = 'company';
-           deductibleSelect.disabled = true;
-           medHint.style.display = 'block';
-        } else {
-           deductibleSelect.disabled = false;
-           medHint.style.display = 'none';
-           if (['Advance', 'Food', 'Cash Relay'].includes(cat)) {
-              if (riderSelect.value) {
-                 deductibleSelect.value = 'deductible';
-              } else {
-                 deductibleSelect.value = 'supervisor';
-              }
-           } else if (deductibleSelect.value === 'false' || deductibleSelect.value === 'true') {
-              deductibleSelect.value = 'company';
-           }
-        }
-        
-        if (cat === 'Other' || riderSelect.value === '') {
-          vendorGroup.style.display = 'block';
-          vendorInput.required = true;
-        } else {
-          vendorGroup.style.display = 'none';
-          vendorInput.required = false;
-        }
-        
-        checkSubmitBtn();
-      };
-
-      catSelect.addEventListener('change', updateEditVisibility);
-      riderSelect.addEventListener('change', updateEditVisibility);
-      amountInput.addEventListener('input', checkSubmitBtn);
-      updateEditVisibility();
-
-      this.initMultiUpload('edit-receipt-upload', 'edit-receipt-base64-hidden', 'edit-receipt-preview-area', 'edit-expense-form');
-
-      document.getElementById('edit-expense-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="spinner" style="width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div> Saving...</span>';
-        submitBtn.style.opacity = '0.7';
-
-        const category = fd.get('category');
-        const deductType = document.getElementById('edit-expense-deductible').value;
-        const isDeductible = deductType !== 'company';
-        
-        const data = {
-          expense_date: fd.get('expense_date'),
-          category: category,
-          amount: parseFloat(fd.get('amount')) || 0,
-          is_deductible: isDeductible,
-          notes: fd.get('notes'),
-          receipt_base64: document.getElementById('edit-receipt-base64-hidden').value || null
-        };
+         
+         if (cat === 'Other' || riderSelect.value === '') {
+           vendorGroup.style.display = 'block';
+           vendorInput.required = true;
+         } else {
+           vendorGroup.style.display = 'none';
+           vendorInput.required = false;
+         }
+         
+         checkSubmitBtn();
+       };
+ 
+       catSelect.addEventListener('change', updateEditVisibility);
+       riderSelect.addEventListener('change', updateEditVisibility);
+       amountInput.addEventListener('input', checkSubmitBtn);
+       updateEditVisibility();
+ 
+       this.initMultiUpload('edit-receipt-upload', 'edit-receipt-base64-hidden', 'edit-receipt-preview-area', 'edit-expense-form');
+ 
+       document.getElementById('edit-expense-form').addEventListener('submit', async (e) => {
+         e.preventDefault();
+         const fd = new FormData(e.target);
+         submitBtn.disabled = true;
+         submitBtn.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="spinner" style="width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div> Saving...</span>';
+         submitBtn.style.opacity = '0.7';
+ 
+         const category = fd.get('category');
+         const deductType = document.getElementById('edit-expense-deductible').value;
+         const isDeductible = deductType !== 'company';
+         
+         const fundIdVal = fd.get('fund_id');
+         const data = {
+           expense_date: fd.get('expense_date'),
+           category: category,
+           amount: parseFloat(fd.get('amount')) || 0,
+           is_deductible: isDeductible,
+           notes: fd.get('notes'),
+           fund_id: fundIdVal ? parseInt(fundIdVal) : null,
+           receipt_base64: document.getElementById('edit-receipt-base64-hidden').value || null
+         };
 
         if (fd.get('rider_id')) {
           data.rider_id = parseInt(fd.get('rider_id'));
@@ -3572,6 +3664,411 @@ const Expenses = {
       console.error('Custom Excel Export Error:', err);
       Utils.hideLoading();
       Utils.showToast('Failed to export Excel Report: ' + err.message, 'error');
+    }
+  },
+
+  async generateFundExcelReport(fundId) {
+    Utils.showLoading('Generating Excel Report...', 'Fetching data and building sheet...');
+
+    try {
+      if (typeof ExcelJS === 'undefined') {
+        throw new Error('ExcelJS library not loaded. Please refresh the page and try again.');
+      }
+
+      // Fetch all funds and expenses
+      const [funds, allExpenses] = await Promise.all([
+        API.getFunds(),
+        API.getExpenses()
+      ]);
+
+      const fund = funds.find(f => String(f.id) === String(fundId));
+      if (!fund) throw new Error('Fund deposit not found');
+
+      // Filter only expenses linked to this fund
+      const validExpenses = allExpenses.filter(e => String(e.fund_id) === String(fundId) && e.category !== 'Manual Deduction' && e.category !== 'Advance Installment');
+      const totalFundsPeriod = parseFloat(fund.amount) || 0;
+      const totalExpensesPeriod = validExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const remainingBalance = totalFundsPeriod - totalExpensesPeriod;
+
+      // ── Build category & rider breakdowns ──
+      const categoryMap = {};
+      const riderMap = {};
+      validExpenses.forEach(e => {
+        const cat = e.category || 'Other';
+        const rider = e.rider_name || 'Company Covered';
+        const amt = parseFloat(e.amount) || 0;
+        categoryMap[cat] = (categoryMap[cat] || 0) + amt;
+        riderMap[rider] = (riderMap[rider] || 0) + amt;
+      });
+      const categoryBreakdown = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
+      const riderBreakdown = Object.entries(riderMap).sort((a, b) => b[1] - a[1]);
+
+      // Deductible vs Company paid totals
+      const totalDeductible = validExpenses.filter(e => e.is_deductible === 1 || e.is_deductible === true).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      const totalCompanyPaid = totalExpensesPeriod - totalDeductible;
+
+      // Create workbook
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Inspiring Roads Logistics';
+      wb.title = `Financial Report - Fund Deposit #${fundId}`;
+
+      const ws = wb.addWorksheet('Fund Statement', {
+        views: [{ showGridLines: false }],
+        pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+      });
+
+      // Define grid columns A-G
+      ws.columns = [
+        { width: 5 },  // A: # row number
+        { width: 14 }, // B: Date
+        { width: 24 }, // C: Category / Source
+        { width: 22 }, // D: Rider / Description
+        { width: 18 }, // E: Amount (SAR)
+        { width: 34 }, // F: Notes / Description
+        { width: 16 }  // G: Type / Status
+      ];
+
+      // Palette styling constants
+      const C = {
+        dark: 'FF0F172A',
+        darkBlue: 'FF1E293B',
+        blue: 'FF1E3A8A',
+        green: 'FF16A34A',
+        red: 'FFDC2626',
+        white: 'FFFFFFFF',
+        border: 'FFE2E8F0',
+        muted: 'FF64748B',
+        zebra: 'FFF8FAFC',
+        lightGreen: 'FFD1FAE5',
+        lightRed: 'FFFEE2E2',
+        lightBlue: 'FFDBEAFE',
+        lightAmber: 'FFFEF3C7',
+        amber: 'FFD97706',
+        purple: 'FF7C3AED',
+        lightPurple: 'FFF3E8FF'
+      };
+
+      const thinBorder = {
+        top: { style: 'thin', color: { argb: C.border } },
+        bottom: { style: 'thin', color: { argb: C.border } },
+        left: { style: 'thin', color: { argb: C.border } },
+        right: { style: 'thin', color: { argb: C.border } }
+      };
+
+      const applyRowBorder = (rowNum, startCol, endCol) => {
+        for (let col = startCol; col <= endCol; col++) {
+          ws.getRow(rowNum).getCell(col).border = thinBorder;
+        }
+      };
+
+      // ── Title Banner ──
+      ws.mergeCells(1, 1, 1, 7);
+      const h1 = ws.getCell('A1');
+      h1.value = 'INSPIRING ROADS LOGISTICS';
+      h1.font = { name: 'Calibri', bold: true, size: 18, color: { argb: C.white } };
+      h1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
+      h1.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(1).height = 36;
+
+      ws.mergeCells(2, 1, 2, 7);
+      const h2 = ws.getCell('A2');
+      const fundDate = fund.receive_date || fund.created_at.slice(0, 10);
+      const fundDateFmt = new Date(fundDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      h2.value = `Funding Batch Report: ${fund.description || 'IRL Transfer'}  ·  Received: ${fundDateFmt}`;
+      h2.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF94A3B8' } };
+      h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dark } };
+      h2.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(2).height = 24;
+
+      ws.mergeCells(3, 1, 3, 7);
+      const h3 = ws.getCell('A3');
+      h3.value = `Generated: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}  ·  BATCH ID: #${fundId}`;
+      h3.font = { name: 'Calibri', italic: true, size: 9, color: { argb: C.muted } };
+      h3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+      h3.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(3).height = 20;
+
+      // ── Summary Box ──
+      let r = 5;
+      ws.mergeCells(r, 1, r, 7);
+      const pTitle = ws.getCell(`A${r}`);
+      pTitle.value = ' BATCH METRICS';
+      pTitle.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.white } };
+      pTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue } };
+      pTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+      pTitle.border = thinBorder;
+      ws.getRow(r).height = 26;
+
+      r++;
+      ws.mergeCells(r, 1, r, 2);
+      ws.getCell(`A${r}`).value = 'FUNDS RECEIVED';
+      ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: 'FF064E3B' } };
+      ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFD1FAE5' };
+      ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getCell(`A${r}`).border = thinBorder;
+
+      ws.mergeCells(r, 3, r, 4);
+      ws.getCell(`C${r}`).value = 'TOTAL UTILIZED';
+      ws.getCell(`C${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: 'FF7F1D1D' } };
+      ws.getCell(`C${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFFEE2E2' };
+      ws.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getCell(`C${r}`).border = thinBorder;
+
+      ws.mergeCells(r, 5, r, 7);
+      ws.getCell(`E${r}`).value = 'REMAINING BATCH BALANCE';
+      ws.getCell(`E${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: 'FF1E3A8A' } };
+      ws.getCell(`E${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFDBEAFE' };
+      ws.getCell(`E${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getCell(`E${r}`).border = thinBorder;
+      ws.getRow(r).height = 22;
+
+      r++;
+      ws.mergeCells(r, 1, r, 2);
+      const cellRec = ws.getCell(`A${r}`);
+      cellRec.value = totalFundsPeriod;
+      cellRec.numFmt = '#,##0.00 "SAR"';
+      cellRec.font = { name: 'Calibri', bold: true, size: 20, color: { argb: C.green } };
+      cellRec.fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFD1FAE5' };
+      cellRec.alignment = { vertical: 'middle', horizontal: 'center' };
+      cellRec.border = thinBorder;
+
+      ws.mergeCells(r, 3, r, 4);
+      const cellSpent = ws.getCell(`C${r}`);
+      cellSpent.value = totalExpensesPeriod;
+      cellSpent.numFmt = '#,##0.00 "SAR"';
+      cellSpent.font = { name: 'Calibri', bold: true, size: 20, color: { argb: C.red } };
+      cellSpent.fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFFEE2E2' };
+      cellSpent.alignment = { vertical: 'middle', horizontal: 'center' };
+      cellSpent.border = thinBorder;
+
+      ws.mergeCells(r, 5, r, 7);
+      const cellRem = ws.getCell(`E${r}`);
+      cellRem.value = remainingBalance;
+      cellRem.numFmt = '#,##0.00 "SAR"';
+      cellRem.font = { name: 'Calibri', bold: true, size: 20, color: { argb: remainingBalance >= 0 ? C.green : C.red } };
+      cellRem.fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFDBEAFE' };
+      cellRem.alignment = { vertical: 'middle', horizontal: 'center' };
+      cellRem.border = thinBorder;
+      ws.getRow(r).height = 40;
+
+      r++;
+      ws.mergeCells(r, 1, r, 7);
+      ws.getCell(`A${r}`).value = `  Rider-Deductible (Batch): ${totalDeductible.toFixed(2)} SAR  ·  Company Paid (Batch): ${totalCompanyPaid.toFixed(2)} SAR`;
+      ws.getCell(`A${r}`).font = { name: 'Calibri', size: 10, italic: true, color: { argb: C.muted } };
+      ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getCell(`A${r}`).border = thinBorder;
+      ws.getRow(r).height = 24;
+
+      // ── Expenses Table ──
+      r += 3;
+      ws.mergeCells(r, 1, r, 7);
+      const expTitle = ws.getCell(`A${r}`);
+      expTitle.value = '  § 1.  EXPENSES DEDUCTED FROM THIS FUND BATCH';
+      expTitle.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.white } };
+      expTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: 'FFEF4444' };
+      ws.getRow(r).height = 26;
+
+      const styleTableHeader = (rowNum, headers) => {
+        const row = ws.getRow(rowNum);
+        row.height = 24;
+        headers.forEach((h, i) => {
+          const cell = row.getCell(i + 1);
+          cell.value = h;
+          cell.font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.white } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.darkBlue } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = thinBorder;
+        });
+      };
+
+      r += 2;
+      styleTableHeader(r, ['#', 'Date', 'Category', 'Rider / Recipient', 'Amount', 'Description / Notes', 'Status']);
+
+      const expHeaderRow = r;
+
+      if (validExpenses.length === 0) {
+        r++;
+        ws.mergeCells(r, 1, r, 7);
+        const cell = ws.getCell(`A${r}`);
+        cell.value = 'No expenses have been paid from this fund batch.';
+        cell.font = { name: 'Calibri', italic: true, size: 10, color: { argb: C.muted } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = thinBorder;
+        ws.getRow(r).height = 24;
+      } else {
+        validExpenses.forEach((e, idx) => {
+          r++;
+          const row = ws.getRow(r);
+          row.height = 22;
+
+          const cNum = row.getCell(1);
+          cNum.value = idx + 1;
+          cNum.font = { name: 'Calibri', size: 9, color: { argb: C.muted } };
+          cNum.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cDate = row.getCell(2);
+          cDate.value = e.expense_date ? new Date(e.expense_date + 'T12:00:00Z') : '';
+          cDate.numFmt = 'dd-mmm-yyyy';
+          cDate.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cCat = row.getCell(3);
+          cCat.value = e.category || 'Other';
+          cCat.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cRider = row.getCell(4);
+          cRider.value = e.rider_name || 'Company Covered';
+
+          const cAmt = row.getCell(5);
+          cAmt.value = parseFloat(e.amount) || 0;
+          cAmt.numFmt = '#,##0.00 "SAR"';
+          cAmt.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.red } };
+          cAmt.alignment = { horizontal: 'right', vertical: 'middle' };
+
+          const cNotes = row.getCell(6);
+          cNotes.value = e.notes || e.description || '-';
+
+          const cDed = row.getCell(7);
+          const isDed = e.is_deductible === 1 || e.is_deductible === true;
+          cDed.value = isDed ? '⬤ Deductible' : '○ Company Paid';
+          cDed.font = { name: 'Calibri', size: 9, bold: true, color: { argb: isDed ? C.amber : C.muted } };
+          cDed.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          for (let col = 1; col <= 7; col++) {
+            const cell = row.getCell(col);
+            cell.font = cell.font || { name: 'Calibri', size: 10 };
+            cell.border = thinBorder;
+            if (idx % 2 === 1) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } };
+            }
+          }
+        });
+
+        // Expenses Total Row
+        r++;
+        ws.mergeCells(r, 1, r, 4);
+        ws.getCell(`A${r}`).value = `TOTAL BATCH EXPENSES  (${validExpenses.length} item${validExpenses.length !== 1 ? 's' : ''})`;
+        ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10 };
+        ws.getCell(`A${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
+        ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightRed } };
+
+        const totExpCell = ws.getCell(`E${r}`);
+        totExpCell.value = totalExpensesPeriod;
+        totExpCell.numFmt = '#,##0.00 "SAR"';
+        totExpCell.font = { name: 'Calibri', bold: true, size: 12, color: { argb: C.red } };
+        totExpCell.alignment = { horizontal: 'right', vertical: 'middle' };
+        totExpCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightRed } };
+
+        ws.mergeCells(r, 6, r, 7);
+        ws.getCell(`F${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightRed } };
+        applyRowBorder(r, 1, 7);
+        ws.getRow(r).height = 26;
+
+        ws.autoFilter = { from: { row: expHeaderRow, column: 1 }, to: { row: r - 1, column: 7 } };
+      }
+
+      // ── Category Breakdown ──
+      if (categoryBreakdown.length > 0) {
+        r += 3;
+        ws.mergeCells(r, 1, r, 7);
+        const catTitle = ws.getCell(`A${r}`);
+        catTitle.value = '  § 2.  EXPENSE BREAKDOWN BY CATEGORY';
+        catTitle.font = { name: 'Calibri', bold: true, size: 11, color: { argb: C.white } };
+        catTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.purple } };
+        ws.getRow(r).height = 26;
+
+        r += 2;
+        ws.getRow(r).height = 24;
+        ws.mergeCells(r, 1, r, 3);
+        ws.getCell(`A${r}`).value = 'Category';
+        ws.getCell(`A${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.white } };
+        ws.getCell(`A${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.darkBlue } };
+        ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+        ws.getCell(`A${r}`).border = thinBorder;
+
+        ws.mergeCells(r, 4, r, 5);
+        ws.getCell(`D${r}`).value = 'Total Amount';
+        ws.getCell(`D${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.white } };
+        ws.getCell(`D${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.darkBlue } };
+        ws.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        ws.getCell(`D${r}`).border = thinBorder;
+
+        ws.mergeCells(r, 6, r, 7);
+        ws.getCell(`F${r}`).value = '% of Total';
+        ws.getCell(`F${r}`).font = { name: 'Calibri', bold: true, size: 10, color: { argb: C.white } };
+        ws.getCell(`F${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.darkBlue } };
+        ws.getCell(`F${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+        ws.getCell(`F${r}`).border = thinBorder;
+
+        categoryBreakdown.forEach(([cat, amt], idx) => {
+          r++;
+          const row = ws.getRow(r);
+          row.height = 22;
+
+          ws.mergeCells(r, 1, r, 3);
+          const cCat = row.getCell(1);
+          cCat.value = '  ' + cat;
+          cCat.font = { name: 'Calibri', size: 10, bold: true };
+          cCat.alignment = { vertical: 'middle' };
+
+          ws.mergeCells(r, 4, r, 5);
+          const cAmt = row.getCell(4);
+          cAmt.value = amt;
+          cAmt.numFmt = '#,##0.00 "SAR"';
+          cAmt.font = { name: 'Calibri', size: 10, bold: true, color: { argb: C.red } };
+          cAmt.alignment = { vertical: 'middle', horizontal: 'right' };
+
+          ws.mergeCells(r, 6, r, 7);
+          const cPct = row.getCell(6);
+          const pct = totalExpensesPeriod > 0 ? (amt / totalExpensesPeriod) : 0;
+          cPct.value = pct;
+          cPct.numFmt = '0.0%';
+          cPct.font = { name: 'Calibri', size: 10, color: { argb: C.muted } };
+          cPct.alignment = { vertical: 'middle', horizontal: 'center' };
+
+          for (let col = 1; col <= 7; col++) {
+            row.getCell(col).border = thinBorder;
+            if (idx % 2 === 1) {
+              row.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lightPurple } };
+            }
+          }
+        });
+      }
+
+      // ── End of Report Footer ──
+      r += 3;
+      ws.mergeCells(r, 1, r, 7);
+      const footerCell = ws.getCell(`A${r}`);
+      footerCell.value = '— End of Report  ·  Inspiring Roads Logistics  ·  Confidential —';
+      footerCell.font = { name: 'Calibri', italic: true, size: 9, color: { argb: C.muted } };
+      footerCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      footerCell.border = { top: { style: 'thin', color: { argb: C.border } } };
+      ws.getRow(r).height = 22;
+
+      ws.views = [{ state: 'frozen', ySplit: 3, showGridLines: false }];
+
+      // ── Download Workbook ──
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const fundLabel = (fund.description || 'IRL_Transfer').replace(/[^a-zA-Z0-9]/g, '_');
+      a.download = `IRL_Batch_Report_${fundLabel}_${fundDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 200);
+
+      Utils.hideLoading();
+      Utils.showToast('Batch Excel Report exported successfully!', 'success');
+
+    } catch (err) {
+      console.error('Batch Excel Export Error:', err);
+      Utils.hideLoading();
+      Utils.showToast('Failed to export Batch Excel Report: ' + err.message, 'error');
     }
   },
 

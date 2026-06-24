@@ -2144,6 +2144,128 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ========== OTP AUTHENTICATION ==========
+
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Generate 6-digit OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+app.post('/api/auth/admin/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const key = email.toLowerCase();
+    
+    // Check rate limiting
+    const attempts = loginAttempts[key];
+    if (attempts && attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+      const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({ error: 'Account temporarily locked', lockout_seconds: remaining });
+    }
+
+    // Verify user exists and is admin
+    const user = await db.getAuthUser(key);
+    if (!user) {
+      trackFailedAttempt(key);
+      return res.status(401).json({ error: 'User not found or unauthorized' });
+    }
+
+    const otp = generateOTP();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    // Store in DB settings to survive Vercel serverless environment
+    let allOtps = await db.getSettings('admin_otps') || {};
+    allOtps[key] = { otp, expiresAt };
+    await db.updateSettings('admin_otps', allOtps);
+
+    // Send email via Resend
+    const { data, error } = await resend.emails.send({
+      from: 'IRL Admin <admin@resend.dev>', // You should use your verified domain here if possible e.g., noreply@irl.sa
+      to: [key],
+      subject: 'Your IRL Admin Login OTP',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+          <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2 style="color: #FF5A00; margin-top: 0;">IRL Express Admin Login</h2>
+            <p>You requested to log in. Here is your One-Time Password (OTP):</p>
+            <div style="background-color: #f9f9f9; padding: 15px; text-align: center; border-radius: 6px; margin: 20px 0;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333;">${otp}</span>
+            </div>
+            <p style="color: #666; font-size: 14px;">This code will expire in 5 minutes.</p>
+            <p style="color: #999; font-size: 12px; margin-top: 30px;">If you did not request this, please ignore this email.</p>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend Error:', error);
+      return res.status(500).json({ error: 'Failed to send OTP email' });
+    }
+
+    res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error('Send OTP error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/auth/admin/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
+
+    const key = email.toLowerCase();
+
+    // Check rate limiting
+    const attempts = loginAttempts[key];
+    if (attempts && attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+      const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({ error: 'Account temporarily locked', lockout_seconds: remaining });
+    }
+
+    const user = await db.getAuthUser(key);
+    if (!user) {
+      trackFailedAttempt(key);
+      return res.status(401).json({ error: 'Invalid user' });
+    }
+
+    const allOtps = await db.getSettings('admin_otps') || {};
+    const record = allOtps[key];
+
+    if (!record || record.otp !== otp || Date.now() > record.expiresAt) {
+      trackFailedAttempt(key);
+      return res.status(401).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Success - clear OTP and login attempts
+    delete allOtps[key];
+    await db.updateSettings('admin_otps', allOtps);
+    delete loginAttempts[key];
+
+    const token = jwt.sign(
+      { email: user.email, name: user.name, role: user.role },
+      DASHBOARD_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    // Return the token in JSON for Android App
+    res.json({ 
+      success: true, 
+      token: token,
+      user: { name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    console.error('Verify OTP error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Session check
 app.get('/api/auth/session', (req, res) => {
   const token = req.cookies?.irl_session;

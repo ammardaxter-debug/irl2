@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   request_id INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
-  vendor_name TEXT
+  vendor_name TEXT,
+  fund_id INTEGER REFERENCES company_funds(id) ON DELETE SET NULL
 );
 
 -- 4. SALARY ADVANCES
