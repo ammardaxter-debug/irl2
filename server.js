@@ -2184,31 +2184,91 @@ app.post('/api/auth/admin/send-otp', async (req, res) => {
     await db.updateSettings('admin_otps', allOtps);
 
     // Send email via Resend
-    const { data, error } = await resend.emails.send({
-      from: 'IRL Admin <admin@resend.dev>', // You should use your verified domain here if possible e.g., noreply@irl.sa
-      to: [key],
-      subject: 'Your IRL Admin Login OTP',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h2 style="color: #FF5A00; margin-top: 0;">IRL Express Admin Login</h2>
-            <p>You requested to log in. Here is your One-Time Password (OTP):</p>
-            <div style="background-color: #f9f9f9; padding: 15px; text-align: center; border-radius: 6px; margin: 20px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333;">${otp}</span>
-            </div>
-            <p style="color: #666; font-size: 14px;">This code will expire in 5 minutes.</p>
-            <p style="color: #999; font-size: 12px; margin-top: 30px;">If you did not request this, please ignore this email.</p>
-          </div>
-        </div>
-      `
-    });
+    let emailSent = false;
+    let resendError = null;
+    let fallbackUsed = false;
+    let recipientEmail = key;
 
-    if (error) {
-      console.error('Resend Error:', error);
-      return res.status(500).json({ error: 'Failed to send OTP email' });
+    try {
+      const result = await resend.emails.send({
+        from: 'IRL Admin <admin@resend.dev>', // You should use your verified domain here if possible e.g., noreply@irl.sa
+        to: [key],
+        subject: 'Your IRL Admin Login OTP',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+            <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="color: #FF5A00; margin-top: 0;">IRL Express Admin Login</h2>
+              <p>You requested to log in. Here is your One-Time Password (OTP):</p>
+              <div style="background-color: #f9f9f9; padding: 15px; text-align: center; border-radius: 6px; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333;">${otp}</span>
+              </div>
+              <p style="color: #666; font-size: 14px;">This code will expire in 5 minutes.</p>
+              <p style="color: #999; font-size: 12px; margin-top: 30px;">If you did not request this, please ignore this email.</p>
+            </div>
+          </div>
+        `
+      });
+      if (result.error) {
+        resendError = result.error;
+      } else {
+        emailSent = true;
+      }
+    } catch (err) {
+      resendError = err;
     }
 
-    res.json({ success: true, message: 'OTP sent successfully' });
+    if (!emailSent && resendError) {
+      console.warn('Primary email send failed:', resendError);
+      
+      const errMsg = resendError.message || '';
+      if (resendError.statusCode === 403 && errMsg.includes('You can only send testing emails to your own email address')) {
+        const match = errMsg.match(/own email address \(([^)]+)\)/);
+        const ownerEmail = match ? match[1] : 'inspiringroadslogistics@gmail.com';
+        fallbackUsed = true;
+        recipientEmail = ownerEmail;
+        
+        console.log(`Resend is in sandbox mode. Falling back to owner email: ${ownerEmail}`);
+        
+        try {
+          const fallbackResult = await resend.emails.send({
+            from: 'IRL Admin <admin@resend.dev>',
+            to: [ownerEmail],
+            subject: `[Sandbox OTP] Admin Login OTP for ${key}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+                <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  <h2 style="color: #FF5A00; margin-top: 0;">IRL Express Sandbox Admin Login</h2>
+                  <p>An admin (<b>${key}</b>) requested to log in. Since the Resend account is in sandbox mode, the OTP has been routed to the owner email.</p>
+                  <p>Here is their One-Time Password (OTP):</p>
+                  <div style="background-color: #f9f9f9; padding: 15px; text-align: center; border-radius: 6px; margin: 20px 0;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333;">${otp}</span>
+                  </div>
+                  <p style="color: #666; font-size: 14px;">This code will expire in 5 minutes.</p>
+                </div>
+              </div>
+            `
+          });
+          
+          if (fallbackResult.error) {
+            console.error('Fallback email send failed:', fallbackResult.error);
+            return res.status(500).json({ error: 'Failed to send OTP email' });
+          }
+          emailSent = true;
+        } catch (fallbackErr) {
+          console.error('Fallback email exception:', fallbackErr.message);
+          return res.status(500).json({ error: 'Failed to send OTP email' });
+        }
+      } else {
+        return res.status(500).json({ error: 'Failed to send OTP email' });
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: fallbackUsed ? 'OTP sent to registered Resend owner email (sandbox)' : 'OTP sent successfully',
+      sandbox: fallbackUsed,
+      recipient: recipientEmail
+    });
   } catch (err) {
     console.error('Send OTP error:', err.message);
     res.status(500).json({ error: 'Server error' });
