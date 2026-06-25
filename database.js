@@ -458,7 +458,17 @@ async function createExpense(expData) {
   }
   
   const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
-  if (error) throw error;
+  if (error) {
+    if (error.message && (error.message.includes('fund_id') || error.message.includes('schema cache')) && 'fund_id' in insertData) {
+      console.warn('⚠️ fund_id column is missing in DB. Retrying insert without fund_id...');
+      const { fund_id, ...fallbackData } = insertData;
+      const { data: retryData, error: retryError } = await supabase.from('expenses').insert([fallbackData]).select().single();
+      if (retryError) throw retryError;
+      await logAudit('CREATE', 'Expense', `Logged expense (fallback - no fund link): ${expData.category} - ${expData.amount} SAR`);
+      return { ...retryData, description: retryData.notes || '', receipt_base64: retryData.receipt_url };
+    }
+    throw error;
+  }
   await logAudit('CREATE', 'Expense', `Logged expense: ${expData.category} - ${expData.amount} SAR`);
   return { ...data, description: data.notes || '', receipt_base64: data.receipt_url };
 }
@@ -482,7 +492,16 @@ async function updateExpense(id, expData) {
   }
   
   const { error } = await supabase.from('expenses').update(updateData).eq('id', id);
-  if (error) throw error;
+  if (error) {
+    if (error.message && (error.message.includes('fund_id') || error.message.includes('schema cache')) && 'fund_id' in updateData) {
+      console.warn('⚠️ fund_id column is missing in DB. Retrying update without fund_id...');
+      const { fund_id, ...fallbackData } = updateData;
+      const { error: retryError } = await supabase.from('expenses').update(fallbackData).eq('id', id);
+      if (retryError) throw retryError;
+      return { id };
+    }
+    throw error;
+  }
   return { id };
 }
 
