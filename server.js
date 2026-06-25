@@ -166,8 +166,18 @@ function verifyAdminToken(req, res, next) {
 }
 
 // Middleware to restrict write operations to admin-only (blocks viewers)
-function requireAdmin(req, res, next) {
-  if (req.adminRole === 'viewer') {
+async function requireAdmin(req, res, next) {
+  if (req.adminRole !== 'admin') {
+    try {
+      // Double check DB in case token is stale
+      const user = await db.getAuthUser(req.adminEmail || '');
+      if (user && user.role === 'admin') {
+        req.adminRole = 'admin'; // upgrade for this request
+        return next();
+      }
+    } catch (e) {
+      console.error('Role fallback check failed:', e);
+    }
     return res.status(403).json({ error: 'Insufficient permissions. Admin access required.' });
   }
   next();
