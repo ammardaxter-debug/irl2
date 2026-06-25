@@ -442,7 +442,7 @@ async function createExpense(expData) {
     if (rider) expData.rider_name = rider.name;
   }
   
-  const { receipt_base64, description, ...rest } = expData;
+  const { receipt_base64, description, status, date, ...rest } = expData;
   const insertData = {
     ...rest,
     notes: expData.notes || description || '',
@@ -478,7 +478,7 @@ async function updateExpense(id, expData) {
     const rider = await getRiderById(expData.rider_id);
     if (rider) expData.rider_name = rider.name;
   }
-  const { receipt_base64, description, ...rest } = expData;
+  const { receipt_base64, description, status, date, ...rest } = expData;
   const updateData = { ...rest, updated_at: nowISO() };
   if (description !== undefined || expData.notes !== undefined) {
     updateData.notes = expData.notes !== undefined ? expData.notes : description;
