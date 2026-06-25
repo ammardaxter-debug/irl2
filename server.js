@@ -33,8 +33,8 @@ const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 // Dashboard auth users
 const DASHBOARD_USERS = [
   { email: 'abdullah@irl.sa', name: 'Abdullah Khan', role: 'admin', password: 'IRL@Admin2026!' },
-  { email: 'saad@irl.sa', name: 'Saad', role: 'viewer', password: 'Saad@View2026!' },
-  { email: 'firas@irl.sa', name: 'Firas Al Arifi', role: 'viewer', password: 'Firas@View2026!' }
+  { email: 'saad@irl.sa', name: 'Saad', role: 'admin', password: 'Saad@View2026!' },
+  { email: 'firas@irl.sa', name: 'Firas Al Arifi', role: 'admin', password: 'Firas@View2026!' }
 ];
 
 app.use(cors());
