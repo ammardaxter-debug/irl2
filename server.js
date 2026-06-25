@@ -9,6 +9,14 @@ const cookieParser = require('cookie-parser');
 const db = require('./database');
 const XLSX = require('xlsx');
 
+// Twilio SMS Client
+const twilio = require('twilio');
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID || '', 
+  process.env.TWILIO_AUTH_TOKEN
+);
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+
 const JWT_SECRET = process.env.JWT_SECRET || 'irl-rider-portal-secret-2026';
 const DASHBOARD_SECRET = process.env.DASHBOARD_SECRET || 'irl-dashboard-secret-2026';
 
@@ -134,7 +142,17 @@ function verifyRiderToken(req, res, next) {
 
 // JWT middleware for admin dashboard API
 function verifyAdminToken(req, res, next) {
-  const token = req.cookies?.irl_session;
+  let token = req.cookies?.irl_session;
+  
+  if (!token && req.headers.authorization) {
+    const parts = req.headers.authorization.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      token = parts[1];
+    } else {
+      token = req.headers.authorization;
+    }
+  }
+
   if (!token) return res.status(401).json({ error: 'Admin authentication required' });
   try {
     const decoded = jwt.verify(token, DASHBOARD_SECRET);
@@ -1049,7 +1067,118 @@ app.put('/api/warning-message-status', verifyAdminToken, requireAdmin, async (re
 
 // ========== RIDER PORTAL API ==========
 
-// Login
+// Request SMS OTP for Rider Login
+app.post('/api/rider/send-otp', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+    // Look up rider by phone
+    const allRiders = await db.getAllRiders('active');
+    const matchedRider = allRiders.find(r => {
+      if (!r.phone) return false;
+      const cleanDb = r.phone.replace(/\s+/g, '');
+      const cleanReq = phone.replace(/\s+/g, '');
+      return cleanDb === cleanReq || 
+             cleanDb === cleanReq.replace(/^\+966/, '0') ||
+             cleanReq === '+966' + cleanDb.replace(/^0/, '');
+    });
+
+    if (!matchedRider) {
+      return res.status(401).json({ error: 'No rider account found for this phone number. Contact your admin.' });
+    }
+
+    if (!matchedRider.portal_enabled) {
+      return res.status(403).json({ error: 'Your portal access is not enabled. Contact your admin.' });
+    }
+
+    if (!process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+      return res.status(500).json({ error: 'Twilio SMS is not configured on the server. Please contact admin.' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    // Store OTP in settings
+    const cleanPhoneKey = phone.replace(/\s+/g, '');
+    let allOtps = await db.getSettings('rider_otps') || {};
+    allOtps[cleanPhoneKey] = { otp, expiresAt };
+    await db.updateSettings('rider_otps', allOtps);
+
+    // Send SMS via Twilio
+    await twilioClient.messages.create({
+      body: `Your IRL Express login code is: ${otp}`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: cleanPhoneKey // e.g. +9665...
+    });
+
+    res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error('Send Rider OTP error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to send SMS' });
+  }
+});
+
+// Verify SMS OTP for Rider Login
+app.post('/api/rider/verify-otp', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ error: 'Phone and OTP are required' });
+
+    const cleanPhoneKey = phone.replace(/\s+/g, '');
+    let allOtps = await db.getSettings('rider_otps') || {};
+    const storedOtpData = allOtps[cleanPhoneKey];
+
+    if (!storedOtpData || storedOtpData.otp !== otp) {
+      return res.status(401).json({ error: 'Invalid verification code' });
+    }
+    
+    if (Date.now() > storedOtpData.expiresAt) {
+      return res.status(401).json({ error: 'Code has expired. Please request a new one.' });
+    }
+
+    // Clear the OTP
+    delete allOtps[cleanPhoneKey];
+    await db.updateSettings('rider_otps', allOtps);
+
+    // Find rider again to issue token
+    const allRiders = await db.getAllRiders('active');
+    const matchedRider = allRiders.find(r => {
+      if (!r.phone) return false;
+      const cleanDb = r.phone.replace(/\s+/g, '');
+      return cleanDb === cleanPhoneKey || 
+             cleanDb === cleanPhoneKey.replace(/^\+966/, '0') ||
+             cleanPhoneKey === '+966' + cleanDb.replace(/^0/, '');
+    });
+
+    if (!matchedRider) {
+      return res.status(401).json({ error: 'Rider not found' });
+    }
+
+    // Generate session token for single-device enforcement
+    const sessionToken = require('crypto').randomUUID();
+    await db.updateRider(matchedRider.id, { 
+      last_login: new Date().toISOString(), 
+      session_token: sessionToken 
+    });
+
+    const { portal_password, ...safeRider } = matchedRider;
+    safeRider.session_token = sessionToken;
+
+    const token = jwt.sign(
+      { riderId: safeRider.id, riderName: safeRider.name, sessionToken: sessionToken },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    return res.json({ token, rider: safeRider });
+  } catch (err) {
+    console.error('Verify Rider OTP error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Legacy Password Login (Backward Compat for old app versions)
 app.post('/api/rider/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
