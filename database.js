@@ -424,6 +424,7 @@ async function getExpenses(start, end) {
   
   return data.map(e => ({
     ...e,
+    description: e.notes || '',
     rider_name: e.rider_name,
     receipt_base64: e.receipt_url || e.receipt_base64
   })).sort((a, b) => {
@@ -441,9 +442,10 @@ async function createExpense(expData) {
     if (rider) expData.rider_name = rider.name;
   }
   
-  const { receipt_base64, ...rest } = expData;
+  const { receipt_base64, description, ...rest } = expData;
   const insertData = {
     ...rest,
+    notes: expData.notes || description || '',
     "deductionSettled": false,
     created_at: nowISO()
   };
@@ -458,7 +460,7 @@ async function createExpense(expData) {
   const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
   if (error) throw error;
   await logAudit('CREATE', 'Expense', `Logged expense: ${expData.category} - ${expData.amount} SAR`);
-  return { ...data, receipt_base64: data.receipt_url };
+  return { ...data, description: data.notes || '', receipt_base64: data.receipt_url };
 }
 
 async function updateExpense(id, expData) {
@@ -466,8 +468,11 @@ async function updateExpense(id, expData) {
     const rider = await getRiderById(expData.rider_id);
     if (rider) expData.rider_name = rider.name;
   }
-  const { receipt_base64, ...rest } = expData;
+  const { receipt_base64, description, ...rest } = expData;
   const updateData = { ...rest, updated_at: nowISO() };
+  if (description !== undefined || expData.notes !== undefined) {
+    updateData.notes = expData.notes !== undefined ? expData.notes : description;
+  }
   if (receipt_base64 !== undefined) {
     let receiptUrl = receipt_base64;
     if (receipt_base64 && receipt_base64.startsWith('data:image')) {
