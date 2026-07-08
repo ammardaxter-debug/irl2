@@ -1559,7 +1559,89 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
     leaderboard.sort((a, b) => b.total_orders - a.total_orders);
 
     leaderboardCacheMap.set(cacheKey, { data: leaderboard, time: now });
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     res.json(leaderboard);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/rider/leaderboard/champions-daily', verifyRiderToken, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
+
+    // Calculate previous cycle dates by shifting back by 1 month
+    const s = new Date(start);
+    const e = new Date(end);
+    s.setMonth(s.getMonth() - 1);
+    e.setMonth(e.getMonth() - 1);
+    const prevStart = s.toISOString().split('T')[0];
+    const prevEnd = e.toISOString().split('T')[0];
+
+    const riders = await db.getAllRiders('active');
+
+    // 1. Get top 3 of the previous cycle
+    const { data: prevLogs, error: prevErr } = await db.getDb()
+      .from('daily_logs')
+      .select('rider_id, primary_orders, associate_orders')
+      .gte('log_date', prevStart)
+      .lte('log_date', prevEnd);
+
+    if (prevErr) throw prevErr;
+
+    const prevStats = {};
+    (prevLogs || []).forEach(log => {
+      const rid = log.rider_id;
+      const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      prevStats[rid] = (prevStats[rid] || 0) + orders;
+    });
+
+    const prevLeaderboard = riders.map(r => ({
+      id: r.id,
+      name: r.name,
+      photo: r.profile_photo || r.photo_url || null,
+      rider_type: r.rider_type,
+      total_orders: prevStats[r.id] || 0
+    })).sort((a, b) => b.total_orders - a.total_orders);
+
+    const top3 = prevLeaderboard.slice(0, 3);
+    const top3Ids = top3.map(r => r.id);
+
+    // 2. Fetch daily logs for the top 3 riders in the current cycle
+    const { data: currLogs, error: currErr } = await db.getDb()
+      .from('daily_logs')
+      .select('rider_id, primary_orders, associate_orders, log_date')
+      .in('rider_id', top3Ids.length > 0 ? top3Ids : ['dummy_id'])
+      .gte('log_date', start)
+      .lte('log_date', end);
+
+    if (currErr) throw currErr;
+
+    // Group current logs by rider and date
+    const dailyMap = {};
+    top3Ids.forEach(id => {
+      dailyMap[id] = {};
+    });
+
+    (currLogs || []).forEach(log => {
+      const rid = log.rider_id;
+      const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      dailyMap[rid][log.log_date] = orders;
+    });
+
+    // Structure response
+    const response = top3.map((r, index) => ({
+      id: r.id,
+      name: r.name,
+      photo: r.photo,
+      rider_type: r.rider_type,
+      rank: index + 1,
+      prev_total_orders: r.total_orders,
+      daily_orders: dailyMap[r.id] || {}
+    }));
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
