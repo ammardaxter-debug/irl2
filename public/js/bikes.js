@@ -194,11 +194,39 @@ const Bikes = {
             </div>
           `).join('');
 
+          const initials = (req.rider_name || 'RD').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const avatarHTML = req.rider_photo 
+            ? `<img src="${req.rider_photo}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid var(--border-light);" alt="${Utils.escapeHtml(req.rider_name)}">`
+            : `<div style="width:40px; height:40px; border-radius:50%; background:var(--bg-light); border:1px solid var(--border-light); display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--text-secondary); font-size:13px;">${initials}</div>`;
+
           return `
             <div class="card" style="padding:16px; border-radius:12px; border:1px solid var(--border-light); background:var(--card-bg); display:flex; flex-direction:column; gap:16px; width: 100%; box-sizing: border-box;">
               <div style="display:flex; flex-direction:column; gap:8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                  <span style="font-weight:800; font-size:16px; color:var(--text-primary);">${Utils.escapeHtml(req.rider_name)}</span>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    ${avatarHTML}
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                      <span style="font-weight:800; font-size:15px; color:var(--text-primary); text-align:left;">${Utils.escapeHtml(req.rider_name)}</span>
+                      <!-- Contact shortcuts -->
+                      ${req.rider_phone ? `
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <a href="tel:${req.rider_phone}" style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#3b82f6; text-decoration:none;" title="Call Rider">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11" height="11">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Call
+                          </a>
+                          <span style="color:var(--border-light);">|</span>
+                          <a href="https://wa.me/${req.rider_phone.replace(/[^0-9]/g, '')}" target="_blank" style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#10b981; text-decoration:none;" title="Chat on WhatsApp">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.896 0c3.181.001 6.171 1.242 8.42 3.496 2.248 2.253 3.487 5.247 3.484 8.421-.003 6.574-5.328 11.899-11.896 11.899-2.007-.001-3.98-.507-5.731-1.472L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.747 1.451 5.436 0 9.86-4.427 9.863-9.864.001-2.63-1.023-5.102-2.884-6.964C16.452 1.912 13.979.888 11.35.888c-5.435 0-9.858 4.426-9.861 9.862-.002 1.763.481 3.483 1.399 5.015l-.999 3.648 3.738-.98c1.488.813 2.946 1.218 4.43 1.221zm11.233-7.247c-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.496.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.569-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                            </svg>
+                            WhatsApp
+                          </a>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
                   <span style="background:rgba(37,99,235,0.1); color:#2563eb; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px;">Plate: ${Utils.escapeHtml(req.bike_plate)}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">

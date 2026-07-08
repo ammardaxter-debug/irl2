@@ -1923,6 +1923,8 @@ async function getAllMaintenanceRequests() {
     return {
       ...req,
       rider_name: rider ? rider.name : 'Unknown Rider',
+      rider_phone: rider ? rider.phone : '',
+      rider_photo: rider ? (rider.photo_url || rider.profile_photo) : null,
       bike_plate: bike ? bike.plate_number : 'Unknown Bike',
       bike_model: bike ? bike.model : 'Standard Bike'
     };
