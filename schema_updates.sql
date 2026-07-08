@@ -66,4 +66,6 @@ ALTER TABLE bike_maintenance_requests
   ADD COLUMN IF NOT EXISTS scheduled_time TEXT,
   ADD COLUMN IF NOT EXISTS missing_part_desc TEXT,
   ADD COLUMN IF NOT EXISTS missing_part_photo TEXT,
-  ADD COLUMN IF NOT EXISTS resolution_photo TEXT;
+  ADD COLUMN IF NOT EXISTS resolution_photo TEXT,
+  ADD COLUMN IF NOT EXISTS rider_rating INTEGER,
+  ADD COLUMN IF NOT EXISTS rider_feedback TEXT;

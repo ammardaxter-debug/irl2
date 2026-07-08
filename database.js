@@ -1977,6 +1977,9 @@ async function updateMaintenanceRequest(requestId, updates) {
     payload.resolution_photo = photoUrl;
   }
 
+  if (updates.rider_rating !== undefined) payload.rider_rating = updates.rider_rating;
+  if (updates.rider_feedback !== undefined) payload.rider_feedback = updates.rider_feedback;
+
   const { data, error } = await supabase
     .from('bike_maintenance_requests')
     .update(payload)

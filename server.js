@@ -968,6 +968,33 @@ app.get('/api/rider/maintenance-requests', verifyRiderToken, async (req, res) =>
   }
 });
 
+// Rider submits rating & feedback for resolved request
+app.put('/api/rider/maintenance-requests/:id/rate', verifyRiderToken, async (req, res) => {
+  try {
+    const requestId = parseInt(req.params.id);
+    const { rating, feedback } = req.body;
+
+    if (rating === undefined || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+    }
+
+    // Verify this request belongs to the logged-in rider
+    const requests = await db.getMyMaintenanceRequests(req.riderId);
+    const hasRequest = requests.some(r => r.id === requestId);
+    if (!hasRequest) {
+      return res.status(403).json({ error: 'You are not authorized to rate this request.' });
+    }
+
+    const request = await db.updateMaintenanceRequest(requestId, {
+      rider_rating: rating,
+      rider_feedback: feedback
+    });
+    res.json(request);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin/Mechanic views all requests
 app.get('/api/admin/maintenance-requests', verifyAdminToken, async (req, res) => {
   try {

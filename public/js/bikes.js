@@ -315,6 +315,25 @@ const Bikes = {
                 </div>
               ` : ''}
 
+              ${req.status === 'resolved' && req.rider_rating ? `
+                <div style="background:#fffaf0; border:1px solid #feebc8; border-radius:8px; padding:12px; margin-top:8px;">
+                  <div style="display:flex; align-items:center; gap:6px; color:#dd6b20; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
+                    ⭐ Rider Satisfaction Rating
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px; margin-top:6px;">
+                    ${Array.from({ length: 5 }).map((_, i) => `
+                      <span style="color:${i < req.rider_rating ? '#f6ad55' : '#cbd5e0'}; font-size:18px;">★</span>
+                    `).join('')}
+                    <span style="font-size:13px; font-weight:700; color:var(--text-primary); margin-left:6px;">(${req.rider_rating}/5)</span>
+                  </div>
+                  ${req.rider_feedback ? `
+                    <div style="font-size:13px; color:var(--text-secondary); font-style:italic; margin-top:6px; background:#fff; padding:8px 12px; border-radius:6px; border:1px solid #feebc8; line-height:1.4;">
+                      "${Utils.escapeHtml(req.rider_feedback)}"
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+
               ${req.mechanic_note ? `
                 <div style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px; padding:12px 16px; margin-top:4px;">
                   <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Mechanic/Admin Note</div>
