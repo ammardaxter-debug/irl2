@@ -121,29 +121,33 @@ const Bikes = {
     const bulkCont = document.getElementById('fleet-bulk-container');
     if (alertCont) alertCont.innerHTML = '';
     if (statsCont) statsCont.innerHTML = '';
-    if (bulkCont) bulkCont.innerHTML = '';
-
-    const toolbarCont = document.getElementById('fleet-toolbar-container');
+    if (bulkCont) bulkCont    const toolbarCont = document.getElementById('fleet-toolbar-container');
     if (toolbarCont) {
       toolbarCont.innerHTML = `
-        <div class="fleet-toolbar" style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="fleet-toolbar-left" style="display:flex; align-items:center; gap:16px;">
-            <h2 class="section-title" style="margin:0;">Active Maintenance Requests</h2>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-xs ${this.currentFilter === 'all' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('all')">All (${this.maintenanceRequests.length})</button>
-              <button class="btn btn-xs ${this.currentFilter === 'pending' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('pending')">Pending (${this.maintenanceRequests.filter(r => r.status === 'pending').length})</button>
-              <button class="btn btn-xs ${this.currentFilter === 'in-progress' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('in-progress')">In Progress (${this.maintenanceRequests.filter(r => r.status === 'in-progress').length})</button>
-              <button class="btn btn-xs ${this.currentFilter === 'waiting-for-parts' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('waiting-for-parts')">Waiting for Parts (${this.maintenanceRequests.filter(r => r.status === 'waiting-for-parts').length})</button>
-              <button class="btn btn-xs ${this.currentFilter === 'resolved' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('resolved')">Resolved (${this.maintenanceRequests.filter(r => r.status === 'resolved').length})</button>
-            </div>
-          </div>
-          <div class="fleet-toolbar-right">
-            <button class="btn btn-outline btn-sm" onclick="Bikes.render()" style="height:36px; display:flex; align-items:center; gap:6px;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
+        <div class="fleet-toolbar" style="display:flex; flex-direction:column; gap:12px; width: 100%; padding: 4px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <h2 class="section-title" style="margin:0; font-size: 20px; font-weight: 800; color: var(--text-primary);">Maintenance Tasks</h2>
+            <button class="btn btn-outline btn-sm" onclick="Bikes.render()" style="height:36px; padding: 0 10px; display:flex; align-items:center; gap:6px; border-radius: 8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
               </svg>
               Refresh
             </button>
+          </div>
+          <!-- Horizontal Scrollable Filter Chips -->
+          <div style="display:flex; gap:8px; overflow-x:auto; width: 100%; padding-bottom: 8px; scrollbar-width: none; -ms-overflow-style: none;">
+            <style>
+              .scroll-hide::-webkit-scrollbar {
+                display: none;
+              }
+            </style>
+            <div class="scroll-hide" style="display:flex; gap:8px; overflow-x:auto; padding-bottom: 2px; width: 100%;">
+              <button class="btn btn-sm ${this.currentFilter === 'all' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('all')" style="white-space: nowrap; border-radius: 20px; padding: 6px 14px; font-size: 13px;">All (${this.maintenanceRequests.length})</button>
+              <button class="btn btn-sm ${this.currentFilter === 'pending' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('pending')" style="white-space: nowrap; border-radius: 20px; padding: 6px 14px; font-size: 13px;">Pending (${this.maintenanceRequests.filter(r => r.status === 'pending').length})</button>
+              <button class="btn btn-sm ${this.currentFilter === 'in-progress' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('in-progress')" style="white-space: nowrap; border-radius: 20px; padding: 6px 14px; font-size: 13px;">In Progress (${this.maintenanceRequests.filter(r => r.status === 'in-progress').length})</button>
+              <button class="btn btn-sm ${this.currentFilter === 'waiting-for-parts' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('waiting-for-parts')" style="white-space: nowrap; border-radius: 20px; padding: 6px 14px; font-size: 13px;">Waiting for Parts (${this.maintenanceRequests.filter(r => r.status === 'waiting-for-parts').length})</button>
+              <button class="btn btn-sm ${this.currentFilter === 'resolved' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('resolved')" style="white-space: nowrap; border-radius: 20px; padding: 6px 14px; font-size: 13px;">Resolved (${this.maintenanceRequests.filter(r => r.status === 'resolved').length})</button>
+            </div>
           </div>
         </div>
       `;
@@ -159,16 +163,16 @@ const Bikes = {
 
     if (filtered.length === 0) {
       contentCont.innerHTML = `
-        <div class="empty-state" style="padding: 48px; text-align: center; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-light);">
+        <div class="empty-state" style="padding: 48px 24px; text-align: center; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-light);">
           <div style="font-size: 32px; margin-bottom: 12px;">🛠️</div>
-          <p style="color: var(--text-secondary); margin: 0; font-weight: 500;">No maintenance requests found.</p>
+          <p style="color: var(--text-secondary); margin: 0; font-weight: 600;">No maintenance requests found.</p>
         </div>
       `;
       return;
     }
 
     contentCont.innerHTML = `
-      <div class="maintenance-grid" style="display:flex; flex-direction:column; gap:16px;">
+      <div class="maintenance-grid" style="display:flex; flex-direction:column; gap:16px; width: 100%;">
         ${filtered.map(req => {
           const statusColors = {
             'pending': { bg: '#fee2e2', text: '#ef4444' },
@@ -189,43 +193,46 @@ const Bikes = {
           `).join('');
 
           return `
-            <div class="card" style="padding:20px; border-radius:12px; border:1px solid var(--border-light); background:var(--card-bg); display:flex; flex-direction:column; gap:16px;">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
-                <div>
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-weight:700; font-size:16px; color:var(--text-primary);">${Utils.escapeHtml(req.rider_name)}</span>
-                    <span style="background:rgba(37,99,235,0.1); color:#2563eb; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px;">Plate: ${Utils.escapeHtml(req.bike_plate)}</span>
-                  </div>
-                  <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
-                    Submitted: ${new Date(req.created_at).toLocaleString()}
-                  </div>
+            <div class="card" style="padding:16px; border-radius:12px; border:1px solid var(--border-light); background:var(--card-bg); display:flex; flex-direction:column; gap:16px; width: 100%; box-sizing: border-box;">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                  <span style="font-weight:800; font-size:16px; color:var(--text-primary);">${Utils.escapeHtml(req.rider_name)}</span>
+                  <span style="background:rgba(37,99,235,0.1); color:#2563eb; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px;">Plate: ${Utils.escapeHtml(req.bike_plate)}</span>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <span style="background:${st.bg}; color:${st.text}; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; text-transform:uppercase;">${req.status.replace(/-/g, ' ')}</span>
-                  ${App.isViewer() ? '' : `
-                    <button class="btn btn-outline btn-sm" onclick="Bikes.openUpdateMaintenanceDialog(${req.id})" style="height:32px; padding:0 12px; font-size:12px; font-weight:600;">Update Status</button>
-                  `}
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                  <div style="font-size:11px; color:var(--text-secondary);">
+                    ${new Date(req.created_at).toLocaleString()}
+                  </div>
+                  <span style="background:${st.bg}; color:${st.text}; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; text-transform:uppercase; letter-spacing:0.5px;">${req.status.replace(/-/g, ' ')}</span>
                 </div>
+                ${App.isViewer() ? '' : `
+                  <button class="btn btn-primary btn-sm" onclick="Bikes.openUpdateMaintenanceDialog(${req.id})" style="height:38px; width:100%; font-size:13px; font-weight:700; margin-top:4px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    Update Status & Action
+                  </button>
+                `}
               </div>
 
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; border-top:1px solid var(--border-light); padding-top:16px;">
+              <div style="display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--border-light); padding-top:16px;">
                 <div>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Problematic Parts</div>
+                  <div style="font-size:11px; font-weight:800; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Problematic Parts</div>
                   <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
                     ${partsPills || '<span style="color:var(--text-secondary); font-size:12px;">None selected</span>'}
                   </div>
 
-                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Problem Description</div>
+                  <div style="font-size:11px; font-weight:800; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Problem Description</div>
                   <div style="font-size:13px; color:var(--text-primary); line-height:1.5; margin-top:6px; background:var(--bg-light); padding:10px 14px; border-radius:8px; white-space:pre-wrap;">${Utils.escapeHtml(req.description)}</div>
                 </div>
 
                 <div>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Rider Availability (Shift End)</div>
-                  <div style="font-size:13px; font-weight:600; color:#2563eb; margin-top:6px; display:flex; align-items:center; gap:6px;">
+                  <div style="font-size:11px; font-weight:800; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Rider Availability (Shift End)</div>
+                  <div style="font-size:13px; font-weight:700; color:#2563eb; margin-top:6px; display:flex; align-items:center; gap:6px;">
                     🕒 ${Utils.escapeHtml(req.shift_end_time)}
                   </div>
 
-                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Photos of Problematic Area</div>
+                  <div style="font-size:11px; font-weight:800; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Photos of Problematic Area</div>
                   <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
                     ${photosHTML || '<span style="color:var(--text-secondary); font-size:12px;">No photos uploaded</span>'}
                   </div>
@@ -233,7 +240,7 @@ const Bikes = {
               </div>
 
               ${req.scheduled_time ? `
-                <div style="background:#fffbeb; border-left:4px solid #d97706; border-radius:4px; padding:12px 16px; margin-top:8px;">
+                <div style="background:#fffbeb; border-left:4px solid #d97706; border-radius:4px; padding:12px 16px; margin-top:4px;">
                   <div style="font-size:11px; font-weight:800; color:#b45309; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
                     📅 Scheduled Repair Time
                   </div>
@@ -242,7 +249,7 @@ const Bikes = {
               ` : ''}
 
               ${req.status === 'waiting-for-parts' ? `
-                <div style="background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:16px; margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+                <div style="background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:12px; margin-top:4px; display:flex; flex-direction:column; gap:8px;">
                   <div style="display:flex; align-items:center; gap:6px; color:#dc2626; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
                     ⚠️ IN QUEUE - WAITING FOR PARTS
                   </div>
@@ -252,7 +259,7 @@ const Bikes = {
                   ${req.missing_part_photo ? `
                     <div style="margin-top:4px;">
                       <div style="font-size:11px; font-weight:700; color:#dc2626; text-transform:uppercase; margin-bottom:6px;">Missing Part Photo</div>
-                      <div style="position:relative; width:120px; height:120px; border-radius:8px; border:1px solid #fca5a5; overflow:hidden; cursor:pointer;" onclick="Bikes.previewImage('${req.missing_part_photo}')">
+                      <div style="position:relative; width:100px; height:100px; border-radius:8px; border:1px solid #fca5a5; overflow:hidden; cursor:pointer;" onclick="Bikes.previewImage('${req.missing_part_photo}')">
                         <img src="${req.missing_part_photo}" style="width:100%; height:100%; object-fit:cover;" alt="Missing Part Photo">
                       </div>
                     </div>
@@ -261,7 +268,7 @@ const Bikes = {
               ` : ''}
 
               ${req.mechanic_note ? `
-                <div style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px; padding:12px 16px; margin-top:8px;">
+                <div style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px; padding:12px 16px; margin-top:4px;">
                   <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Mechanic/Admin Note</div>
                   <p style="margin:4px 0 0; font-size:13px; color:#1e3a8a; line-height:1.4;">${Utils.escapeHtml(req.mechanic_note)}</p>
                 </div>
@@ -292,10 +299,10 @@ const Bikes = {
     if (!req) return;
 
     const html = `
-      <form id="maintenance-update-form" style="display:flex; flex-direction:column; gap:16px; min-width:320px; max-width:450px;">
+      <form id="maintenance-update-form" style="display:flex; flex-direction:column; gap:16px; width:100%; max-width:400px; padding: 4px; box-sizing: border-box;">
         <div>
-          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Status</label>
-          <select id="muf-status" class="fleet-sort-select" style="width:100%; height:40px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);">
+          <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Update Status</label>
+          <select id="muf-status" class="fleet-sort-select" style="width:100%; height:44px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg); font-size:14px; font-weight:600;">
             <option value="pending" ${req.status === 'pending' ? 'selected' : ''}>Pending</option>
             <option value="in-progress" ${req.status === 'in-progress' ? 'selected' : ''}>Accept & Schedule</option>
             <option value="waiting-for-parts" ${req.status === 'waiting-for-parts' ? 'selected' : ''}>Pause (Waiting for Parts)</option>
@@ -306,19 +313,19 @@ const Bikes = {
 
         <!-- Scheduled Time Fields (Show if Accepted/In-progress) -->
         <div id="muf-scheduled-fields" style="display:none;">
-          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Scheduled Repair Time *</label>
-          <input type="text" id="muf-scheduled-time" style="width:100%; height:40px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);" placeholder="e.g. Today at 5:00 PM, or Tomorrow 10 AM" value="${Utils.escapeHtml(req.scheduled_time || '')}" />
+          <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Scheduled Repair Time *</label>
+          <input type="text" id="muf-scheduled-time" style="width:100%; height:44px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg); font-size:14px;" placeholder="e.g. Today at 5:00 PM, or Tomorrow 10 AM" value="${Utils.escapeHtml(req.scheduled_time || '')}" />
         </div>
 
         <!-- Missing Parts Fields (Show if Waiting for parts) -->
         <div id="muf-missing-part-fields" style="display:none; flex-direction:column; gap:12px;">
           <div>
-            <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">What part is missing/needed? *</label>
-            <textarea id="muf-missing-part-desc" rows="2" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);" placeholder="Describe the missing part (e.g. Front brake pads)...">${Utils.escapeHtml(req.missing_part_desc || '')}</textarea>
+            <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">What part is missing/needed? *</label>
+            <textarea id="muf-missing-part-desc" rows="2" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg); font-size:14px; line-height:1.4;" placeholder="Describe the missing part (e.g. Front brake pads)...">${Utils.escapeHtml(req.missing_part_desc || '')}</textarea>
           </div>
           <div>
-            <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Upload Photo of Missing Part / Problematic Area *</label>
-            <input type="file" id="muf-missing-part-file" accept="image/*" style="width:100%; padding:8px 0;" />
+            <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Upload Photo of Missing Part / Problem Area *</label>
+            <input type="file" id="muf-missing-part-file" accept="image/*" style="width:100%; padding:8px 0; font-size:13px;" />
             <div id="muf-file-preview" style="margin-top:8px; display:${req.missing_part_photo ? 'block' : 'none'};">
               <img id="muf-preview-img" src="${req.missing_part_photo || ''}" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--border-light);" />
             </div>
@@ -326,13 +333,13 @@ const Bikes = {
         </div>
 
         <div>
-          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Mechanic/Admin Note</label>
+          <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Mechanic/Admin Note</label>
           <textarea id="muf-note" rows="3" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; line-height:1.4; background:var(--card-bg);" placeholder="Describe what was fixed, parts replaced, or general feedback...">${Utils.escapeHtml(req.mechanic_note || '')}</textarea>
         </div>
 
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:8px;">
-          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
+        <div style="display:flex; gap:12px; margin-top:8px; width:100%;">
+          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()" style="flex:1; height:44px; font-size:14px; font-weight:700; border-radius:8px;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex:1; height:44px; font-size:14px; font-weight:700; border-radius:8px;">Save</button>
         </div>
       </form>
     `;
