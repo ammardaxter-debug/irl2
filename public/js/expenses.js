@@ -2702,6 +2702,8 @@ const Expenses = {
       } catch(e) {
         if (exp.receipt_base64.startsWith('data:')) {
            files = [{ type: exp.receipt_base64.startsWith('data:application/pdf') ? 'pdf' : 'image', data: exp.receipt_base64 }];
+        } else if (exp.receipt_base64.startsWith('http')) {
+           files = [{ type: exp.receipt_base64.toLowerCase().includes('.pdf') ? 'pdf' : 'image', data: exp.receipt_base64 }];
         } else {
            files = [];
         }
@@ -2742,6 +2744,8 @@ const Expenses = {
       } catch(e) {
         if (fund.receipt_base64.startsWith('data:')) {
            files = [{ type: fund.receipt_base64.startsWith('data:application/pdf') ? 'pdf' : 'image', data: fund.receipt_base64 }];
+        } else if (fund.receipt_base64.startsWith('http')) {
+           files = [{ type: fund.receipt_base64.toLowerCase().includes('.pdf') ? 'pdf' : 'image', data: fund.receipt_base64 }];
         } else {
            files = [];
         }
@@ -2841,6 +2845,8 @@ const Expenses = {
       } catch(e) {
         if (hidden.value.startsWith('data:')) {
            files = [{ type: hidden.value.startsWith('data:application/pdf') ? 'pdf' : 'image', data: hidden.value }];
+        } else if (hidden.value.startsWith('http')) {
+           files = [{ type: hidden.value.toLowerCase().includes('.pdf') ? 'pdf' : 'image', data: hidden.value }];
         } else {
            files = [];
         }
@@ -2958,6 +2964,8 @@ const Expenses = {
     } catch(e) {
       if (base64Str.startsWith('data:')) {
          files = [{ type: base64Str.startsWith('data:application/pdf') ? 'pdf' : 'image', data: base64Str }];
+      } else if (base64Str.startsWith('http')) {
+         files = [{ type: base64Str.toLowerCase().includes('.pdf') ? 'pdf' : 'image', data: base64Str }];
       } else {
          return `<span style="font-size:12px; color:#9CA3AF;">None</span>`;
       }
@@ -4081,6 +4089,8 @@ const Expenses = {
     } catch(e) {
       if (base64Str.startsWith('data:')) {
          files = [{ type: base64Str.startsWith('data:application/pdf') ? 'pdf' : 'image', data: base64Str }];
+      } else if (base64Str.startsWith('http')) {
+         files = [{ type: base64Str.toLowerCase().includes('.pdf') ? 'pdf' : 'image', data: base64Str }];
       } else {
          return `<span style="font-size:12px; color:#9CA3AF;">None</span>`;
       }

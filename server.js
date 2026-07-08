@@ -925,6 +925,8 @@ app.put('/api/bikes/:id/unassign', verifyAdminToken, requireAdmin, async (req, r
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
 // ========== BIKE MAINTENANCE REQUESTS ==========
 
 // Rider submits a request
