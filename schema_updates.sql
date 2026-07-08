@@ -61,8 +61,9 @@ CREATE TABLE IF NOT EXISTS bike_maintenance_requests (
 ALTER TABLE bike_maintenance_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Service role full access" ON bike_maintenance_requests;
 CREATE POLICY "Service role full access" ON bike_maintenance_requests FOR ALL USING (true) WITH CHECK (true);
--- 7. Add scheduled time, missing parts columns for mechanic details
+-- 7. Add scheduled time, missing parts, and resolution proof columns for mechanic details
 ALTER TABLE bike_maintenance_requests 
   ADD COLUMN IF NOT EXISTS scheduled_time TEXT,
   ADD COLUMN IF NOT EXISTS missing_part_desc TEXT,
-  ADD COLUMN IF NOT EXISTS missing_part_photo TEXT;
+  ADD COLUMN IF NOT EXISTS missing_part_photo TEXT,
+  ADD COLUMN IF NOT EXISTS resolution_photo TEXT;

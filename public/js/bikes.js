@@ -231,7 +231,14 @@ const Bikes = {
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                   <div style="font-size:11px; color:var(--text-secondary);">
-                    ${new Date(req.created_at).toLocaleString()}
+                    ${new Date(req.created_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
                   </div>
                   <span style="background:${st.bg}; color:${st.text}; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; text-transform:uppercase; letter-spacing:0.5px;">${req.status.replace(/-/g, ' ')}</span>
                 </div>
@@ -297,6 +304,17 @@ const Bikes = {
                 </div>
               ` : ''}
 
+              ${req.status === 'resolved' && req.resolution_photo ? `
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px; margin-top:4px; display:flex; flex-direction:column; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:6px; color:#16a34a; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
+                    ✓ RESOLVED - PROOF OF FIX
+                  </div>
+                  <div style="position:relative; width:100px; height:100px; border-radius:8px; border:1px solid #86efac; overflow:hidden; cursor:pointer;" onclick="Bikes.previewImage('${req.resolution_photo}')">
+                    <img src="${req.resolution_photo}" style="width:100%; height:100%; object-fit:cover;" alt="Resolution Proof Photo">
+                  </div>
+                </div>
+              ` : ''}
+
               ${req.mechanic_note ? `
                 <div style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px; padding:12px 16px; margin-top:4px;">
                   <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Mechanic/Admin Note</div>
@@ -328,6 +346,9 @@ const Bikes = {
     const req = this.maintenanceRequests.find(r => r.id === id);
     if (!req) return;
 
+    // A pending request cannot be marked resolved directly; it must be accepted first
+    const showResolvedOption = req.status !== 'pending';
+
     const html = `
       <form id="maintenance-update-form" style="display:flex; flex-direction:column; gap:16px; width:100%; max-width:400px; padding: 4px; box-sizing: border-box;">
         <div>
@@ -336,7 +357,9 @@ const Bikes = {
             <option value="pending" ${req.status === 'pending' ? 'selected' : ''}>Pending</option>
             <option value="in-progress" ${req.status === 'in-progress' ? 'selected' : ''}>Accept & Schedule</option>
             <option value="waiting-for-parts" ${req.status === 'waiting-for-parts' ? 'selected' : ''}>Pause (Waiting for Parts)</option>
-            <option value="resolved" ${req.status === 'resolved' ? 'selected' : ''}>Resolved / Fixed</option>
+            ${showResolvedOption ? `
+              <option value="resolved" ${req.status === 'resolved' ? 'selected' : ''}>Resolved / Fixed</option>
+            ` : ''}
             <option value="cancelled" ${req.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
           </select>
         </div>
@@ -362,6 +385,17 @@ const Bikes = {
           </div>
         </div>
 
+        <!-- Resolution Proof Fields (Show if Resolved) -->
+        <div id="muf-resolution-fields" style="display:none; flex-direction:column; gap:12px;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Upload Proof of Fix / Resolution Photo *</label>
+            <input type="file" id="muf-resolution-file" accept="image/*" style="width:100%; padding:8px 0; font-size:13px;" />
+            <div id="muf-resolution-preview" style="margin-top:8px; display:${req.resolution_photo ? 'block' : 'none'};">
+              <img id="muf-res-preview-img" src="${req.resolution_photo || ''}" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--border-light);" />
+            </div>
+          </div>
+        </div>
+
         <div>
           <label style="display:block; font-size:12px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Mechanic/Admin Note</label>
           <textarea id="muf-note" rows="3" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; line-height:1.4; background:var(--card-bg);" placeholder="Describe what was fixed, parts replaced, or general feedback...">${Utils.escapeHtml(req.mechanic_note || '')}</textarea>
@@ -379,17 +413,19 @@ const Bikes = {
     const statusSelect = document.getElementById('muf-status');
     const scheduledFields = document.getElementById('muf-scheduled-fields');
     const missingPartFields = document.getElementById('muf-missing-part-fields');
+    const resolutionFields = document.getElementById('muf-resolution-fields');
     
     function toggleFields() {
       const val = statusSelect.value;
       scheduledFields.style.display = (val === 'in-progress') ? 'block' : 'none';
       missingPartFields.style.display = (val === 'waiting-for-parts') ? 'flex' : 'none';
+      resolutionFields.style.display = (val === 'resolved') ? 'flex' : 'none';
     }
     
     statusSelect.addEventListener('change', toggleFields);
     toggleFields(); // Initial call
 
-    // File base64 parsing
+    // File base64 parsing (Missing part photo)
     let missingPartPhotoBase64 = req.missing_part_photo || '';
     const fileInput = document.getElementById('muf-missing-part-file');
     const previewDiv = document.getElementById('muf-file-preview');
@@ -403,6 +439,25 @@ const Bikes = {
           missingPartPhotoBase64 = event.target.result;
           previewImg.src = missingPartPhotoBase64;
           previewDiv.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // File base64 parsing (Resolution proof photo)
+    let resolutionPhotoBase64 = req.resolution_photo || '';
+    const resolutionInput = document.getElementById('muf-resolution-file');
+    const resolutionPreviewDiv = document.getElementById('muf-resolution-preview');
+    const resolutionPreviewImg = document.getElementById('muf-res-preview-img');
+    
+    resolutionInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          resolutionPhotoBase64 = event.target.result;
+          resolutionPreviewImg.src = resolutionPhotoBase64;
+          resolutionPreviewDiv.style.display = 'block';
         };
         reader.readAsDataURL(file);
       }
@@ -425,6 +480,10 @@ const Bikes = {
         Utils.showToast('Please specify the details of the missing part.', 'error');
         return;
       }
+      if (status === 'resolved' && !resolutionPhotoBase64) {
+        Utils.showToast('Please upload a proof photo of the fixed bike.', 'error');
+        return;
+      }
 
       Utils.showLoading('Saving...');
       try {
@@ -433,7 +492,8 @@ const Bikes = {
           mechanic_note,
           scheduled_time: status === 'in-progress' ? scheduled_time : null,
           missing_part_desc: status === 'waiting-for-parts' ? missing_part_desc : null,
-          missing_part_photo: status === 'waiting-for-parts' ? missingPartPhotoBase64 : null
+          missing_part_photo: status === 'waiting-for-parts' ? missingPartPhotoBase64 : null,
+          resolution_photo: status === 'resolved' ? resolutionPhotoBase64 : null
         });
         Utils.closeModal();
         Utils.showToast('Request updated successfully!', 'success');

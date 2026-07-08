@@ -982,7 +982,7 @@ app.get('/api/admin/maintenance-requests', verifyAdminToken, async (req, res) =>
 app.put('/api/admin/maintenance-requests/:id', verifyAdminToken, async (req, res) => {
   try {
     const requestId = parseInt(req.params.id);
-    const { status, mechanic_note, scheduled_time, missing_part_desc, missing_part_photo } = req.body;
+    const { status, mechanic_note, scheduled_time, missing_part_desc, missing_part_photo, resolution_photo } = req.body;
     
     // Validate status if provided
     if (status !== undefined && !['pending', 'in-progress', 'resolved', 'cancelled', 'waiting-for-parts'].includes(status)) {
@@ -994,7 +994,8 @@ app.put('/api/admin/maintenance-requests/:id', verifyAdminToken, async (req, res
       mechanic_note, 
       scheduled_time, 
       missing_part_desc, 
-      missing_part_photo 
+      missing_part_photo,
+      resolution_photo
     });
     res.json(request);
   } catch (err) {

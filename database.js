@@ -1226,10 +1226,23 @@ async function authenticateRider(phone, plainPassword) {
 }
 
 async function updateRiderSelfService(riderId, riderData) {
-  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry', 'noon_id', 'doc_vault', 'client_company', 'store_warehouse'];
+  const allowed = ['phone', 'email', 'bank_name', 'bank_account', 'iban', 'date_of_birth', 'nationality', 'iqama_number', 'iqama_expiry', 'noon_id', 'doc_vault', 'client_company', 'store_warehouse', 'profile_photo', 'photo_url'];
   const updates = { updated_at: nowISO() };
   for (const key of allowed) {
     if (riderData[key] !== undefined) updates[key] = riderData[key];
+  }
+
+  if (updates.profile_photo && updates.profile_photo.startsWith('data:image')) {
+    try {
+      const photoUrl = await uploadBase64ToStorage(updates.profile_photo, 'rider-proofs', `profile_rider_${riderId}`);
+      updates.profile_photo = photoUrl;
+      updates.photo_url = photoUrl;
+    } catch (err) {
+      console.error('Failed to upload self service profile photo:', err);
+    }
+  } else if (updates.profile_photo === null || updates.profile_photo === '') {
+    updates.profile_photo = null;
+    updates.photo_url = null;
   }
 
   const oldRider = await getRiderById(riderId);
@@ -1950,6 +1963,18 @@ async function updateMaintenanceRequest(requestId, updates) {
       }
     }
     payload.missing_part_photo = photoUrl;
+  }
+
+  if (updates.resolution_photo !== undefined) {
+    let photoUrl = updates.resolution_photo;
+    if (photoUrl && photoUrl.startsWith('data:image')) {
+      try {
+        photoUrl = await uploadBase64ToStorage(photoUrl, 'rider-proofs', `resolution_req_${requestId}_${Date.now()}`);
+      } catch (err) {
+        console.error('Failed to upload resolution photo:', err);
+      }
+    }
+    payload.resolution_photo = photoUrl;
   }
 
   const { data, error } = await supabase
