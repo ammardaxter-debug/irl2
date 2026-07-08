@@ -38,15 +38,16 @@ const Dashboard = {
     try {
       const activeDate = Utils.getActiveDate();
       const period = Utils.getNoonCyclePeriod(activeDate);
-      const [stats, bikes, riders, expenses] = await Promise.all([
+      const [stats, bikes, riders, expenses, maintenanceRequests] = await Promise.all([
         API.getDashboardStats(period.start, period.end),
         API.getBikes(),
         API.getRiders(),
-        API.getExpenses()
+        API.getExpenses(),
+        API.getMaintenanceRequests().catch(() => [])
       ]);
       this.bikes = bikes;
       this.riders = riders;
-      container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses);
+      container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses, maintenanceRequests);
       this.attachEvents();
     } catch (err) {
       container.innerHTML = `<div class="empty-state"><p>Failed to load dashboard: ${err.message}</p></div>`;
@@ -62,18 +63,19 @@ const Dashboard = {
     try {
       const activeDate = Utils.getActiveDate();
       const period = Utils.getNoonCyclePeriod(activeDate);
-      const [stats, bikes, riders, expenses] = await Promise.all([
+      const [stats, bikes, riders, expenses, maintenanceRequests] = await Promise.all([
         API.getDashboardStats(period.start, period.end),
         API.getBikes(),
         API.getRiders(),
-        API.getExpenses()
+        API.getExpenses(),
+        API.getMaintenanceRequests().catch(() => [])
       ]);
       if (searchInput) {
         this.bikeSearchQuery = searchVal;
       }
       this.bikes = bikes;
       this.riders = riders;
-      container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses);
+      container.innerHTML = this.buildHTML(stats, period, bikes, riders, expenses, maintenanceRequests);
       this.attachEvents();
       if (isSearchFocused) {
         const newSearchInput = document.getElementById('bike-search');
@@ -87,7 +89,7 @@ const Dashboard = {
     }
   },
 
-  buildHTML(stats, period, bikes = [], riders = [], expenses = []) {
+  buildHTML(stats, period, bikes = [], riders = [], expenses = [], maintenanceRequests = []) {
     // Gather unified action items
     const actionItems = [];
 
@@ -1104,6 +1106,8 @@ const Dashboard = {
       }
     });
 
+    const activeMaintenanceCount = (this.maintenanceRequests || []).filter(r => ['pending', 'in-progress', 'waiting-for-parts'].includes(r.status)).length;
+
     const rowsHtml = this.buildBikeTableRows(bikes, riders, this.bikeSearchQuery);
 
     const summaryBadgeText = expiredCount > 0 
@@ -1167,6 +1171,10 @@ const Dashboard = {
             <div style="background:#F1F5F9; border:1px solid #CBD5E1; padding:12px 14px; border-radius:12px; border-left: 4px solid #64748B; cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Dashboard.setBikeFilter('unassigned')">
               <div style="font-size:10px; color:#475569; font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Unassigned</div>
               <div style="font-size:22px; font-weight:800; color:#334155; margin-top:4px;" id="bike-stat-unassigned">${unassignedCount}</div>
+            </div>
+            <div style="background:#FFF3C7; border:1px solid #FCD34D; padding:12px 14px; border-radius:12px; border-left: 4px solid #D97706; cursor:pointer; transition: all 0.2s;" class="hover-scale" onclick="Bikes.currentSubTab = 'maintenance'; App.navigate('fleet');">
+              <div style="font-size:10px; color:#B45309; font-weight:700; text-transform:uppercase; letter-spacing: 0.5px;">Active Maintenance</div>
+              <div style="font-size:22px; font-weight:800; color:#92400E; margin-top:4px;" id="bike-stat-maintenance">${activeMaintenanceCount}</div>
             </div>
           </div>
 
