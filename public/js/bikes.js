@@ -121,7 +121,9 @@ const Bikes = {
     const bulkCont = document.getElementById('fleet-bulk-container');
     if (alertCont) alertCont.innerHTML = '';
     if (statsCont) statsCont.innerHTML = '';
-    if (bulkCont) bulkCont    const toolbarCont = document.getElementById('fleet-toolbar-container');
+    if (bulkCont) bulkCont.innerHTML = '';
+
+    const toolbarCont = document.getElementById('fleet-toolbar-container');
     if (toolbarCont) {
       toolbarCont.innerHTML = `
         <div class="fleet-toolbar" style="display:flex; flex-direction:column; gap:12px; width: 100%; padding: 4px 0;">

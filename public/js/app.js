@@ -36,8 +36,50 @@ const App = {
 
   applyRolePermissions() {
     const role = window._irlUserRole || 'admin';
+    
+    // UI elements to control
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('main-content');
+    const mainHeader = document.getElementById('main-header');
+    const themeToggle = document.getElementById('theme-toggle');
+    const globalRefresh = document.getElementById('global-refresh-btn');
+    const cycleSwiper = document.querySelector('.cycle-swiper');
+    const notifIcon = document.querySelector('[onclick="Notifications.showPanel()"]');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const pageTitleEl = document.getElementById('page-title');
+
     if (role === 'mechanic') {
-      // Hide other sidebar links
+      // Hide sidebar completely and expand main content
+      if (sidebar) sidebar.style.display = 'none';
+      if (mainContent) {
+        mainContent.style.marginLeft = '0';
+        mainContent.style.width = '100%';
+        mainContent.style.maxWidth = '100vw';
+        mainContent.style.boxSizing = 'border-box';
+      }
+
+      // Add top padding/notch protection to header and flex layout
+      if (mainHeader) {
+        mainHeader.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 12px)';
+        mainHeader.style.paddingBottom = '12px';
+        mainHeader.style.height = 'auto';
+        mainHeader.style.minHeight = '64px';
+        mainHeader.style.boxSizing = 'border-box';
+      }
+
+      // Hide unnecessary header actions
+      if (themeToggle) themeToggle.style.display = 'none';
+      if (globalRefresh) globalRefresh.style.display = 'none';
+      if (cycleSwiper) cycleSwiper.style.display = 'none';
+      if (notifIcon) notifIcon.style.display = 'none';
+      if (mobileMenuBtn) mobileMenuBtn.style.display = 'none';
+      if (pageTitleEl) {
+        pageTitleEl.textContent = 'Mechanic Portal';
+        pageTitleEl.style.fontSize = '20px';
+        pageTitleEl.style.fontWeight = '800';
+      }
+
+      // Hide other sidebar links in case sidebar becomes visible
       const allowedPages = ['fleet'];
       document.querySelectorAll('.nav-item').forEach(item => {
         const page = item.dataset.page;
@@ -45,13 +87,12 @@ const App = {
           item.style.display = 'none';
         } else {
           item.style.display = 'flex';
-          // Customize label
           const span = item.querySelector('span');
           if (span) span.textContent = 'Maintenance Tasks';
         }
       });
 
-      // Update sidebar profile details
+      // Update sidebar profile details in case
       const nameEl = document.getElementById('sidebar-name');
       const titleEl = document.getElementById('sidebar-title');
       const avatarEl = document.getElementById('sidebar-avatar');
@@ -73,16 +114,36 @@ const App = {
         this.navigate('fleet');
       }
     } else {
-      // Admin/Viewer: show all sidebar links
+      // Admin/Viewer: Restore default sidebar and main content styles
+      if (sidebar) sidebar.style.display = '';
+      if (mainContent) {
+        mainContent.style.marginLeft = '';
+        mainContent.style.width = '';
+        mainContent.style.maxWidth = '';
+      }
+      if (mainHeader) {
+        mainHeader.style.paddingTop = '';
+        mainHeader.style.paddingBottom = '';
+        mainHeader.style.height = '';
+        mainHeader.style.minHeight = '';
+      }
+
       document.querySelectorAll('.nav-item').forEach(item => {
         item.style.display = 'flex';
-        // Reset custom label if needed
         const page = item.dataset.page;
         if (page === 'fleet') {
           const span = item.querySelector('span');
           if (span) span.textContent = 'Fleet Mgt';
         }
       });
+
+      // Restore header actions
+      if (themeToggle) themeToggle.style.display = 'flex';
+      if (globalRefresh) globalRefresh.style.display = 'flex';
+      if (cycleSwiper) cycleSwiper.style.display = 'flex';
+      if (notifIcon) notifIcon.style.display = 'block';
+      if (mobileMenuBtn) mobileMenuBtn.style.display = 'block';
+      if (pageTitleEl) pageTitleEl.textContent = 'Dashboard';
     }
   },
 
