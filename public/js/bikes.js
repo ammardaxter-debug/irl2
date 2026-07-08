@@ -315,7 +315,7 @@ const Bikes = {
                 </div>
               ` : ''}
 
-              ${req.status === 'resolved' && req.rider_rating ? `
+              ${(req.status === 'resolved' || req.status === 'cancelled') && req.rider_rating ? `
                 <div style="background:#fffaf0; border:1px solid #feebc8; border-radius:8px; padding:12px; margin-top:8px;">
                   <div style="display:flex; align-items:center; gap:6px; color:#dd6b20; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
                     ⭐ Rider Satisfaction Rating
