@@ -36,3 +36,33 @@ ADD COLUMN IF NOT EXISTS chest_safety_date TEXT,
 ADD COLUMN IF NOT EXISTS foot_safety_date TEXT,
 ADD COLUMN IF NOT EXISTS asset_history JSONB DEFAULT '[]'::jsonb;
 
+
+-- ====================================================================
+-- Bike Maintenance Request System Schema Updates
+-- Run this in your Supabase Dashboard SQL Editor (https://supabase.com)
+-- ====================================================================
+
+-- 5. Create bike_maintenance_requests table
+CREATE TABLE IF NOT EXISTS bike_maintenance_requests (
+  id SERIAL PRIMARY KEY,
+  rider_id INTEGER REFERENCES riders(id) ON DELETE CASCADE,
+  bike_id INTEGER REFERENCES bikes(id) ON DELETE CASCADE,
+  selected_parts TEXT[] NOT NULL,
+  description TEXT NOT NULL,
+  shift_end_time TEXT NOT NULL,
+  photos TEXT[] NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, in-progress, resolved, cancelled
+  mechanic_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Enable RLS and add a policy for service role access
+ALTER TABLE bike_maintenance_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access" ON bike_maintenance_requests;
+CREATE POLICY "Service role full access" ON bike_maintenance_requests FOR ALL USING (true) WITH CHECK (true);
+-- 7. Add scheduled time, missing parts columns for mechanic details
+ALTER TABLE bike_maintenance_requests 
+  ADD COLUMN IF NOT EXISTS scheduled_time TEXT,
+  ADD COLUMN IF NOT EXISTS missing_part_desc TEXT,
+  ADD COLUMN IF NOT EXISTS missing_part_photo TEXT;

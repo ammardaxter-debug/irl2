@@ -925,6 +925,79 @@ app.put('/api/bikes/:id/unassign', verifyAdminToken, requireAdmin, async (req, r
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+// ========== BIKE MAINTENANCE REQUESTS ==========
+
+// Rider submits a request
+app.post('/api/rider/maintenance-requests', verifyRiderToken, async (req, res) => {
+  try {
+    const { selected_parts, description, shift_end_time, photos } = req.body;
+    if (!selected_parts || !Array.isArray(selected_parts) || selected_parts.length === 0) {
+      return res.status(400).json({ error: 'Please select at least one bike part.' });
+    }
+    if (!description || description.trim() === '') {
+      return res.status(400).json({ error: 'Please explain the problem.' });
+    }
+    if (!shift_end_time || shift_end_time.trim() === '') {
+      return res.status(400).json({ error: 'Please specify when your shift is ending.' });
+    }
+    if (!photos || !Array.isArray(photos) || photos.length < 2) {
+      return res.status(400).json({ error: 'At least two clear pictures of the problematic area are required.' });
+    }
+
+    const request = await db.createMaintenanceRequest(req.riderId, {
+      selected_parts,
+      description,
+      shift_end_time,
+      photos
+    });
+    res.status(201).json(request);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rider views their own requests
+app.get('/api/rider/maintenance-requests', verifyRiderToken, async (req, res) => {
+  try {
+    const requests = await db.getMyMaintenanceRequests(req.riderId);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin/Mechanic views all requests
+app.get('/api/admin/maintenance-requests', verifyAdminToken, async (req, res) => {
+  try {
+    const requests = await db.getAllMaintenanceRequests();
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin/Mechanic updates a request
+app.put('/api/admin/maintenance-requests/:id', verifyAdminToken, async (req, res) => {
+  try {
+    const requestId = parseInt(req.params.id);
+    const { status, mechanic_note, scheduled_time, missing_part_desc, missing_part_photo } = req.body;
+    
+    // Validate status if provided
+    if (status !== undefined && !['pending', 'in-progress', 'resolved', 'cancelled', 'waiting-for-parts'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value.' });
+    }
+
+    const request = await db.updateMaintenanceRequest(requestId, { 
+      status, 
+      mechanic_note, 
+      scheduled_time, 
+      missing_part_desc, 
+      missing_part_photo 
+    });
+    res.json(request);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ========== AUDIT LOGS ==========

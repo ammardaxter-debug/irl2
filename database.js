@@ -143,10 +143,13 @@ async function createRider(riderData) {
     profilePhoto = await uploadBase64ToStorage(profilePhoto, 'rider-proofs', `profile_rider`);
   }
 
+  const insertData = { ...riderData };
+  delete insertData.id;
+
   const { data, error } = await supabase.from('riders').insert([{
-    ...riderData,
+    ...insertData,
     profile_photo: profilePhoto,
-    rider_type: riderData.rider_type || 'company',
+    rider_type: insertData.rider_type || 'company',
     status: 'active',
     created_at: nowISO(),
     updated_at: nowISO()
@@ -1230,48 +1233,15 @@ async function updateRiderSelfService(riderId, riderData) {
   }
 
   const oldRider = await getRiderById(riderId);
-  let assignedBikeId = riderData.bike_id;
 
-  if (riderData.new_bike) {
-    const newBike = await createBike({
-      plate_number: riderData.new_bike.plate_number,
-      model: riderData.new_bike.model || ''
-    });
-    assignedBikeId = newBike.id;
-  }
-
-  if (assignedBikeId !== undefined) {
-    if (assignedBikeId) {
-      const { data: existingRider } = await supabase
-        .from('riders')
-        .select('id')
-        .eq('bike_id', assignedBikeId)
-        .neq('id', riderId)
-        .maybeSingle();
-        
-      if (existingRider) {
-        throw new Error('This bike is already assigned to another rider.');
-      }
-    }
-    updates.bike_id = assignedBikeId; // can also be null if they unassign
+  // Safety: riders cannot assign/unassign bikes themselves anymore.
+  // This must be done via the admin dashboard.
+  if (riderData.bike_id !== undefined || riderData.new_bike !== undefined) {
+    console.warn(`Rider ${riderId} attempted to self-assign/update bike.`);
   }
 
   const { data, error } = await supabase.from('riders').update(updates).eq('id', riderId).select().single();
   if (error) throw error;
-
-  // Sync bike assignment if bike_id changed
-  if (assignedBikeId !== undefined && String(oldRider?.bike_id) !== String(assignedBikeId)) {
-    try {
-      if (oldRider?.bike_id) {
-        await updateBike(oldRider.bike_id, { assigned_rider_id: null, assigned_rider_name: null });
-      }
-      if (assignedBikeId) {
-        await updateBike(assignedBikeId, { assigned_rider_id: String(riderId), assigned_rider_name: data.name });
-      }
-    } catch (err) {
-      console.error('Failed to sync bike assignment:', err);
-    }
-  }
 
   // Intercept vehicle istimara/auth expiry to update the assigned bike
   if (riderData.istimara_expiry !== undefined || riderData.authorization_expiry !== undefined || riderData.auth_expiry !== undefined || riderData.insurance_expiry !== undefined) {
@@ -1746,7 +1716,9 @@ module.exports = {
   // Tracking Shutdown
   isTrackingShutdown, setTrackingShutdown,
   // LA Commission Partner System
-  getLACommissions, getLASummary
+  getLACommissions, getLASummary,
+  // Bike Maintenance Requests
+  createMaintenanceRequest, getMyMaintenanceRequests, getAllMaintenanceRequests, updateMaintenanceRequest
 };
 
 // ========== CYCLE TRANSFERS ==========
@@ -1879,5 +1851,113 @@ async function getLASummary() {
       total_earned: totalEarned
     };
   });
+}
+
+// ========== BIKE MAINTENANCE REQUESTS ==========
+
+async function createMaintenanceRequest(riderId, requestData) {
+  const rider = await getRiderById(riderId);
+  if (!rider) throw new Error('Rider not found');
+  if (!rider.bike_id) throw new Error('You do not have a bike assigned. Only riders with an assigned bike can request maintenance.');
+
+  // Upload photos to storage
+  const uploadedUrls = [];
+  if (requestData.photos && Array.isArray(requestData.photos)) {
+    for (let i = 0; i < requestData.photos.length; i++) {
+      const base64Str = requestData.photos[i];
+      try {
+        const url = await uploadBase64ToStorage(base64Str, 'rider-proofs', `maintenance_rider_${riderId}_photo_${i}_${Date.now()}`);
+        uploadedUrls.push(url);
+      } catch (err) {
+        console.error('Failed to upload maintenance photo:', err);
+      }
+    }
+  }
+
+  if (uploadedUrls.length < 2) {
+    throw new Error('At least two clear pictures of the problematic area are required.');
+  }
+
+  const { data, error } = await supabase.from('bike_maintenance_requests').insert([{
+    rider_id: riderId,
+    bike_id: parseInt(rider.bike_id),
+    selected_parts: requestData.selected_parts || [],
+    description: requestData.description,
+    shift_end_time: requestData.shift_end_time,
+    photos: uploadedUrls,
+    status: 'pending',
+    created_at: nowISO(),
+    updated_at: nowISO()
+  }]).select().single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getMyMaintenanceRequests(riderId) {
+  const { data, error } = await supabase
+    .from('bike_maintenance_requests')
+    .select('*')
+    .eq('rider_id', riderId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function getAllMaintenanceRequests() {
+  const { data, error } = await supabase
+    .from('bike_maintenance_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  // Let's populate rider name and bike plate number
+  const riders = await getAllRiders();
+  const bikes = await getAllBikes();
+
+  return (data || []).map(req => {
+    const rider = riders.find(r => r.id === req.rider_id);
+    const bike = bikes.find(b => b.id === req.bike_id);
+    return {
+      ...req,
+      rider_name: rider ? rider.name : 'Unknown Rider',
+      bike_plate: bike ? bike.plate_number : 'Unknown Bike',
+      bike_model: bike ? bike.model : 'Standard Bike'
+    };
+  });
+}
+
+async function updateMaintenanceRequest(requestId, updates) {
+  const payload = {
+    updated_at: nowISO()
+  };
+  if (updates.status !== undefined) payload.status = updates.status;
+  if (updates.mechanic_note !== undefined) payload.mechanic_note = updates.mechanic_note;
+  if (updates.scheduled_time !== undefined) payload.scheduled_time = updates.scheduled_time;
+  if (updates.missing_part_desc !== undefined) payload.missing_part_desc = updates.missing_part_desc;
+  
+  if (updates.missing_part_photo !== undefined) {
+    let photoUrl = updates.missing_part_photo;
+    if (photoUrl && photoUrl.startsWith('data:image')) {
+      try {
+        photoUrl = await uploadBase64ToStorage(photoUrl, 'rider-proofs', `missing_part_req_${requestId}_${Date.now()}`);
+      } catch (err) {
+        console.error('Failed to upload missing part photo:', err);
+      }
+    }
+    payload.missing_part_photo = photoUrl;
+  }
+
+  const { data, error } = await supabase
+    .from('bike_maintenance_requests')
+    .update(payload)
+    .eq('id', requestId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 

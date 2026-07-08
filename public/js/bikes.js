@@ -10,6 +10,8 @@ const Bikes = {
   currentView: 'grid',      // 'grid' | 'table' | 'map'
   currentSort: 'plate',     // 'plate' | 'status' | 'expiry' | 'rider'
   selectedBikes: new Set(),
+  currentSubTab: 'overview',
+  maintenanceRequests: [],
   _mapInstance: null,       // Map instance for Map tab
   _mapMarkers: {},          // Markers for Map tab
   _mapInterval: null,       // Periodic sync interval for Map tab
@@ -26,17 +28,37 @@ const Bikes = {
     // Reset tracking intervals
     this.cleanupMap();
 
+    // Default tab based on role
+    const isMechanic = window._irlUserRole === 'mechanic';
+    if (isMechanic) {
+      this.currentSubTab = 'maintenance';
+    }
+
     try {
       this.bikes = await API.getBikes();
+      
+      // Load maintenance requests
+      try {
+        this.maintenanceRequests = await API.getMaintenanceRequests();
+      } catch (err) {
+        console.warn('Failed to load maintenance requests:', err);
+        this.maintenanceRequests = [];
+      }
+
       container.innerHTML = this.buildPageSkeleton();
       
-      this.renderAlertBanner();
-      this.renderStatsRow();
-      this.renderToolbar();
-      this.renderContent();
-      this.renderBulkBar();
+      if (this.currentSubTab === 'overview') {
+        this.renderAlertBanner();
+        this.renderStatsRow();
+        this.renderToolbar();
+        this.renderContent();
+        this.renderBulkBar();
+      } else {
+        this.renderMaintenanceView();
+      }
       
       this.attachEvents();
+      this.updateMaintenanceBadge();
     } catch (err) {
       container.innerHTML = `<div class="empty-state"><p>Failed to load fleet data: ${err.message}</p></div>`;
     }
@@ -62,13 +84,330 @@ const Bikes = {
 
   // ── Page Base Skeleton ──
   buildPageSkeleton() {
+    const isMechanic = window._irlUserRole === 'mechanic';
     return `
+      ${isMechanic ? '' : `
+        <div class="fleet-tabs-nav" style="display:flex; gap:16px; border-bottom:1px solid var(--border-light); padding-bottom:0px; margin-bottom:20px;">
+          <button class="fleet-tab-btn ${this.currentSubTab === 'overview' ? 'active' : ''}" data-subtab="overview" style="background:none; border:none; padding:12px 16px; font-weight:600; font-size:14px; color:${this.currentSubTab === 'overview' ? 'var(--primary)' : 'var(--text-secondary)'}; border-bottom:${this.currentSubTab === 'overview' ? '3px solid var(--primary)' : 'none'}; cursor:pointer; transition: all 0.2s;">Fleet Overview</button>
+          <button class="fleet-tab-btn ${this.currentSubTab === 'maintenance' ? 'active' : ''}" data-subtab="maintenance" style="background:none; border:none; padding:12px 16px; font-weight:600; font-size:14px; color:${this.currentSubTab === 'maintenance' ? 'var(--primary)' : 'var(--text-secondary)'}; border-bottom:${this.currentSubTab === 'maintenance' ? '3px solid var(--primary)' : 'none'}; cursor:pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px;">
+            Maintenance Requests
+            <span id="maintenance-badge" class="badge" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px;">0</span>
+          </button>
+        </div>
+      `}
       <div id="fleet-alert-container"></div>
       <div id="fleet-stats-container"></div>
       <div id="fleet-toolbar-container" class="mt-24"></div>
       <div id="fleet-content-container" class="mt-24"></div>
       <div id="fleet-bulk-container"></div>
     `;
+  },
+
+  updateMaintenanceBadge() {
+    const badge = document.getElementById('maintenance-badge');
+    if (!badge) return;
+    const pendingCount = this.maintenanceRequests.filter(r => r.status === 'pending').length;
+    if (pendingCount > 0) {
+      badge.textContent = pendingCount;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  },
+
+  renderMaintenanceView() {
+    const alertCont = document.getElementById('fleet-alert-container');
+    const statsCont = document.getElementById('fleet-stats-container');
+    const bulkCont = document.getElementById('fleet-bulk-container');
+    if (alertCont) alertCont.innerHTML = '';
+    if (statsCont) statsCont.innerHTML = '';
+    if (bulkCont) bulkCont.innerHTML = '';
+
+    const toolbarCont = document.getElementById('fleet-toolbar-container');
+    if (toolbarCont) {
+      toolbarCont.innerHTML = `
+        <div class="fleet-toolbar" style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="fleet-toolbar-left" style="display:flex; align-items:center; gap:16px;">
+            <h2 class="section-title" style="margin:0;">Active Maintenance Requests</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-xs ${this.currentFilter === 'all' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('all')">All (${this.maintenanceRequests.length})</button>
+              <button class="btn btn-xs ${this.currentFilter === 'pending' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('pending')">Pending (${this.maintenanceRequests.filter(r => r.status === 'pending').length})</button>
+              <button class="btn btn-xs ${this.currentFilter === 'in-progress' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('in-progress')">In Progress (${this.maintenanceRequests.filter(r => r.status === 'in-progress').length})</button>
+              <button class="btn btn-xs ${this.currentFilter === 'waiting-for-parts' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('waiting-for-parts')">Waiting for Parts (${this.maintenanceRequests.filter(r => r.status === 'waiting-for-parts').length})</button>
+              <button class="btn btn-xs ${this.currentFilter === 'resolved' ? 'btn-primary' : 'btn-outline'}" onclick="Bikes.filterMaintenance('resolved')">Resolved (${this.maintenanceRequests.filter(r => r.status === 'resolved').length})</button>
+            </div>
+          </div>
+          <div class="fleet-toolbar-right">
+            <button class="btn btn-outline btn-sm" onclick="Bikes.render()" style="height:36px; display:flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    const contentCont = document.getElementById('fleet-content-container');
+    if (!contentCont) return;
+
+    let filtered = [...this.maintenanceRequests];
+    if (this.currentFilter !== 'all') {
+      filtered = filtered.filter(r => r.status === this.currentFilter);
+    }
+
+    if (filtered.length === 0) {
+      contentCont.innerHTML = `
+        <div class="empty-state" style="padding: 48px; text-align: center; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-light);">
+          <div style="font-size: 32px; margin-bottom: 12px;">🛠️</div>
+          <p style="color: var(--text-secondary); margin: 0; font-weight: 500;">No maintenance requests found.</p>
+        </div>
+      `;
+      return;
+    }
+
+    contentCont.innerHTML = `
+      <div class="maintenance-grid" style="display:flex; flex-direction:column; gap:16px;">
+        ${filtered.map(req => {
+          const statusColors = {
+            'pending': { bg: '#fee2e2', text: '#ef4444' },
+            'in-progress': { bg: '#fef3c7', text: '#d97706' },
+            'waiting-for-parts': { bg: 'rgba(239, 68, 68, 0.1)', text: '#dc2626' },
+            'resolved': { bg: '#dcfce7', text: '#22c55e' },
+            'cancelled': { bg: '#f3f4f6', text: '#6b7280' }
+          };
+          const st = statusColors[req.status] || { bg: '#eee', text: '#333' };
+          const partsPills = (req.selected_parts || []).map(p => `
+            <span style="background:var(--bg-light); border:1px solid var(--border-light); font-size:11px; font-weight:600; padding:2px 8px; border-radius:12px; color:var(--text-primary);">${Utils.escapeHtml(p)}</span>
+          `).join('');
+
+          const photosHTML = (req.photos || []).map((imgUrl, idx) => `
+            <div style="position:relative; width:80px; height:80px; border-radius:8px; border:1px solid var(--border-light); overflow:hidden; cursor:pointer;" onclick="Bikes.previewImage('${imgUrl}')">
+              <img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;" alt="Problem Area ${idx + 1}">
+            </div>
+          `).join('');
+
+          return `
+            <div class="card" style="padding:20px; border-radius:12px; border:1px solid var(--border-light); background:var(--card-bg); display:flex; flex-direction:column; gap:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:700; font-size:16px; color:var(--text-primary);">${Utils.escapeHtml(req.rider_name)}</span>
+                    <span style="background:rgba(37,99,235,0.1); color:#2563eb; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px;">Plate: ${Utils.escapeHtml(req.bike_plate)}</span>
+                  </div>
+                  <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+                    Submitted: ${new Date(req.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span style="background:${st.bg}; color:${st.text}; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; text-transform:uppercase;">${req.status.replace(/-/g, ' ')}</span>
+                  ${App.isViewer() ? '' : `
+                    <button class="btn btn-outline btn-sm" onclick="Bikes.openUpdateMaintenanceDialog(${req.id})" style="height:32px; padding:0 12px; font-size:12px; font-weight:600;">Update Status</button>
+                  `}
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; border-top:1px solid var(--border-light); padding-top:16px;">
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Problematic Parts</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                    ${partsPills || '<span style="color:var(--text-secondary); font-size:12px;">None selected</span>'}
+                  </div>
+
+                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Problem Description</div>
+                  <div style="font-size:13px; color:var(--text-primary); line-height:1.5; margin-top:6px; background:var(--bg-light); padding:10px 14px; border-radius:8px; white-space:pre-wrap;">${Utils.escapeHtml(req.description)}</div>
+                </div>
+
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Rider Availability (Shift End)</div>
+                  <div style="font-size:13px; font-weight:600; color:#2563eb; margin-top:6px; display:flex; align-items:center; gap:6px;">
+                    🕒 ${Utils.escapeHtml(req.shift_end_time)}
+                  </div>
+
+                  <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-top:16px;">Photos of Problematic Area</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+                    ${photosHTML || '<span style="color:var(--text-secondary); font-size:12px;">No photos uploaded</span>'}
+                  </div>
+                </div>
+              </div>
+
+              ${req.scheduled_time ? `
+                <div style="background:#fffbeb; border-left:4px solid #d97706; border-radius:4px; padding:12px 16px; margin-top:8px;">
+                  <div style="font-size:11px; font-weight:800; color:#b45309; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
+                    📅 Scheduled Repair Time
+                  </div>
+                  <p style="margin:4px 0 0; font-size:13px; color:#92400e; font-weight:700;">${Utils.escapeHtml(req.scheduled_time)}</p>
+                </div>
+              ` : ''}
+
+              ${req.status === 'waiting-for-parts' ? `
+                <div style="background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:16px; margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:6px; color:#dc2626; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
+                    ⚠️ IN QUEUE - WAITING FOR PARTS
+                  </div>
+                  <div style="font-size:13px; color:#991b1b; font-weight:700; background:rgba(220,38,38,0.05); padding:8px 12px; border-radius:6px;">
+                    Missing Part Details: ${Utils.escapeHtml(req.missing_part_desc || 'No details provided')}
+                  </div>
+                  ${req.missing_part_photo ? `
+                    <div style="margin-top:4px;">
+                      <div style="font-size:11px; font-weight:700; color:#dc2626; text-transform:uppercase; margin-bottom:6px;">Missing Part Photo</div>
+                      <div style="position:relative; width:120px; height:120px; border-radius:8px; border:1px solid #fca5a5; overflow:hidden; cursor:pointer;" onclick="Bikes.previewImage('${req.missing_part_photo}')">
+                        <img src="${req.missing_part_photo}" style="width:100%; height:100%; object-fit:cover;" alt="Missing Part Photo">
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+
+              ${req.mechanic_note ? `
+                <div style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px; padding:12px 16px; margin-top:8px;">
+                  <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Mechanic/Admin Note</div>
+                  <p style="margin:4px 0 0; font-size:13px; color:#1e3a8a; line-height:1.4;">${Utils.escapeHtml(req.mechanic_note)}</p>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  filterMaintenance(filter) {
+    this.currentFilter = filter;
+    this.renderMaintenanceView();
+  },
+
+  previewImage(url) {
+    const html = `
+      <div style="display:flex; justify-content:center; align-items:center; padding:10px;">
+        <img src="${url}" style="max-width:100%; max-height:80vh; border-radius:8px; object-fit:contain;" alt="Preview">
+      </div>
+    `;
+    Utils.openModal('Photo Preview', html);
+  },
+
+  openUpdateMaintenanceDialog(id) {
+    const req = this.maintenanceRequests.find(r => r.id === id);
+    if (!req) return;
+
+    const html = `
+      <form id="maintenance-update-form" style="display:flex; flex-direction:column; gap:16px; min-width:320px; max-width:450px;">
+        <div>
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Status</label>
+          <select id="muf-status" class="fleet-sort-select" style="width:100%; height:40px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);">
+            <option value="pending" ${req.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="in-progress" ${req.status === 'in-progress' ? 'selected' : ''}>Accept & Schedule</option>
+            <option value="waiting-for-parts" ${req.status === 'waiting-for-parts' ? 'selected' : ''}>Pause (Waiting for Parts)</option>
+            <option value="resolved" ${req.status === 'resolved' ? 'selected' : ''}>Resolved / Fixed</option>
+            <option value="cancelled" ${req.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+          </select>
+        </div>
+
+        <!-- Scheduled Time Fields (Show if Accepted/In-progress) -->
+        <div id="muf-scheduled-fields" style="display:none;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Scheduled Repair Time *</label>
+          <input type="text" id="muf-scheduled-time" style="width:100%; height:40px; padding:0 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);" placeholder="e.g. Today at 5:00 PM, or Tomorrow 10 AM" value="${Utils.escapeHtml(req.scheduled_time || '')}" />
+        </div>
+
+        <!-- Missing Parts Fields (Show if Waiting for parts) -->
+        <div id="muf-missing-part-fields" style="display:none; flex-direction:column; gap:12px;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">What part is missing/needed? *</label>
+            <textarea id="muf-missing-part-desc" rows="2" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); background:var(--card-bg);" placeholder="Describe the missing part (e.g. Front brake pads)...">${Utils.escapeHtml(req.missing_part_desc || '')}</textarea>
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Upload Photo of Missing Part / Problematic Area *</label>
+            <input type="file" id="muf-missing-part-file" accept="image/*" style="width:100%; padding:8px 0;" />
+            <div id="muf-file-preview" style="margin-top:8px; display:${req.missing_part_photo ? 'block' : 'none'};">
+              <img id="muf-preview-img" src="${req.missing_part_photo || ''}" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--border-light);" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Mechanic/Admin Note</label>
+          <textarea id="muf-note" rows="3" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; line-height:1.4; background:var(--card-bg);" placeholder="Describe what was fixed, parts replaced, or general feedback...">${Utils.escapeHtml(req.mechanic_note || '')}</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:8px;">
+          <button type="button" class="btn btn-outline" onclick="Utils.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    `;
+
+    Utils.openModal('Update Maintenance Status', html);
+
+    const statusSelect = document.getElementById('muf-status');
+    const scheduledFields = document.getElementById('muf-scheduled-fields');
+    const missingPartFields = document.getElementById('muf-missing-part-fields');
+    
+    function toggleFields() {
+      const val = statusSelect.value;
+      scheduledFields.style.display = (val === 'in-progress') ? 'block' : 'none';
+      missingPartFields.style.display = (val === 'waiting-for-parts') ? 'flex' : 'none';
+    }
+    
+    statusSelect.addEventListener('change', toggleFields);
+    toggleFields(); // Initial call
+
+    // File base64 parsing
+    let missingPartPhotoBase64 = req.missing_part_photo || '';
+    const fileInput = document.getElementById('muf-missing-part-file');
+    const previewDiv = document.getElementById('muf-file-preview');
+    const previewImg = document.getElementById('muf-preview-img');
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          missingPartPhotoBase64 = event.target.result;
+          previewImg.src = missingPartPhotoBase64;
+          previewDiv.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    const form = document.getElementById('maintenance-update-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const status = statusSelect.value;
+      const mechanic_note = document.getElementById('muf-note').value.trim();
+      const scheduled_time = document.getElementById('muf-scheduled-time').value.trim();
+      const missing_part_desc = document.getElementById('muf-missing-part-desc').value.trim();
+
+      // Validations
+      if (status === 'in-progress' && !scheduled_time) {
+        Utils.showToast('Please specify a scheduled repair time.', 'error');
+        return;
+      }
+      if (status === 'waiting-for-parts' && !missing_part_desc) {
+        Utils.showToast('Please specify the details of the missing part.', 'error');
+        return;
+      }
+
+      Utils.showLoading('Saving...');
+      try {
+        await API.updateMaintenanceRequest(id, { 
+          status, 
+          mechanic_note,
+          scheduled_time: status === 'in-progress' ? scheduled_time : null,
+          missing_part_desc: status === 'waiting-for-parts' ? missing_part_desc : null,
+          missing_part_photo: status === 'waiting-for-parts' ? missingPartPhotoBase64 : null
+        });
+        Utils.closeModal();
+        Utils.showToast('Request updated successfully!', 'success');
+        Bikes.render();
+      } catch (err) {
+        console.error(err);
+        Utils.showToast(`Failed to update: ${err.message}`, 'error');
+      } finally {
+        Utils.hideLoading();
+      }
+    });
   },
 
   // ── Process bike data with computed fields ──
@@ -1160,6 +1499,15 @@ const Bikes = {
   attachEvents() {
     const container = document.getElementById('page-fleet');
     if (!container) return;
+
+    // Sub-tab click handlers
+    container.querySelectorAll('.fleet-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.currentSubTab = btn.dataset.subtab;
+        this.currentFilter = 'all'; // Reset filter when switching tabs
+        this.render();
+      });
+    });
 
     // Fleet refresh button
     document.getElementById('fleet-refresh-btn')?.addEventListener('click', () => {

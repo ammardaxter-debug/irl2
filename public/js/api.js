@@ -109,6 +109,17 @@ const API = {
     });
   },
 
+  getMaintenanceRequests() {
+    return this.request('/admin/maintenance-requests');
+  },
+
+  updateMaintenanceRequest(id, data) {
+    return this.request(`/admin/maintenance-requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
   // ── Daily Logs ──
   getDailyLogs(date, page = 1, limit = 20, search = '') {
     return this.request(`/daily-logs?date=${date}&page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);

@@ -31,6 +31,59 @@ const App = {
     } catch (e) {
       window._irlUserRole = 'admin';
     }
+    this.applyRolePermissions();
+  },
+
+  applyRolePermissions() {
+    const role = window._irlUserRole || 'admin';
+    if (role === 'mechanic') {
+      // Hide other sidebar links
+      const allowedPages = ['fleet'];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const page = item.dataset.page;
+        if (!allowedPages.includes(page)) {
+          item.style.display = 'none';
+        } else {
+          item.style.display = 'flex';
+          // Customize label
+          const span = item.querySelector('span');
+          if (span) span.textContent = 'Maintenance Tasks';
+        }
+      });
+
+      // Update sidebar profile details
+      const nameEl = document.getElementById('sidebar-name');
+      const titleEl = document.getElementById('sidebar-title');
+      const avatarEl = document.getElementById('sidebar-avatar');
+      const loaderAvatarFallback = document.getElementById('loader-avatar-fallback');
+
+      if (nameEl) nameEl.textContent = window._irlUserName || 'Mechanic';
+      if (titleEl) titleEl.textContent = 'Fleet Mechanic · IRL';
+      if (avatarEl) {
+        const initials = (window._irlUserName || 'MC').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+      if (loaderAvatarFallback) {
+        const initials = (window._irlUserName || 'MC').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        loaderAvatarFallback.textContent = initials;
+      }
+
+      // If current page is not fleet, navigate to fleet
+      if (this.currentPage !== 'fleet') {
+        this.navigate('fleet');
+      }
+    } else {
+      // Admin/Viewer: show all sidebar links
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.style.display = 'flex';
+        // Reset custom label if needed
+        const page = item.dataset.page;
+        if (page === 'fleet') {
+          const span = item.querySelector('span');
+          if (span) span.textContent = 'Fleet Mgt';
+        }
+      });
+    }
   },
 
   isViewer() {
@@ -199,6 +252,9 @@ const App = {
   },
 
   navigate(page) {
+    if (window._irlUserRole === 'mechanic' && page !== 'fleet') {
+      page = 'fleet';
+    }
     this.currentPage = page;
 
     // Clear live tracking interval if navigating away
