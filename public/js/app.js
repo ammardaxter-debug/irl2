@@ -347,7 +347,8 @@ const App = {
       'backup': 'Backup & Data Management',
       'sprints': 'Weekly Sprints & Gamification'
     };
-    document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+    const isMechanic = window._irlUserRole === 'mechanic';
+    document.getElementById('page-title').textContent = isMechanic ? 'Mechanic Portal' : (titles[page] || 'Dashboard');
 
     // Close mobile sidebar
     document.getElementById('sidebar')?.classList.remove('open');
