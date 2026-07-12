@@ -1625,6 +1625,7 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
     
     const statsMap = {};
     const yesterdayStatsMap = {};
+    const dailyOrdersMap = {};
 
     (allLogs || []).forEach(log => {
       const rid = log.rider_id;
@@ -1632,6 +1633,9 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
       
       if (!statsMap[rid]) statsMap[rid] = 0;
       statsMap[rid] += orders;
+
+      if (!dailyOrdersMap[rid]) dailyOrdersMap[rid] = {};
+      dailyOrdersMap[rid][log.log_date] = (dailyOrdersMap[rid][log.log_date] || 0) + orders;
 
       if (log.log_date < todayStr) {
         if (!yesterdayStatsMap[rid]) yesterdayStatsMap[rid] = 0;
@@ -1656,7 +1660,8 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
       photo: r.profile_photo || r.photo_url || null,
       total_orders: statsMap[r.id] || 0,
       rider_type: r.rider_type,
-      yesterday_rank: yesterdayRanks[r.id]
+      yesterday_rank: yesterdayRanks[r.id],
+      daily_orders: dailyOrdersMap[r.id] || {}
     }));
 
     leaderboard.sort((a, b) => b.total_orders - a.total_orders);
