@@ -952,6 +952,43 @@ app.post('/api/rider/maintenance-requests', verifyRiderToken, async (req, res) =
       shift_end_time,
       photos
     });
+
+    // Send push notifications to mechanics in background
+    (async () => {
+      try {
+        const [rider, bike] = await Promise.all([
+          db.getRiderById(req.riderId),
+          db.getAllBikes().then(bikes => bikes.find(b => b.id === request.bike_id))
+        ]);
+        const mechanics = await db.getAuthUsersByRole('mechanic');
+        
+        const { Expo } = await import('expo-server-sdk');
+        const expo = new Expo();
+        const tickets = [];
+        
+        for (const mech of mechanics) {
+          if (mech.push_token && Expo.isExpoPushToken(mech.push_token)) {
+            tickets.push({
+              to: mech.push_token,
+              sound: 'default',
+              title: '🔧 New Maintenance Request',
+              body: `Rider ${rider ? rider.name : 'Unknown'} submitted a request for ${bike ? bike.plate_number : 'bike'}.`,
+              channelId: 'default',
+              priority: 'high',
+              data: { type: 'new_maintenance_request', id: request.id }
+            });
+          }
+        }
+        
+        if (tickets.length > 0) {
+          await expo.sendPushNotificationsAsync(tickets);
+          console.log(`[Push] Sent new maintenance request notification to ${tickets.length} mechanics.`);
+        }
+      } catch (err) {
+        console.error('Error sending maintenance request push notification:', err.message);
+      }
+    })();
+
     res.status(201).json(request);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1011,8 +1048,8 @@ app.put('/api/admin/maintenance-requests/:id', verifyAdminToken, async (req, res
     const requestId = parseInt(req.params.id);
     const { status, mechanic_note, scheduled_time, missing_part_desc, missing_part_photo, resolution_photo } = req.body;
     
-    // Validate status if provided
-    if (status !== undefined && !['pending', 'in-progress', 'resolved', 'cancelled', 'waiting-for-parts'].includes(status)) {
+    // Validate status if provided (added 'accepted')
+    if (status !== undefined && !['pending', 'accepted', 'in-progress', 'resolved', 'cancelled', 'waiting-for-parts'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status value.' });
     }
 
@@ -1024,6 +1061,51 @@ app.put('/api/admin/maintenance-requests/:id', verifyAdminToken, async (req, res
       missing_part_photo,
       resolution_photo
     });
+
+    // Send push notification to rider in background
+    (async () => {
+      try {
+        let title = '🔧 Maintenance Update';
+        let message = 'Your maintenance request has been updated.';
+        if (status) {
+          message = `Your request status has been updated to: ${status}.`;
+        } else if (mechanic_note) {
+          message = `Mechanic note added: "${mechanic_note.substring(0, 40)}${mechanic_note.length > 40 ? '...' : ''}"`;
+        } else if (scheduled_time) {
+          message = `Estimated completion time set to: ${scheduled_time}.`;
+        }
+
+        // Create in-app notification first
+        await db.createNotification({
+          rider_id: request.rider_id,
+          type: 'maintenance_update',
+          title: title,
+          message: message,
+          processed_by_name: req.adminName || 'Mechanic',
+          processed_by_photo: ''
+        });
+
+        // Send push notification if token exists
+        const rider = await db.getRiderById(request.rider_id);
+        if (rider && rider.push_token && Expo.isExpoPushToken(rider.push_token)) {
+          const { Expo } = await import('expo-server-sdk');
+          const expo = new Expo();
+          await expo.sendPushNotificationsAsync([{
+            to: rider.push_token,
+            sound: 'default',
+            title: title,
+            body: message,
+            channelId: 'default',
+            priority: 'high',
+            data: { type: 'maintenance_update', id: requestId, status: status || request.status }
+          }]);
+          console.log(`[Push] Sent maintenance update notification to rider ${rider.name}.`);
+        }
+      } catch (err) {
+        console.error('Error sending maintenance update push notification:', err.message);
+      }
+    })();
+
     res.json(request);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1614,7 +1696,7 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
     
     const { data: allLogs, error: logErr } = await db.getDb()
       .from('daily_logs')
-      .select('rider_id, primary_orders, associate_orders, log_date')
+      .select('rider_id, primary_orders, associate_orders, log_date, attendance_status')
       .gte('log_date', start)
       .lte('log_date', end);
 
@@ -1630,12 +1712,18 @@ app.get('/api/rider/leaderboard', verifyRiderToken, async (req, res) => {
     (allLogs || []).forEach(log => {
       const rid = log.rider_id;
       const orders = (log.primary_orders || 0) + (log.associate_orders || 0);
+      const status = log.attendance_status || 'Present';
       
       if (!statsMap[rid]) statsMap[rid] = 0;
       statsMap[rid] += orders;
 
       if (!dailyOrdersMap[rid]) dailyOrdersMap[rid] = {};
-      dailyOrdersMap[rid][log.log_date] = (dailyOrdersMap[rid][log.log_date] || 0) + orders;
+      
+      const existing = dailyOrdersMap[rid][log.log_date] || { orders: 0, status: 'Present' };
+      dailyOrdersMap[rid][log.log_date] = {
+        orders: existing.orders + orders,
+        status: status !== 'Present' ? status : existing.status
+      };
 
       if (log.log_date < todayStr) {
         if (!yesterdayStatsMap[rid]) yesterdayStatsMap[rid] = 0;
@@ -1851,6 +1939,35 @@ app.put('/api/admin/profile', verifyAdminToken, async (req, res) => {
     const emailKey = (req.adminEmail || '').replace(/\./g, '_dot_');
     if (!emailKey) return res.status(400).json({ error: 'Cannot identify admin' });
     await db.updateAdminProfile(emailKey, { name, title, photo_url, role: req.adminRole });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/profile', verifyAdminToken, async (req, res) => {
+  try {
+    const user = await db.getAuthUser(req.adminEmail);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      created_at: user.created_at,
+      push_token: user.push_token
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/mechanic/push-token', verifyAdminToken, async (req, res) => {
+  try {
+    const { push_token } = req.body;
+    if (!push_token) return res.status(400).json({ error: 'Push token is required' });
+    await db.saveMechanicPushToken(req.adminEmail, push_token);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2465,7 +2582,7 @@ app.post('/api/auth/login', async (req, res) => {
       maxAge: 8 * 60 * 60 * 1000
     });
 
-    res.json({ success: true, user: { name: user.name, email: user.email, role: user.role }, redirect: '/' });
+    res.json({ success: true, token, user: { name: user.name, email: user.email, role: user.role }, redirect: '/' });
   } catch (err) {
     console.error('Login error:', err.message);
     const msg = err.message.includes('auth_users') ? err.message : 'Server error';

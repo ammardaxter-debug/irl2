@@ -1,30 +1,423 @@
 // ========================================
-//  Database Operations - Supabase (PostgreSQL)
+//  Database Operations - Local PostgreSQL (Supabase API Compatible Adapter)
 // ========================================
 
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+const pg = require('pg');
+const { Pool } = pg;
 const bcrypt = require('bcryptjs');
 
+// Helper to format PostgreSQL timestamp output into standard ISO-8601 strings
+function formatPostgresTimestampToISO(str) {
+  if (!str) return str;
+  let iso = str.replace(' ', 'T');
+  // Handle short timezones like +00 or +03 (needs :00)
+  const tzMatch = iso.match(/([+-]\d{2})$/);
+  if (tzMatch) {
+    iso = iso + ':00';
+  }
+  if (iso.endsWith('+00:00')) {
+    iso = iso.substring(0, iso.length - 6) + 'Z';
+  }
+  return iso;
+}
+
+// Force Date/Timestamp/Time columns to return as standard ISO strings to match Supabase API response formats
+pg.types.setTypeParser(1114, str => formatPostgresTimestampToISO(str)); // timestamp without timezone
+pg.types.setTypeParser(1184, str => formatPostgresTimestampToISO(str)); // timestamp with timezone
+pg.types.setTypeParser(1082, str => str); // date
+
+let pool;
 let supabase;
 
-// Initialize Supabase
+// Initialize Database connection pool
 function initDb() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  pool = new Pool({
+    host: process.env.PGHOST || 'localhost',
+    port: process.env.PGPORT || 5432,
+    database: process.env.PGDATABASE || 'irlexpress_db',
+    user: process.env.PGUSER || 'irlexpress_user',
+    password: process.env.PGPASSWORD || 'pnvY0y8ers59L/DRSraTyg==',
+  });
   
-  if (!supabaseUrl || !supabaseKey) {
-      console.warn("⚠️ SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing from environment variables.");
-  }
+  // Set up the custom Supabase adapter mock
+  supabase = {
+    from(table) {
+      return new QueryBuilder(table);
+    },
+    storage: {
+      from(bucket) {
+        return {
+          async upload(filename, bufferData, options) {
+            try {
+              const fs = require('fs');
+              const path = require('path');
+              const uploadDir = path.join('/var/www/irlexpress/public/uploads', bucket);
+              fs.mkdirSync(uploadDir, { recursive: true });
+              const filepath = path.join(uploadDir, filename);
+              fs.writeFileSync(filepath, bufferData);
+              return { data: { path: filename }, error: null };
+            } catch (err) {
+              console.error('Local upload error:', err);
+              return { data: null, error: err };
+            }
+          },
+          getPublicUrl(filename) {
+            return {
+              data: {
+                publicUrl: `https://irlexpress.duckdns.org/uploads/${bucket}/${filename}`
+              }
+            };
+          },
+          async createBucket(bucketName, options) {
+            return { data: null, error: null };
+          }
+        };
+      }
+    }
+  };
   
-  supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('  🐘 Supabase connected');
+  console.log('  🐘 Local PostgreSQL connected & Supabase client adapter loaded');
   return Promise.resolve();
 }
 
 function getDb() {
   return supabase;
 }
+
+// PostgreSQL Query Builder mimicking Supabase Client API
+class QueryBuilder {
+  constructor(table) {
+    this.table = table;
+    this.operation = 'SELECT';
+    this.selectFields = '*';
+    this.whereClauses = [];
+    this.params = [];
+    this.orderByClause = '';
+    this.limitClause = '';
+    this.offsetClause = '';
+    this.insertRows = null;
+    this.updateValues = null;
+    this.isSingle = false;
+    this.onConflictClause = '';
+    this.countExact = false;
+  }
+
+  select(fields = '*', options = {}) {
+    this.selectFields = fields;
+    if (options.count === 'exact') {
+      this.countExact = true;
+    }
+    return this;
+  }
+
+  insert(rows) {
+    this.operation = 'INSERT';
+    this.insertRows = rows;
+    return this;
+  }
+
+  update(values) {
+    this.operation = 'UPDATE';
+    this.updateValues = values;
+    return this;
+  }
+
+  delete() {
+    this.operation = 'DELETE';
+    return this;
+  }
+
+  upsert(rows, options = {}) {
+    this.operation = 'UPSERT';
+    this.insertRows = Array.isArray(rows) ? rows : [rows];
+    if (options.onConflict) {
+      this.onConflictClause = options.onConflict;
+    } else {
+      if (this.table === 'app_config') this.onConflictClause = 'key';
+      else if (this.table === 'payment_status') this.onConflictClause = 'cycle_key, rider_id';
+      else if (this.table === 'la_commissions') this.onConflictClause = 'cycle_key, la_rider_id, da_rider_id';
+      else if (this.table === 'admin_profiles') this.onConflictClause = 'email_key';
+      else this.onConflictClause = 'id';
+    }
+    return this;
+  }
+
+  eq(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" = $${this.params.length}`);
+    return this;
+  }
+
+  neq(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" != $${this.params.length}`);
+    return this;
+  }
+
+  gte(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" >= $${this.params.length}`);
+    return this;
+  }
+
+  lte(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" <= $${this.params.length}`);
+    return this;
+  }
+
+  lt(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" < $${this.params.length}`);
+    return this;
+  }
+
+  gt(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" > $${this.params.length}`);
+    return this;
+  }
+
+  ilike(col, val) {
+    this.params.push(val);
+    this.whereClauses.push(`"${col}" ILIKE $${this.params.length}`);
+    return this;
+  }
+
+  in(col, arr) {
+    this.params.push(arr);
+    this.whereClauses.push(`"${col}" = ANY($${this.params.length})`);
+    return this;
+  }
+
+  order(col, options = {}) {
+    const dir = options.ascending === false ? 'DESC' : 'ASC';
+    const nulls = options.nullsFirst ? 'NULLS FIRST' : '';
+    this.orderByClause = `ORDER BY "${col}" ${dir} ${nulls}`;
+    return this;
+  }
+
+  limit(val) {
+    this.limitClause = `LIMIT ${parseInt(val)}`;
+    return this;
+  }
+
+  range(from, to) {
+    const limit = to - from + 1;
+    this.limitClause = `LIMIT ${limit}`;
+    this.offsetClause = `OFFSET ${from}`;
+    return this;
+  }
+
+  single() {
+    this.isSingle = true;
+    return this;
+  }
+
+  // Support thenable so we can "await" the builder directly
+  async then(resolve, reject) {
+    try {
+      const res = await this.execute();
+      resolve(res);
+    } catch (err) {
+      if (reject) reject(err);
+      else throw err;
+    }
+  }
+
+  async execute() {
+    let sql = '';
+    let countSql = '';
+    const executionParams = [...this.params];
+
+    if (this.operation === 'SELECT') {
+      const wherePart = this.whereClauses.length ? `WHERE ${this.whereClauses.join(' AND ')}` : '';
+      
+      let totalCount = null;
+      if (this.countExact) {
+        countSql = `SELECT count(*) FROM "${this.table}" ${wherePart}`;
+        try {
+          const countRes = await pool.query(countSql, executionParams);
+          totalCount = parseInt(countRes.rows[0].count, 10);
+        } catch (err) {
+          console.error('Count query error:', err.message, countSql);
+        }
+      }
+
+      sql = `SELECT ${this.selectFields === '*' ? '*' : this.selectFields} FROM "${this.table}" ${wherePart} ${this.orderByClause} ${this.limitClause} ${this.offsetClause}`;
+      
+      try {
+        const result = await pool.query(sql, executionParams);
+        let data = result.rows;
+        if (this.isSingle) {
+          data = data.length > 0 ? data[0] : null;
+        }
+        return { data, count: totalCount, error: null };
+      } catch (err) {
+        console.error('Select query error:', err.message, sql);
+        return { data: null, count: null, error: err };
+      }
+    }
+
+    if (this.operation === 'INSERT') {
+      const rows = Array.isArray(this.insertRows) ? this.insertRows : [this.insertRows];
+      if (rows.length === 0) {
+        return { data: this.isSingle ? null : [], error: null };
+      }
+
+      const columns = Object.keys(rows[0]);
+      const valuePlaceholders = [];
+      const insertParams = [];
+
+      rows.forEach((row, rowIndex) => {
+        const placeholders = [];
+        columns.forEach(col => {
+          let val = row[col];
+          if (val !== null && typeof val === 'object') {
+            val = JSON.stringify(val);
+          }
+          insertParams.push(val);
+          placeholders.push(`$${insertParams.length}`);
+        });
+        valuePlaceholders.push(`(${placeholders.join(', ')})`);
+      });
+
+      sql = `INSERT INTO "${this.table}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES ${valuePlaceholders.join(', ')} RETURNING *`;
+
+      try {
+        const result = await pool.query(sql, insertParams);
+        let data = result.rows;
+        if (this.isSingle) {
+          data = data.length > 0 ? data[0] : null;
+        }
+        return { data, error: null };
+      } catch (err) {
+        console.error('Insert query error:', err.message, sql);
+        return { data: null, error: err };
+      }
+    }
+
+    if (this.operation === 'UPDATE') {
+      const updates = this.updateValues;
+      const keys = Object.keys(updates);
+      if (keys.length === 0) {
+        return { data: this.isSingle ? null : [], error: null };
+      }
+
+      const setClauses = [];
+      const updateParams = [];
+
+      keys.forEach(key => {
+        let val = updates[key];
+        if (val !== null && typeof val === 'object') {
+          val = JSON.stringify(val);
+        }
+        updateParams.push(val);
+        setClauses.push(`"${key}" = $${updateParams.length}`);
+      });
+
+      const whereClausesMapped = [];
+      this.whereClauses.forEach((clause) => {
+        const matches = clause.match(/\$\d+/g);
+        if (matches) {
+          let newClause = clause;
+          matches.forEach(m => {
+            const oldNum = parseInt(m.substring(1));
+            const val = this.params[oldNum - 1];
+            updateParams.push(val);
+            newClause = newClause.replace(m, `$${updateParams.length}`);
+          });
+          whereClausesMapped.push(newClause);
+        } else {
+          whereClausesMapped.push(clause);
+        }
+      });
+
+      const wherePart = whereClausesMapped.length ? `WHERE ${whereClausesMapped.join(' AND ')}` : '';
+      sql = `UPDATE "${this.table}" SET ${setClauses.join(', ')} ${wherePart} RETURNING *`;
+
+      try {
+        const result = await pool.query(sql, updateParams);
+        let data = result.rows;
+        if (this.isSingle) {
+          data = data.length > 0 ? data[0] : null;
+        }
+        return { data, error: null };
+      } catch (err) {
+        console.error('Update query error:', err.message, sql);
+        return { data: null, error: err };
+      }
+    }
+
+    if (this.operation === 'DELETE') {
+      const wherePart = this.whereClauses.length ? `WHERE ${this.whereClauses.join(' AND ')}` : '';
+      sql = `DELETE FROM "${this.table}" ${wherePart} RETURNING *`;
+
+      try {
+        const result = await pool.query(sql, executionParams);
+        let data = result.rows;
+        if (this.isSingle) {
+          data = data.length > 0 ? data[0] : null;
+        }
+        return { data, error: null };
+      } catch (err) {
+        console.error('Delete query error:', err.message, sql);
+        return { data: null, error: err };
+      }
+    }
+
+    if (this.operation === 'UPSERT') {
+      const rows = this.insertRows;
+      if (rows.length === 0) {
+        return { data: this.isSingle ? null : [], error: null };
+      }
+
+      const columns = Object.keys(rows[0]);
+      const valuePlaceholders = [];
+      const upsertParams = [];
+
+      rows.forEach((row, rowIndex) => {
+        const placeholders = [];
+        columns.forEach(col => {
+          let val = row[col];
+          if (val !== null && typeof val === 'object') {
+            val = JSON.stringify(val);
+          }
+          upsertParams.push(val);
+          placeholders.push(`$${upsertParams.length}`);
+        });
+        valuePlaceholders.push(`(${placeholders.join(', ')})`);
+      });
+
+      const conflictCols = this.onConflictClause.split(',').map(c => `"${c.trim()}"`).join(', ');
+      
+      const updatePart = columns
+        .filter(c => !this.onConflictClause.includes(c))
+        .map(c => `"${c}" = EXCLUDED."${c}"`)
+        .join(', ');
+
+      const conflictAction = updatePart.length > 0 
+        ? `DO UPDATE SET ${updatePart}`
+        : 'DO NOTHING';
+
+      sql = `INSERT INTO "${this.table}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES ${valuePlaceholders.join(', ')} ON CONFLICT (${conflictCols}) ${conflictAction} RETURNING *`;
+
+      try {
+        const result = await pool.query(sql, upsertParams);
+        let data = result.rows;
+        if (this.isSingle) {
+          data = data.length > 0 ? data[0] : null;
+        }
+        return { data, error: null };
+      } catch (err) {
+        console.error('Upsert query error:', err.message, sql);
+        return { data: null, error: err };
+      }
+    }
+  }
+}
+
 
 function nowISO() {
   return new Date().toISOString();
@@ -1731,7 +2124,9 @@ module.exports = {
   // LA Commission Partner System
   getLACommissions, getLASummary,
   // Bike Maintenance Requests
-  createMaintenanceRequest, getMyMaintenanceRequests, getAllMaintenanceRequests, updateMaintenanceRequest
+  createMaintenanceRequest, getMyMaintenanceRequests, getAllMaintenanceRequests, updateMaintenanceRequest,
+  // Mechanic Support
+  saveMechanicPushToken, getAuthUsersByRole
 };
 
 // ========== CYCLE TRANSFERS ==========
@@ -1989,5 +2384,16 @@ async function updateMaintenanceRequest(requestId, updates) {
 
   if (error) throw error;
   return data;
+}
+
+async function saveMechanicPushToken(email, pushToken) {
+  const { error } = await supabase.from('auth_users').update({ push_token: pushToken }).eq('email', email.toLowerCase());
+  if (error) throw error;
+}
+
+async function getAuthUsersByRole(role) {
+  const { data, error } = await supabase.from('auth_users').select('*').eq('role', role);
+  if (error) throw error;
+  return data || [];
 }
 
